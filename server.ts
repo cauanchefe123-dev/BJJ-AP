@@ -124,6 +124,127 @@ async function startServer() {
   });
 
   // ==========================================
+  // SPOTIFY OAUTH & API PROXY ENDPOINTS
+  // ==========================================
+  app.get('/api/spotify/callback', (req, res) => {
+    const code = (req.query.code as string) || '';
+    const error = (req.query.error as string) || '';
+    const state = (req.query.state as string) || '';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <title>BJJCRON — Conexão Spotify</title>
+          <style>
+            body {
+              background: #080c14;
+              color: #f8fafc;
+              font-family: system-ui, -apple-system, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              padding: 20px;
+              box-sizing: border-box;
+              text-align: center;
+            }
+            .card {
+              background: #0d121f;
+              border: 1px solid #1e293b;
+              border-radius: 16px;
+              padding: 32px;
+              max-width: 420px;
+              width: 100%;
+              box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            }
+            h3 { color: #1db954; margin: 0 0 12px; font-size: 20px; }
+            p { color: #94a3b8; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+            .spinner {
+              width: 32px;
+              height: 32px;
+              border: 3px solid #1e293b;
+              border-top-color: #1db954;
+              border-radius: 50%;
+              animation: spin 0.8s linear infinite;
+              margin: 0 auto;
+            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h3>🥋 BJJCRON & Spotify</h3>
+            <p id="status-text">Conectando sua conta ao tatame...</p>
+            <div class="spinner" id="spinner"></div>
+          </div>
+          <script>
+            const code = ${JSON.stringify(code)};
+            const error = ${JSON.stringify(error)};
+            const statusEl = document.getElementById('status-text');
+
+            if (error) {
+              statusEl.innerText = 'Erro na autenticação: ' + error;
+              if (window.opener) {
+                window.opener.postMessage({ type: 'SPOTIFY_AUTH_ERROR', error }, '*');
+                setTimeout(() => window.close(), 2500);
+              }
+            } else if (code) {
+              statusEl.innerText = 'Autenticado com sucesso! Fechando...';
+              if (window.opener) {
+                window.opener.postMessage({ type: 'SPOTIFY_AUTH_CODE', code }, '*');
+                setTimeout(() => window.close(), 800);
+              } else {
+                window.location.href = '/?spotify_code=' + encodeURIComponent(code);
+              }
+            } else {
+              statusEl.innerText = 'Nenhum código de autorização recebido.';
+            }
+          </script>
+        </body>
+      </html>
+    `);
+  });
+
+  app.post('/api/spotify/exchange', async (req, res) => {
+    try {
+      const { code, client_id, redirect_uri, code_verifier } = req.body;
+      if (!code || !client_id) {
+        return res.status(400).json({ error: 'Code and client_id are required' });
+      }
+
+      const params = new URLSearchParams({
+        client_id,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirect_uri || '',
+        code_verifier: code_verifier || ''
+      });
+
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+
+      return res.json(data);
+    } catch (err: any) {
+      console.error('Spotify token exchange proxy error:', err?.message);
+      return res.status(500).json({ error: 'Failed to exchange Spotify token' });
+    }
+  });
+
+  // ==========================================
   // SMTP CONFIG & RECOVERY EMAIL ENDPOINTS
   // ==========================================
   app.get('/api/config/smtp', (req, res) => {
