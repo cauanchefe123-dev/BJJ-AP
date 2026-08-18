@@ -5,6 +5,21 @@ import './index.css';
 
 // Proteção para evitar travamentos do React ('insertBefore' ou 'removeChild' em Node)
 // causados por tradução automática do navegador ou extensões que modificam a árvore DOM.
+if (typeof window !== 'undefined') {
+  // Detector de retorno do popup do Spotify (para Vercel e produção)
+  const urlParams = new URLSearchParams(window.location.search);
+  const spotifyCode = urlParams.get('code');
+  const spotifyError = urlParams.get('error');
+  if ((spotifyCode || spotifyError) && window.opener && window.location.pathname.includes('/api/spotify/callback')) {
+    if (spotifyCode) {
+      window.opener.postMessage({ type: 'SPOTIFY_AUTH_CODE', code: spotifyCode }, '*');
+    } else if (spotifyError) {
+      window.opener.postMessage({ type: 'SPOTIFY_AUTH_ERROR', error: spotifyError }, '*');
+    }
+    window.close();
+  }
+}
+
 if (typeof window !== 'undefined' && typeof Node !== 'undefined' && Node.prototype) {
   const originalInsertBefore = Node.prototype.insertBefore;
   Node.prototype.insertBefore = function <T extends Node>(newNode: T, referenceNode: Node | null): T {

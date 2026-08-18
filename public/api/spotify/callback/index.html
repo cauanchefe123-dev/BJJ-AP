@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify - Conectando BJJCRON...</title>
+  <style>
+    body {
+      background: #020617;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(16, 185, 129, 0.2);
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    h2 { font-size: 1.1rem; margin: 0 0 8px; color: #10b981; font-weight: 800; }
+    p { font-size: 0.85rem; color: #94a3b8; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h2>BJJCRON Tatame</h2>
+  <p id="msg">Autenticando com Spotify...</p>
+
+  <script>
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
+
+      if (code) {
+        document.getElementById('msg').innerText = 'Conexão autorizada! Fechando janela...';
+        if (window.opener) {
+          window.opener.postMessage({ type: 'SPOTIFY_AUTH_CODE', code: code }, '*');
+          setTimeout(() => window.close(), 600);
+        } else {
+          // Fallback se não for popup
+          window.location.href = '/?spotify_code=' + encodeURIComponent(code);
+        }
+      } else if (error) {
+        document.getElementById('msg').innerText = 'Erro: ' + error;
+        if (window.opener) {
+          window.opener.postMessage({ type: 'SPOTIFY_AUTH_ERROR', error: error }, '*');
+          setTimeout(() => window.close(), 1500);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
