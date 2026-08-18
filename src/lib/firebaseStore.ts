@@ -10,30 +10,53 @@ import {
 import { db } from './firebase';
 import { isTestMockRecord, isDeletedRecord } from './deletionTracker';
 
+let quotaExhaustedUntil: number = 0;
+
+function checkQuotaExhausted(): boolean {
+  if (Date.now() < quotaExhaustedUntil) {
+    return true;
+  }
+  return false;
+}
+
+function handleFirestoreError(err: any, context: string) {
+  const errMsg = String(err?.message || err || '');
+  if (errMsg.includes('resource-exhausted') || errMsg.includes('Quota limit exceeded') || errMsg.includes('quota')) {
+    // Suppress repeated console noise and pause outgoing Firestore network writes for 5 minutes
+    quotaExhaustedUntil = Date.now() + 5 * 60 * 1000;
+    console.warn(`[Firestore Quota] Limite diário do plano gratuito atingido. Operando em modo seguro Offline-First (LocalStorage ativo).`);
+    return;
+  }
+  console.warn(`[Firestore] Erro em ${context}:`, err);
+}
+
 export async function saveToFirestore<T extends { id: string }>(collectionName: string, item: T) {
+  if (checkQuotaExhausted()) return;
   try {
     const ref = doc(db, collectionName, item.id);
     await setDoc(ref, item, { merge: true });
   } catch (err) {
-    console.warn(`[Firestore] Erro ao salvar em ${collectionName}:`, err);
+    handleFirestoreError(err, `salvar em ${collectionName}`);
   }
 }
 
 export async function removeFromFirestore(collectionName: string, id: string) {
+  if (checkQuotaExhausted()) return;
   try {
     const ref = doc(db, collectionName, id);
     await deleteDoc(ref);
   } catch (err) {
-    console.warn(`[Firestore] Erro ao remover de ${collectionName}:`, err);
+    handleFirestoreError(err, `remover de ${collectionName}`);
   }
 }
 
 export async function saveConfigToFirestore(configData: any) {
+  if (checkQuotaExhausted()) return;
   try {
     const ref = doc(db, 'config', 'academyConfig');
     await setDoc(ref, configData, { merge: true });
   } catch (err) {
-    console.warn('[Firestore] Erro ao salvar configurações da academia:', err);
+    handleFirestoreError(err, 'salvar configurações da academia');
   }
 }
 
@@ -47,10 +70,10 @@ export function subscribeFirestoreCollection<T>(
       const items: T[] = snapshot.docs.map(doc => doc.data() as T);
       callback(items);
     }, (error) => {
-      console.warn(`[Firestore] Erro de escuta na coleção ${collectionName}:`, error);
+      handleFirestoreError(error, `escuta na coleção ${collectionName}`);
     });
   } catch (err) {
-    console.warn(`[Firestore] Falha ao iniciar escuta de ${collectionName}:`, err);
+    handleFirestoreError(err, `iniciar escuta de ${collectionName}`);
     return () => {};
   }
 }
@@ -63,10 +86,10 @@ export function subscribeFirestoreConfig(callback: (config: any) => void) {
         callback(docSnap.data());
       }
     }, (error) => {
-      console.warn('[Firestore] Erro de escuta nas configurações:', error);
+      handleFirestoreError(error, 'escuta nas configurações');
     });
   } catch (err) {
-    console.warn('[Firestore] Falha ao iniciar escuta nas configurações:', err);
+    handleFirestoreError(err, 'iniciar escuta nas configurações');
     return () => {};
   }
 }

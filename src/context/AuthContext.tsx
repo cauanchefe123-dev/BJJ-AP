@@ -229,9 +229,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchUsersFromApi();
-    const timer = setInterval(fetchUsersFromApi, 3000);
 
     const unsubFirestoreUsers = subscribeFirestoreCollection<User>('users', (cloudUsers) => {
+      if (!cloudUsers || cloudUsers.length === 0) return;
       setUsers(prev => {
         const savedStudents = localStorage.getItem('bjjcron_students');
         const savedCurr = localStorage.getItem('bjjcron_current_user');
@@ -241,9 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedStudents) { try { studentsList = JSON.parse(savedStudents); } catch(e){} }
 
         const cList = cloudUsers || [];
-        const merged: User[] = [];
+        const merged: User[] = [...prev];
 
-        // 1. Merge cloud users with local state
         cList.forEach((u: User) => {
           if (
             isTestMockRecord(u.id) ||
@@ -251,7 +250,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isTestMockRecord(u.name) ||
             isDeletedRecord(u.id, u.email, u.studentId)
           ) {
-            if (u.id) removeFromFirestore('users', u.id);
             return;
           }
 
@@ -263,11 +261,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             currUser.id === u.id || 
             (currUser.email && u.email && currUser.email.trim().toLowerCase() === u.email.trim().toLowerCase())
           );
-          const localPrev = prev.find(p => p.id === u.id || (p.email && u.email && p.email.trim().toLowerCase() === u.email.trim().toLowerCase()));
+          const localPrevIdx = merged.findIndex(p => p.id === u.id || (p.email && u.email && p.email.trim().toLowerCase() === u.email.trim().toLowerCase()));
+          const localPrev = localPrevIdx !== -1 ? merged[localPrevIdx] : undefined;
           const isApproved = u.approvalStatus === 'APPROVED' || (stMatch && stMatch.approvalStatus === 'APPROVED') || (localPrev && localPrev.approvalStatus === 'APPROVED') || (!u.approvalStatus && u.approvalStatus !== 'PENDING' && u.approvalStatus !== 'REJECTED');
           const bestApproval = isApproved ? 'APPROVED' : (u.approvalStatus || (stMatch && stMatch.approvalStatus) || (localPrev && localPrev.approvalStatus) || 'APPROVED');
 
-          merged.push({
+          const userObj: User = {
             ...u,
             approvalStatus: bestApproval,
             isActivated: bestApproval === 'APPROVED' ? true : u.isActivated,
@@ -275,23 +274,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: (isCurr && currUser.email) ? currUser.email : (stMatch && stMatch.email) ? stMatch.email : (localPrev && localPrev.email) ? localPrev.email : u.email,
             phone: (isCurr && currUser.phone) ? currUser.phone : (stMatch && stMatch.phone) ? stMatch.phone : (localPrev && localPrev.phone) ? localPrev.phone : u.phone,
             avatarUrl: (isCurr && currUser.avatarUrl) ? currUser.avatarUrl : (stMatch && stMatch.photoUrl) ? stMatch.photoUrl : (localPrev && localPrev.avatarUrl) ? localPrev.avatarUrl : u.avatarUrl
-          });
-        });
+          };
 
-        // 2. Preserve local users missing from cloud
-        prev.forEach(localU => {
-          if (
-            isTestMockRecord(localU.id) ||
-            isTestMockRecord(localU.email) ||
-            isTestMockRecord(localU.name) ||
-            isDeletedRecord(localU.id, localU.email, localU.studentId)
-          ) {
-            return;
-          }
-          const exists = merged.some(m => m.id === localU.id || (m.email && localU.email && m.email.trim().toLowerCase() === localU.email.trim().toLowerCase()));
-          if (!exists) {
-            merged.push(localU);
-            saveToFirestore('users', localU);
+          if (localPrevIdx !== -1) {
+            merged[localPrevIdx] = userObj;
+          } else {
+            merged.push(userObj);
           }
         });
 
@@ -316,7 +304,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.addEventListener('bjjcron_students_updated', syncFromStorage);
     window.addEventListener('bjjcron_env_changed', syncFromStorage);
     return () => {
-      clearInterval(timer);
       unsubFirestoreUsers();
       window.removeEventListener('storage', syncFromStorage);
       window.removeEventListener('bjjcron_users_updated', syncFromStorage);

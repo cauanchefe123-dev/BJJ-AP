@@ -437,9 +437,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 createdAt: new Date().toISOString(),
                 learnedByStudentIds: [],
               };
-              const updated = [newPos, ...prev];
-              saveToFirestore('weeklyPositions', newPos);
-              return updated;
+              return [newPos, ...prev];
             }
             return prev;
           });
@@ -540,10 +538,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real-time Firestore Cloud Synchronization
   useEffect(() => {
-    // Purge any lingering test or mock records from Firestore automatically
-    purgeTestMockDataFromFirestore();
-
     const unsubStudents = subscribeFirestoreCollection<Student>('students', (data) => {
+      if (!data || data.length === 0) return;
       setStudents(prev => {
         const prefix = environmentMode === 'HOMOLOG' ? 'bjjcron_homolog_' : 'bjjcron_';
         const saved = localStorage.getItem(`${prefix}students`) || localStorage.getItem('bjjcron_students');
@@ -551,21 +547,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (saved) { try { localList = JSON.parse(saved); } catch (e) {} }
 
         const cloudItems = data || [];
-        const merged: Student[] = [];
+        const merged: Student[] = [...localList];
 
-        const findInMerged = (id?: string, email?: string, name?: string, regNum?: string) => {
-          const cleanE = email ? email.trim().toLowerCase() : '';
-          const cleanN = name ? name.trim().toLowerCase() : '';
-          const cleanR = regNum ? regNum.trim().toLowerCase() : '';
-          return merged.find(m => 
-            (id && m.id === id) ||
-            (cleanE && m.email && m.email.trim().toLowerCase() === cleanE) ||
-            (cleanR && m.registrationNumber && m.registrationNumber.trim().toLowerCase() === cleanR) ||
-            (cleanN && m.name && m.name.trim().toLowerCase() === cleanN)
-          );
-        };
-
-        // 1. Process cloud students
         cloudItems.forEach(cloudSt => {
           if (
             isTestMockRecord(cloudSt.id) || 
@@ -574,132 +557,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isTestMockRecord(cloudSt.registrationNumber) ||
             isDeletedRecord(cloudSt.id, cloudSt.email, cloudSt.registrationNumber)
           ) {
-            removeFromFirestore('students', cloudSt.id);
             return;
           }
 
           const cleanCloudEmail = cloudSt.email ? cloudSt.email.trim().toLowerCase() : '';
           const cleanCloudName = cloudSt.name ? cloudSt.name.trim().toLowerCase() : '';
 
-          const localSt = localList.find(s => 
-            s.id === cloudSt.id || 
-            (cleanCloudEmail && s.email && s.email.trim().toLowerCase() === cleanCloudEmail) ||
-            (cleanCloudName && s.name && s.name.trim().toLowerCase() === cleanCloudName)
-          );
-
-          const existingMergedIdx = merged.findIndex(m => 
+          const existingIdx = merged.findIndex(m => 
             m.id === cloudSt.id || 
             (cleanCloudEmail && m.email && m.email.trim().toLowerCase() === cleanCloudEmail) ||
             (cleanCloudName && m.name && m.name.trim().toLowerCase() === cleanCloudName)
           );
 
-          const isApproved = cloudSt.approvalStatus === 'APPROVED' || (localSt && localSt.approvalStatus === 'APPROVED') || (!cloudSt.approvalStatus && (!localSt || !localSt.approvalStatus));
-          const bestApproval = isApproved ? 'APPROVED' : (cloudSt.approvalStatus || (localSt && localSt.approvalStatus) || 'APPROVED');
-
-          // Rank & name resolution: local state holds latest user modifications and must never be clobbered
-          const bestBelt = localSt?.belt || cloudSt.belt || 'BRANCA';
-          const bestStripes = localSt?.stripes !== undefined ? localSt.stripes : (cloudSt.stripes !== undefined ? cloudSt.stripes : 0);
-          const bestName = (localSt?.name && localSt.name.trim()) ? localSt.name.trim() : (cloudSt.name || 'Aluno');
-          const bestPhone = localSt?.phone || cloudSt.phone || '';
-          const bestEmail = localSt?.email || cloudSt.email || '';
-          const bestPhoto = (localSt?.photoUrl && !localSt.photoUrl.includes('unsplash.com')) ? localSt.photoUrl : (cloudSt.photoUrl || DEFAULT_BLACK_GI_AVATAR);
-          const bestGradDate = localSt?.lastGraduationDate || cloudSt.lastGraduationDate;
-
-          const mergedItem: Student = {
-            ...cloudSt,
-            ...(localSt || {}),
-            id: localSt?.id || cloudSt.id,
-            approvalStatus: bestApproval,
-            active: bestApproval === 'APPROVED' ? true : (localSt?.active ?? cloudSt.active ?? true),
-            name: bestName,
-            email: bestEmail,
-            phone: bestPhone,
-            photoUrl: bestPhoto,
-            belt: bestBelt,
-            stripes: bestStripes,
-            lastGraduationDate: bestGradDate,
-            startDate: localSt?.startDate || cloudSt.startDate || new Date().toISOString().split('T')[0],
-            totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
-            classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
-          };
-
-          if (existingMergedIdx !== -1) {
-            merged[existingMergedIdx] = mergedItem;
+          if (existingIdx !== -1) {
+            const localSt = merged[existingIdx];
+            merged[existingIdx] = {
+              ...cloudSt,
+              ...localSt,
+              photoUrl: (localSt?.photoUrl && !localSt.photoUrl.includes('unsplash.com')) ? localSt.photoUrl : (cloudSt.photoUrl || DEFAULT_BLACK_GI_AVATAR),
+              totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
+              classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
+            };
           } else {
-            merged.push(mergedItem);
+            merged.push(cloudSt);
           }
         });
-
-        // 2. Preserve local students missing from cloud and push them to cloud
-        localList.forEach(localSt => {
-          if (
-            isTestMockRecord(localSt.id) || 
-            isTestMockRecord(localSt.email) ||
-            isTestMockRecord(localSt.name) ||
-            isTestMockRecord(localSt.registrationNumber) ||
-            isDeletedRecord(localSt.id, localSt.email, localSt.registrationNumber)
-          ) {
-            return;
-          }
-          const exists = findInMerged(localSt.id, localSt.email, localSt.name, localSt.registrationNumber);
-          if (!exists) {
-            merged.push(localSt);
-            saveToFirestore('students', localSt);
-          }
-        });
-
-        // 3. Auto-sync ALUNO users from bjjcron_users
-        try {
-          const savedUsersStr = localStorage.getItem('bjjcron_users');
-          if (savedUsersStr) {
-            const allUsers: any[] = JSON.parse(savedUsersStr);
-            allUsers.forEach(u => {
-              if (
-                u.role === 'ALUNO' && 
-                u.approvalStatus === 'APPROVED' &&
-                !isTestMockRecord(u.id) && 
-                !isTestMockRecord(u.email) &&
-                !isTestMockRecord(u.name) &&
-                !isDeletedRecord(u.id, u.email, u.studentId)
-              ) {
-                const exists = findInMerged(u.studentId, u.email, u.name);
-                if (!exists) {
-                  const prevMatch = localList.find(s => s.id === u.studentId || (s.email && u.email && s.email.trim().toLowerCase() === u.email.trim().toLowerCase()));
-                  const isApproved = u.approvalStatus === 'APPROVED' || prevMatch?.approvalStatus === 'APPROVED';
-                  const statusVal = isApproved ? 'APPROVED' : (u.approvalStatus || prevMatch?.approvalStatus || 'PENDING');
-
-                  const autoStudent: Student = {
-                    id: u.studentId || `std-${u.id}`,
-                    registrationNumber: `BJJ-2026-${String(merged.length + 1).padStart(3, '0')}`,
-                    name: u.name,
-                    email: u.email,
-                    phone: u.phone || '',
-                    birthDate: '2000-01-01',
-                    photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
-                    belt: prevMatch?.belt || 'BRANCA',
-                    stripes: prevMatch?.stripes || 0,
-                    startDate: new Date().toISOString().split('T')[0],
-                    totalClassesAttended: prevMatch?.totalClassesAttended || 0,
-                    classesSinceLastGraduation: prevMatch?.classesSinceLastGraduation || 0,
-                    weightCategory: 'MÉDIO',
-                    ageCategory: 'ADULTO',
-                    active: statusVal === 'APPROVED',
-                    planName: 'Plano Mensal Padrão',
-                    planPrice: 240,
-                    paymentDueDateDay: 10,
-                    paymentStatus: 'PENDENTE',
-                    qrCodeToken: `BJJCRON-${u.studentId || u.id}`,
-                    approvalStatus: statusVal,
-                    notes: 'Atleta integrado via usuário',
-                    hasActivatedAccount: true,
-                  };
-                  merged.push(autoStudent);
-                  saveToFirestore('students', autoStudent);
-                }
-              }
-            });
-          }
-        } catch (e) {}
 
         safeSave('bjjcron_students', merged);
         return merged;
