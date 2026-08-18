@@ -566,7 +566,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const existingIdx = merged.findIndex(m => 
             m.id === cloudSt.id || 
             (cleanCloudEmail && m.email && m.email.trim().toLowerCase() === cleanCloudEmail) ||
-            (m.registrationNumber && cloudSt.registrationNumber && m.registrationNumber === cloudSt.registrationNumber)
+            (cleanCloudName && m.name && m.name.trim().toLowerCase() === cleanCloudName)
           );
 
           if (existingIdx !== -1) {
@@ -574,9 +574,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             merged[existingIdx] = {
               ...cloudSt,
               ...localSt,
-              name: localSt?.name || cloudSt.name,
-              belt: localSt?.belt || cloudSt.belt,
-              stripes: typeof localSt?.stripes === 'number' ? localSt.stripes : (cloudSt.stripes ?? 0),
               photoUrl: (localSt?.photoUrl && !localSt.photoUrl.includes('unsplash.com')) ? localSt.photoUrl : (cloudSt.photoUrl || DEFAULT_BLACK_GI_AVATAR),
               totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
               classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
@@ -587,7 +584,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         safeSave('bjjcron_students', merged);
-        localStorage.setItem('bjjcron_students', JSON.stringify(merged));
         return merged;
       });
       window.dispatchEvent(new Event('bjjcron_students_updated'));
@@ -630,6 +626,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsubGraduations = subscribeFirestoreCollection<Graduation>('graduations', (data) => {
       setGraduations(data);
+      if (data && data.length > 0) {
+        setStudents(prev => {
+          let updated = false;
+          const newList = prev.map(s => {
+            const cleanSEmail = s.email ? s.email.trim().toLowerCase() : '';
+            const studentGrads = data.filter(g => 
+              g.studentId === s.id || 
+              (cleanSEmail && g.studentId && g.studentId.trim().toLowerCase() === cleanSEmail)
+            );
+            if (studentGrads.length > 0) {
+              studentGrads.sort((a,b) => new Date(b.promotedAt).getTime() - new Date(a.promotedAt).getTime());
+              const latestGrad = studentGrads[0];
+              const gradWeight = getBeltWeight(latestGrad.belt, latestGrad.stripes);
+              const currentWeight = getBeltWeight(s.belt, s.stripes);
+
+              if (latestGrad.belt && gradWeight > currentWeight) {
+                updated = true;
+                return { ...s, belt: latestGrad.belt, stripes: latestGrad.stripes ?? s.stripes };
+              }
+            }
+            return s;
+          });
+          if (updated) {
+            safeSave('bjjcron_students', newList);
+            return newList;
+          }
+          return prev;
+        });
+      }
     });
 
     const unsubBeltRequests = subscribeFirestoreCollection<BeltChangeRequest>('beltRequests', (data) => {
@@ -816,7 +841,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return s;
       });
       safeSave('bjjcron_students', updated);
-      localStorage.setItem('bjjcron_students', JSON.stringify(updated));
       return updated;
     });
 
@@ -838,10 +862,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           classesCountAtPromotion: st.totalClassesAttended,
         };
         setGraduations(gPrev => {
-          // Remove outdated conflicting graduations for this student so they don't cause reversion
-          const nextGrads = [gradRec, ...gPrev.filter(g => g.studentId !== st.id && (st.email ? g.studentId !== st.email : true))];
+          const nextGrads = [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)];
           safeSave('bjjcron_graduations', nextGrads);
-          localStorage.setItem('bjjcron_graduations', JSON.stringify(nextGrads));
           return nextGrads;
         });
         saveToFirestore('graduations', gradRec);
