@@ -49,6 +49,8 @@ const SPOTIFY_REFRESH_KEY = 'bjjcron_spotify_refresh_token';
 const SPOTIFY_EXPIRES_KEY = 'bjjcron_spotify_expires_at';
 const SPOTIFY_CUSTOM_CLIENT_ID = 'bjjcron_spotify_client_id';
 
+export const DEFAULT_SPOTIFY_CLIENT_ID = '6fa5891513034ba082ef1ece2ee6cbde';
+
 export class SpotifyService {
   private static token: string | null = null;
   private static player: any = null;
@@ -91,7 +93,7 @@ export class SpotifyService {
   }
 
   static getCustomClientId(): string {
-    return localStorage.getItem(SPOTIFY_CUSTOM_CLIENT_ID) || '';
+    return localStorage.getItem(SPOTIFY_CUSTOM_CLIENT_ID) || DEFAULT_SPOTIFY_CLIENT_ID;
   }
 
   static setCustomClientId(clientId: string) {

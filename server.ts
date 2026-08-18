@@ -1547,7 +1547,7 @@ async function startServer() {
   app.post('/api/spotify/exchange', express.json(), async (req, res) => {
     try {
       const { code, client_id, redirect_uri, code_verifier } = req.body;
-      const clientId = client_id || process.env.SPOTIFY_CLIENT_ID || '98dc96a5b6f3458dbf436e2f1e67bfd9';
+      const clientId = client_id || process.env.SPOTIFY_CLIENT_ID || '6fa5891513034ba082ef1ece2ee6cbde';
       
       const bodyParams = new URLSearchParams({
         grant_type: 'authorization_code',
