@@ -234,7 +234,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       l.id !== '2' &&
       l.id !== 'log-1' &&
       l.id !== 'log-2' &&
-      !(l.techniquesLearned && l.techniquesLearned.some(t => t.toLowerCase().includes('passagem de guarda emborcando') && (l.date === '2026-07-28' || l.date === '2026-08-06' || l.date === '2026-08-07')))
+      l.notes !== 'gostei' &&
+      l.notes !== 'Oss!!!' &&
+      !(typeof l.notes === 'string' && (l.notes.toLowerCase().includes('raspagem de aranha') || l.notes.toLowerCase().includes('posicionamento de calcanhar'))) &&
+      !(Array.isArray(l.techniquesLearned) && l.techniquesLearned.some(t => {
+        const lower = (t || '').toLowerCase();
+        return lower.includes('passagem de guarda emborcando') || lower.includes('ogoshi') || lower.includes('triângulo ajustado') || lower.includes('leg lock no-gi');
+      }))
     );
     if (saved && cleanLogs.length !== parsed.length) {
       localStorage.setItem('bjjcron_training_logs', JSON.stringify(cleanLogs));
