@@ -34,6 +34,7 @@ import {
   SpotifyPlaybackState, 
   SpotifyPlaylistItem 
 } from '../../lib/spotifyService';
+import { createSpotifyAuthUrl, exchangeSpotifyCodeForToken } from '../../lib/spotifyPkce';
 
 interface SpotifyTatamePlayerProps {
   isTimerRunning: boolean;
@@ -106,33 +107,14 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     return () => clearInterval(interval);
   }, [fetchSpotifyData]);
 
-  // Handle OAuth Popup (Identical to GitHub OAuth Popup Flow)
+  // Handle OAuth Popup (PKCE Authorization Code Flow)
   const handleConnectSpotify = async () => {
     setIsLoading(true);
     setStatusMessage('Abrindo tela de autorização do Spotify...');
 
     try {
       const clientId = customClientId.trim() || '98dc96a5b6f3458dbf436e2f1e67bfd9';
-      const scopes = [
-        'streaming',
-        'user-read-email',
-        'user-read-private',
-        'user-read-playback-state',
-        'user-modify-playback-state',
-        'user-read-currently-playing',
-        'playlist-read-private',
-        'playlist-read-collaborative'
-      ].join(' ');
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-        response_type: 'token',
-        redirect_uri: redirectUri,
-        scope: scopes,
-        show_dialog: 'true'
-      });
-
-      const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
+      const { authUrl, codeVerifier } = await createSpotifyAuthUrl(clientId, redirectUri);
 
       const width = 520;
       const height = 720;
@@ -157,8 +139,49 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
 
   // Listen for OAuth message from Popup
   useEffect(() => {
-    const handleAuthMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS' && event.data?.accessToken) {
+    const handleAuthMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'SPOTIFY_AUTH_CODE' && event.data?.code) {
+        setStatusMessage('Trocando código de autorização por token...');
+        const clientId = customClientId.trim() || '98dc96a5b6f3458dbf436e2f1e67bfd9';
+        
+        // Exchange via PKCE
+        const tokenData = await exchangeSpotifyCodeForToken(event.data.code, clientId, redirectUri);
+        if (tokenData?.accessToken) {
+          SpotifyService.setToken(tokenData.accessToken, tokenData.expiresIn || 3600);
+          setStatusMessage('✅ Conta Spotify conectada com sucesso!');
+          setIsLoading(false);
+          fetchSpotifyData();
+          setTimeout(() => setStatusMessage(null), 3000);
+        } else {
+          // Try server exchange proxy fallback
+          try {
+            const res = await fetch('/api/spotify/exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: event.data.code,
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                code_verifier: sessionStorage.getItem('spotify_code_verifier') || ''
+              })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+              SpotifyService.setToken(data.access_token, data.expires_in || 3600);
+              setStatusMessage('✅ Conta Spotify conectada com sucesso!');
+              setIsLoading(false);
+              fetchSpotifyData();
+              setTimeout(() => setStatusMessage(null), 3000);
+              return;
+            }
+          } catch {
+            // fallback error
+          }
+          setStatusMessage('Não foi possível autenticar. Você pode inserir seu token nas configurações.');
+          setIsLoading(false);
+          setShowConfigModal(true);
+        }
+      } else if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS' && event.data?.accessToken) {
         SpotifyService.setToken(event.data.accessToken, event.data.expiresIn || 3600);
         setStatusMessage('✅ Conta Spotify conectada com sucesso!');
         setIsLoading(false);
@@ -173,7 +196,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
 
     window.addEventListener('message', handleAuthMessage);
     return () => window.removeEventListener('message', handleAuthMessage);
-  }, [fetchSpotifyData]);
+  }, [fetchSpotifyData, customClientId, redirectUri]);
 
   // Auto-Sync Audio with Tatame Timer
   const wasRunningRef = useRef(isTimerRunning);

@@ -1490,33 +1490,8 @@ async function startServer() {
   });
 
   // ==========================================
-  // SPOTIFY INTEGRATION ENDPOINTS
+  // SPOTIFY INTEGRATION ENDPOINTS (PKCE + Code Flow)
   // ==========================================
-  app.get('/api/spotify/auth-url', (req, res) => {
-    const clientId = process.env.SPOTIFY_CLIENT_ID || req.query.client_id || '98dc96a5b6f3458dbf436e2f1e67bfd9';
-    const redirectUri = (process.env.APP_URL ? `${process.env.APP_URL}/api/spotify/callback` : `${req.protocol}://${req.get('host')}/api/spotify/callback`);
-    const scopes = [
-      'streaming',
-      'user-read-email',
-      'user-read-private',
-      'user-read-playback-state',
-      'user-modify-playback-state',
-      'user-read-currently-playing',
-      'playlist-read-private',
-      'playlist-read-collaborative'
-    ].join(' ');
-
-    const params = new URLSearchParams({
-      client_id: String(clientId),
-      response_type: 'token',
-      redirect_uri: redirectUri,
-      scope: scopes,
-      show_dialog: 'true'
-    });
-
-    res.json({ url: `https://accounts.spotify.com/authorize?${params.toString()}`, redirectUri });
-  });
-
   app.get('/api/spotify/callback', (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!DOCTYPE html>
@@ -1530,13 +1505,21 @@ async function startServer() {
   <script>
     try {
       var hash = window.location.hash.substring(1);
-      var params = new URLSearchParams(hash);
-      var accessToken = params.get('access_token');
-      var expiresIn = params.get('expires_in') || '3600';
-      var error = params.get('error') || new URLSearchParams(window.location.search).get('error');
+      var hashParams = new URLSearchParams(hash);
+      var searchParams = new URLSearchParams(window.location.search);
+      
+      var accessToken = hashParams.get('access_token');
+      var expiresIn = hashParams.get('expires_in') || '3600';
+      var code = searchParams.get('code') || hashParams.get('code');
+      var error = searchParams.get('error') || hashParams.get('error');
 
       if (window.opener) {
-        if (accessToken) {
+        if (code) {
+          window.opener.postMessage({ 
+            type: 'SPOTIFY_AUTH_CODE', 
+            code: code 
+          }, '*');
+        } else if (accessToken) {
           window.opener.postMessage({ 
             type: 'SPOTIFY_AUTH_SUCCESS', 
             accessToken: accessToken, 
@@ -1559,6 +1542,34 @@ async function startServer() {
   </script>
 </body>
 </html>`);
+  });
+
+  app.post('/api/spotify/exchange', express.json(), async (req, res) => {
+    try {
+      const { code, client_id, redirect_uri, code_verifier } = req.body;
+      const clientId = client_id || process.env.SPOTIFY_CLIENT_ID || '98dc96a5b6f3458dbf436e2f1e67bfd9';
+      
+      const bodyParams = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirect_uri || `${req.protocol}://${req.get('host')}/api/spotify/callback`,
+        client_id: clientId,
+        code_verifier: code_verifier || ''
+      });
+
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: bodyParams.toString()
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to exchange token' });
+    }
   });
 
   // Version check endpoint for PWA / Mobile live updates
