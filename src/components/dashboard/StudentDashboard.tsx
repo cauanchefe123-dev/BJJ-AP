@@ -34,8 +34,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAttendance = myAttendances.find(a => a.date === todayStr);
 
-  const pendingPayment = myPayments.find(p => p.status === 'PENDENTE' || p.status === 'ATRASADO');
-
   // Calculate current student's weekly & monthly ranking
   const weekRanking = calculateRanking(students, attendances, 'WEEK');
   const monthRanking = calculateRanking(students, attendances, 'MONTH');
@@ -51,21 +49,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
   return (
     <div className="space-y-6">
       {currentStudent.approvalStatus === 'PENDING' && (
-        <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-2 border-amber-500/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl animate-fade-in">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-lg shrink-0">
+        <div className="bg-amber-950/40 border border-amber-500/40 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xl shrink-0">
               ⏳
             </div>
             <div>
-              <p className="font-extrabold text-amber-300 text-sm">Vínculo Pendente — Aguardando Aprovação na Equipe</p>
+              <p className="font-black text-amber-300 text-sm">Vínculo Pendente com a Academia</p>
               <p className="text-slate-300 text-xs mt-0.5 max-w-xl leading-relaxed">
-                Você solicitou vínculo com a equipe <strong>{academyConfig.name}</strong>. Sua solicitação está na fila do Professor ou Administrador da academia para ser aprovada.
+                Você solicitou matrícula na equipe <strong>{academyConfig.name}</strong>. Aguarde a aprovação do seu Mestre.
               </p>
             </div>
           </div>
           <button
             onClick={() => onNavigate('academies')}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shrink-0 transition-all shadow-md"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 transition-all shadow-md cursor-pointer"
           >
             Gerenciar Vínculo →
           </button>
@@ -73,25 +71,25 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
       )}
 
       {/* Student Profile Header */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 text-white space-y-5 shadow-sm">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-7 text-white space-y-5 shadow-lg">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+          <div className="flex items-center gap-4">
             <img
               src={getStudentAvatar(currentStudent)}
               alt={currentStudent.name}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0 shadow-md"
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-bold text-slate-100 truncate">{currentStudent.name}</h2>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight truncate">{currentStudent.name}</h2>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0 font-mono">
                   Matrícula {currentStudent.registrationNumber}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate">Atleta da {academyConfig.name}</p>
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-slate-400 truncate mt-0.5">{academyConfig.name}</p>
+              <div className="mt-2.5 flex items-center gap-2.5 flex-wrap">
                 <BeltBadge belt={currentStudent.belt} stripes={currentStudent.stripes} size="md" />
-                <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-slate-800/80 text-slate-300 border border-slate-700/80 flex items-center gap-1.5 shrink-0">
+                <span className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-950/80 text-slate-300 border border-slate-800 flex items-center gap-1.5 shrink-0">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                   {getTrainingTimeText(currentStudent.startDate, currentStudent.initialMonthsTrained)}
                 </span>
@@ -99,85 +97,69 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {onOpenCheckin && (
               <button
                 onClick={onOpenCheckin}
-                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4 shrink-0" />
-                <span className="truncate">Bater Frequência</span>
-              </button>
-            )}
-            {onOpenEditModal && currentStudent && (
-              <button
-                onClick={() => onOpenEditModal(currentStudent)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all active:scale-95"
-              >
-                <Edit3 className="w-4 h-4 shrink-0 text-slate-400" />
-                <span className="truncate">Editar Cadastro</span>
-              </button>
-            )}
-            {currentUser?.role !== 'ADMIN' && !selectedStudentId && (
-              <button
-                onClick={() => onNavigate('academies')}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium text-xs border border-slate-700/60 transition-all active:scale-95"
-              >
-                <Shield className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate">Vincular Academia</span>
+                <span>Bater Frequência</span>
               </button>
             )}
             <button
               onClick={() => onNavigate('card')}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-extrabold text-xs border border-slate-700 shadow-md transition-all active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 shadow-xs transition-all active:scale-95 cursor-pointer"
             >
               <QrCode className="w-4 h-4 shrink-0" />
-              <span className="truncate">Carteirinha</span>
+              <span>Carteirinha</span>
             </button>
             <button
               onClick={() => onNavigate('journal')}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate">Diário</span>
+              <span>Diário</span>
             </button>
-            <button
-              onClick={() => onNavigate('observations')}
-              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/60 text-purple-200 font-bold text-xs border border-purple-700/50 transition-all active:scale-95"
-            >
-              <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
-              <span className="truncate">Observações</span>
-            </button>
+            {onOpenEditModal && currentStudent && (
+              <button
+                onClick={() => onOpenEditModal(currentStudent)}
+                className="p-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all active:scale-95 cursor-pointer"
+                title="Editar Cadastro"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Status de Frequência do Dia (Check-in do Atleta) */}
-        <div className="bg-slate-950/90 rounded-xl p-4 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-base shrink-0 ${
+        <div className="bg-slate-950/80 rounded-2xl p-4 sm:p-5 border border-slate-800/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 shadow-inner">
+          <div className="flex items-center gap-3.5">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-base shrink-0 ${
               todayAttendance
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
-                : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 animate-pulse'
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                : 'bg-amber-500/15 border border-amber-500/30 text-amber-400 animate-pulse'
             }`}>
-              {todayAttendance ? <CheckCircle className="w-6 h-6" /> : <UserCheck className="w-6 h-6" />}
+              {todayAttendance ? <CheckCircle className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-200">Frequência de Hoje ({todayStr.split('-').reverse().join('/')})</span>
+                <span className="text-xs font-bold text-slate-200">Presença do Dia ({todayStr.split('-').reverse().join('/')})</span>
                 {todayAttendance ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    ✓ PRESENÇA CONFIRMADA
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    ✓ CONFIRMADA
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-300 border border-amber-500/30">
                     NÃO REGISTRADA
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {todayAttendance
-                  ? `Você treinou na turma "${todayAttendance.className}" às ${todayAttendance.timestamp ? new Date(todayAttendance.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}. Bom treino!`
-                  : 'Não se esqueça de registrar seu check-in na aula de hoje para contabilizar suas graduações.'}
+                  ? `Presença na turma "${todayAttendance.className}" às ${todayAttendance.timestamp ? new Date(todayAttendance.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}. Bom treino!`
+                  : 'Faça seu check-in na aula de hoje para contabilizar suas graduações e ranking.'}
               </p>
             </div>
           </div>
@@ -185,98 +167,91 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           {!todayAttendance && onOpenCheckin && (
             <button
               onClick={onOpenCheckin}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
             >
               <UserCheck className="w-4 h-4" />
-              Bater Presença Agora
+              <span>Bater Presença Agora</span>
             </button>
           )}
         </div>
+      </div>
 
-        {/* Linked Academy Quick Banner */}
-        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img
-              src={academyConfig.logoUrl || 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&q=80&w=300'}
-              alt={academyConfig.name}
-              className="w-12 h-12 rounded-xl object-cover border border-amber-500/60 shadow-md bg-slate-900"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase text-amber-400">
-                  Sua Academia Vinculada:
-                </span>
-                {currentStudent.approvalStatus === 'PENDING' ? (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
-                    ⏳ VÍNCULO PENDENTE
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    ATLETA ATIVO
-                  </span>
-                )}
-              </div>
-              <h4 className="text-sm font-extrabold text-slate-100 mt-0.5">
-                {academyConfig.name} — Prof. {academyConfig.headCoachName || 'Gabriel "Fera" Santos'}
-              </h4>
-            </div>
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div 
+          onClick={() => onNavigate('ranking')}
+          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400">Posição da Semana</span>
+            <Trophy className="w-4 h-4 text-amber-400" />
           </div>
-          {currentUser?.role !== 'ADMIN' && !selectedStudentId && (
-            <button
-              onClick={() => onNavigate('academies')}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0"
-            >
-              <Shield className="w-3.5 h-3.5 text-amber-400" />
-              Mudar / Vincular a Outra Academia →
-            </button>
-          )}
+          <p className="text-2xl sm:text-3xl font-black text-amber-300">
+            #{myWeekItem?.rank || '-'}
+          </p>
+          <p className="text-[11px] text-slate-400 truncate">
+            {myWeekItem ? `${myWeekItem.weekCount} treino(s) esta semana` : 'Nenhum treino ainda'}
+          </p>
         </div>
 
-        {/* Treinos Realizados (Visão do Atleta) */}
-        <div className="bg-slate-950/80 rounded-xl p-4 border border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
-              <Award className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-200 block">Treinos Registrados (Pós-Graduação)</span>
-              <p className="text-[11px] text-slate-400">Total de aulas contabilizadas desde a sua última graduação ou grau</p>
-            </div>
+        <div 
+          onClick={() => onNavigate('ranking')}
+          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400">Posição do Mês</span>
+            <Flame className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-right shrink-0">
-            <span className="text-xl font-black text-amber-400 font-mono block">
-              {currentStudent.classesSinceLastGraduation}
-            </span>
-            <span className="text-[10px] text-slate-500">treino(s)</span>
-          </div>
+          <p className="text-2xl sm:text-3xl font-black text-amber-400">
+            #{myMonthItem?.rank || '-'}
+          </p>
+          <p className="text-[11px] text-slate-400 truncate">
+            {myMonthItem ? `${myMonthItem.monthCount} treino(s) este mês` : 'Nenhum treino no mês'}
+          </p>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white space-y-2 shadow-md">
+          <span className="text-xs font-bold text-slate-400 block">Total de Treinos</span>
+          <p className="text-2xl sm:text-3xl font-black text-slate-100">
+            {getStudentTotalClasses(currentStudent, attendances)}
+          </p>
+          <p className="text-[11px] text-emerald-400 font-semibold truncate">Presenças no tatame</p>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white space-y-2 shadow-md">
+          <span className="text-xs font-bold text-slate-400 block">Tempo de Treino</span>
+          <p className="text-lg sm:text-xl font-black text-amber-300 truncate">
+            {getTrainingTimeText(currentStudent.startDate, currentStudent.initialMonthsTrained)}
+          </p>
+          <p className="text-[11px] text-slate-400 truncate">Jornada acumulada</p>
         </div>
       </div>
 
       {/* Foco Técnico da Semana por Turma */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4 shadow-xl">
-        <div className="flex items-center justify-between">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
           <div>
             <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-              <Target className="w-5 h-5 text-amber-400" />
-              Foco Técnico da Semana nas Turmas
+              <Target className="w-4 h-4 text-amber-400" />
+              Foco Técnico da Semana
             </h3>
-            <p className="text-xs text-slate-400">
-              Acompanhe as posições e técnicas que seu professor definiu para o treino desta semana.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Posições e técnicas programadas pelo seu Professor para as turmas desta semana.
             </p>
           </div>
           <button
             onClick={() => onNavigate('weekly-focus')}
-            className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1"
+            className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span>Ver Acervo de Posições →</span>
+            <span>Ver Acervo →</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {classes.map(c => (
             <div
               key={c.id}
-              className="bg-slate-950 border border-slate-800 hover:border-amber-500/50 rounded-xl p-4 space-y-3 transition-all"
+              className="bg-slate-950/80 border border-slate-800/90 hover:border-amber-500/40 rounded-2xl p-4 space-y-3 transition-all shadow-xs"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-amber-400 flex items-center gap-1">
@@ -289,26 +264,26 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               </div>
 
               <div>
-                <h4 className="font-extrabold text-sm text-slate-100">{c.title}</h4>
+                <h4 className="font-bold text-sm text-slate-100">{c.title}</h4>
                 <p className="text-xs text-slate-400">Prof. {c.professorName}</p>
               </div>
 
               {/* Focus Badge */}
-              <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/60 border border-amber-500/40 rounded-lg p-2.5 space-y-2">
+              <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 space-y-2">
                 <span className="text-[10px] font-black uppercase text-amber-400 block mb-0.5">
                   🎯 Foco da Semana:
                 </span>
-                <p className="text-xs font-bold text-amber-100">
+                <p className="text-xs font-semibold text-slate-200">
                   {c.weeklyFocus ? c.weeklyFocus : 'Treino geral e aperfeiçoamento de posições.'}
                 </p>
 
                 {c.weeklyFocusVideoUrl && (
                   <button
                     onClick={() => setSelectedVideoClass(c)}
-                    className="w-full py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all"
+                    className="w-full py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                   >
                     <Video className="w-4 h-4" />
-                    <span>Assistir Vídeo da Posição</span>
+                    <span>Assistir Posição</span>
                     <Play className="w-3 h-3 fill-slate-950 text-slate-950 ml-0.5" />
                   </button>
                 )}
@@ -318,59 +293,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div 
-          onClick={() => onNavigate('ranking')}
-          className="bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-900 border border-amber-500/40 hover:border-amber-400 rounded-2xl p-4 sm:p-5 text-white space-y-1 cursor-pointer transition-all hover:scale-[1.02] shadow-lg"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-bold text-amber-400 block truncate">Posição da Semana</span>
-            <Trophy className="w-4 h-4 text-amber-400" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-300">
-            #{myWeekItem?.rank || '-'}
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
-            {myWeekItem ? `${myWeekItem.weekCount} treino(s) esta semana` : 'Nenhum treino ainda'}
-          </p>
-        </div>
-
-        <div 
-          onClick={() => onNavigate('ranking')}
-          className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 sm:p-5 text-white space-y-1 cursor-pointer transition-all hover:scale-[1.02]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-400 block truncate">Posição do Mês</span>
-            <Flame className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-400">
-            #{myMonthItem?.rank || '-'}
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-            {myMonthItem ? `${myMonthItem.monthCount} treino(s) este mês` : 'Nenhum treino no mês'}
-          </p>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 text-white space-y-1">
-          <span className="text-[11px] sm:text-xs font-bold text-slate-400 block truncate">Total de Treinos</span>
-          <p className="text-2xl sm:text-3xl font-black text-slate-100">
-            {getStudentTotalClasses(currentStudent, attendances)}
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Presenças no tatame</p>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 text-white space-y-1">
-          <span className="text-[11px] sm:text-xs font-bold text-slate-400 block truncate">Tempo de Treino</span>
-          <p className="text-lg sm:text-xl font-black text-amber-300 truncate">
-            {getTrainingTimeText(currentStudent.startDate, currentStudent.initialMonthsTrained)}
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Jornada acumulada</p>
-        </div>
-      </div>
-
       {/* Digital Card Preview Box */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 shadow-lg">
         <DigitalMembershipCard student={currentStudent} />
       </div>
 

@@ -8,7 +8,7 @@
   }
   
   body {
-    background-color: #0b0f19; /* slate-950 deep charcoal */
+    background-color: #080c14; /* Deep rich obsidian slate */
     color: #f1f5f9; /* slate-100 */
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -21,7 +21,7 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0b0f19;
+    background: #080c14;
   }
   ::-webkit-scrollbar-thumb {
     background: #1e293b;
@@ -32,32 +32,33 @@
   }
 }
 
-/* Modern Layout & Color Harmony Utility Classes - Refined Minimalist Palette */
+/* Modern Minimalist Glass & Card Utilities */
 .glass-panel {
-  background-color: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.4);
-  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  background-color: rgba(13, 18, 30, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.45);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
 .card-uniform {
-  background-color: #0f172a;
+  background-color: #0d121f;
   border: 1px solid #1e293b;
-  border-radius: 0.875rem; /* 14px */
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s ease-in-out;
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card-uniform:hover {
   border-color: #334155;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.6);
 }
 
 .input-uniform {
-  background-color: #090d16;
+  background-color: #060911;
   border: 1px solid #1e293b;
-  border-radius: 0.625rem;
-  padding: 0.55rem 0.875rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
   color: #f8fafc;
   font-size: 0.875rem;
   transition: all 0.15s ease-in-out;
@@ -65,81 +66,96 @@
 
 .input-uniform:focus {
   outline: none;
-  border-color: #94a3b8;
-  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.12);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .btn-primary-uniform {
-  background-color: #e2e8f0;
+  background-color: #f8fafc;
   color: #090d16;
-  font-weight: 700;
-  border-radius: 0.625rem;
-  padding: 0.55rem 1.15rem;
-  transition: all 0.15s ease-in-out;
-  border: 1px solid #f8fafc;
+  font-weight: 800;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
 }
 
 .btn-primary-uniform:hover {
   background-color: #ffffff;
-  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.18);
   transform: translateY(-1px);
 }
 
 .btn-secondary-uniform {
-  background-color: #1e293b;
+  background-color: #161f30;
   color: #e2e8f0;
   font-weight: 600;
-  border: 1px solid #334155;
-  border-radius: 0.625rem;
-  padding: 0.55rem 1.15rem;
+  border: 1px solid #283548;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1.25rem;
   transition: all 0.15s ease-in-out;
 }
 
 .btn-secondary-uniform:hover {
-  background-color: #334155;
+  background-color: #202d44;
   color: #ffffff;
-  border-color: #475569;
+  border-color: #3b4d68;
 }
 
-/* Badge System for Consistent Harmony - Subtle Low Saturation */
+/* Badge System for Consistent Harmony */
 .badge-amber {
-  background-color: rgba(217, 119, 6, 0.1);
-  color: #d97706;
-  border: 1px solid rgba(217, 119, 6, 0.2);
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .badge-emerald {
-  background-color: rgba(16, 185, 129, 0.08);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .badge-rose {
-  background-color: rgba(244, 63, 94, 0.08);
-  color: #f43f5e;
-  border: 1px solid rgba(244, 63, 94, 0.2);
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
+  background-color: rgba(244, 63, 94, 0.1);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .badge-blue {
-  background-color: rgba(100, 116, 139, 0.12);
-  color: #94a3b8;
-  border: 1px solid rgba(100, 116, 139, 0.25);
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
+  background-color: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
+/* Subtle fade in animations */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 
+.animate-fade-in-scale {
+  animation: fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

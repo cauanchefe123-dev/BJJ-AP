@@ -25,7 +25,9 @@ import {
   LogIn,
   LogOut,
   AlertCircle,
-  ListMusic
+  ListMusic,
+  Tv,
+  Sparkles
 } from 'lucide-react';
 import { 
   SpotifyService, 
@@ -40,7 +42,7 @@ interface CuratedPlaylist {
   id: string;
   name: string;
   category: string;
-  embedUri: string;
+  uri: string;
   icon: string;
   description: string;
 }
@@ -50,7 +52,7 @@ const CURATED_PLAYLISTS: CuratedPlaylist[] = [
     id: 'hiphop',
     name: 'BJJ Rolling - Hip-Hop & Rap',
     category: 'Hip-Hop / Sparring',
-    embedUri: 'playlist/37i9dQZF1DX0XUsuxWHRQd',
+    uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd',
     icon: '🥋',
     description: 'Batidas pesadas para rolas intensos e sparring.'
   },
@@ -58,7 +60,7 @@ const CURATED_PLAYLISTS: CuratedPlaylist[] = [
     id: 'phonk',
     name: 'Gym Phonk & Electronic Energy',
     category: 'Phonk / Combate',
-    embedUri: 'playlist/37i9dQZF1DWZjqjZMudx9T',
+    uri: 'spotify:playlist:37i9dQZF1DWZjqjZMudx9T',
     icon: '🔥',
     description: 'Gás máximo e ritmo acelerado para o tatame.'
   },
@@ -66,7 +68,7 @@ const CURATED_PLAYLISTS: CuratedPlaylist[] = [
     id: 'rock',
     name: 'Hard Rock & Metal Tatame',
     category: 'Rock / Heavy',
-    embedUri: 'playlist/37i9dQZF1DX9qNs32fujYe',
+    uri: 'spotify:playlist:37i9dQZF1DX9qNs32fujYe',
     icon: '⚡',
     description: 'Rounds intensos sem descanso ao som de guitarras pesadas.'
   },
@@ -74,7 +76,7 @@ const CURATED_PLAYLISTS: CuratedPlaylist[] = [
     id: 'flow',
     name: 'Flow Roll & Drill Focus (Lo-Fi)',
     category: 'Lo-Fi / Treino Técnico',
-    embedUri: 'playlist/37i9dQZF1DXdLEN7aqioXM',
+    uri: 'spotify:playlist:37i9dQZF1DXdLEN7aqioXM',
     icon: '🧘',
     description: 'Foco contínuo para repetições de posição e aquecimento.'
   }
@@ -92,11 +94,11 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const [user, setUser] = useState<SpotifyUser | null>(null);
   const [playback, setPlayback] = useState<SpotifyPlaybackState | null>(null);
   const [userPlaylists, setUserPlaylists] = useState<SpotifyPlaylistItem[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [selectedPlaylistUri, setSelectedPlaylistUri] = useState<string>(() => {
-    return localStorage.getItem('bjjcron_spotify_selected') || 'playlist/37i9dQZF1DX0XUsuxWHRQd';
+    return localStorage.getItem('bjjcron_spotify_selected_uri') || 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd';
   });
   const [customInputUrl, setCustomInputUrl] = useState('');
-  const [customAddedMessage, setCustomAddedMessage] = useState(false);
   const [autoSyncWithTimer, setAutoSyncWithTimer] = useState(true);
   const [autoDjMode, setAutoDjMode] = useState<'pause' | 'ducking'>(() => {
     return (localStorage.getItem('bjjcron_spotify_autodj_mode') as 'pause' | 'ducking') || 'pause';
@@ -113,6 +115,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const [customClientId, setCustomClientId] = useState(() => SpotifyService.getCustomClientId() || DEFAULT_SPOTIFY_CLIENT_ID);
   const [customTokenInput, setCustomTokenInput] = useState('');
   const [copiedRedirect, setCopiedRedirect] = useState(false);
+  const [volume, setVolume] = useState<number>(80);
 
   const [customRedirectUri, setCustomRedirectUri] = useState(() => {
     return localStorage.getItem('bjjcron_spotify_redirect_uri') || '';
@@ -134,12 +137,17 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       const profile = await SpotifyService.getUserProfile();
       if (profile) {
         setUser(profile);
-        const [currentPlay, playlists] = await Promise.all([
+        const [currentPlay, playlists, devList] = await Promise.all([
           SpotifyService.getPlaybackState(),
-          SpotifyService.getUserPlaylists(20)
+          SpotifyService.getUserPlaylists(20),
+          SpotifyService.getDevices()
         ]);
         setPlayback(currentPlay);
         setUserPlaylists(playlists);
+        setDevices(devList);
+        if (currentPlay?.device?.volume_percent !== undefined) {
+          setVolume(currentPlay.device.volume_percent);
+        }
         if (playlists.length > 0) {
           setActiveTab('my-playlists');
         }
@@ -151,13 +159,19 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     checkToken();
     const interval = setInterval(() => {
       if (user) {
-        SpotifyService.getPlaybackState().then(setPlayback);
+        SpotifyService.getPlaybackState().then(st => {
+          setPlayback(st);
+          if (st?.device?.volume_percent !== undefined) {
+            setVolume(st.device.volume_percent);
+          }
+        });
+        SpotifyService.getDevices().then(setDevices);
       }
     }, 4000);
     return () => clearInterval(interval);
   }, [checkToken, user]);
 
-  // Handle 1-Click OAuth Popup Login (Identical UX to GitHub Login)
+  // Handle 1-Click OAuth Popup Login
   const handleConnectSpotify = async () => {
     setIsLoadingAuth(true);
     setStatusMessage('Abrindo tela oficial de login do Spotify...');
@@ -230,7 +244,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
           await checkToken();
           setTimeout(() => setStatusMessage(null), 3000);
         } else {
-          setStatusMessage('Não foi possível obter o token do Spotify.');
+          setStatusMessage('Não foi possível obter o token do Spotify. Verifique as configurações de Client ID.');
           setIsLoadingAuth(false);
         }
       } else if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS' && event.data?.accessToken) {
@@ -249,17 +263,12 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     return () => window.removeEventListener('message', handleAuthMessage);
   }, [checkToken, customClientId, redirectUri]);
 
-  // Handle Auto-Sync with Timer (Precise state transition tracker)
+  // Handle Auto-Sync with Timer
   const wasRunningRef = useRef(isTimerRunning);
   const wasRestingRef = useRef(isResting);
 
-  // Manual instant sync trigger
   const triggerAutoDjSync = useCallback((forcePlay?: boolean) => {
-    if (!user) {
-      setStatusMessage('ℹ️ Conecte o Spotify para controlar a reprodução automática.');
-      setTimeout(() => setStatusMessage(null), 3000);
-      return;
-    }
+    if (!user) return;
 
     if (forcePlay || (isTimerRunning && !isResting)) {
       if (skipTrackOnRound) {
@@ -268,18 +277,14 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       if (autoDjMode === 'ducking') {
         SpotifyService.setVolume(100);
       }
-      const formattedUri = selectedPlaylistUri.startsWith('spotify:') || selectedPlaylistUri.startsWith('http') 
-        ? selectedPlaylistUri 
-        : `spotify:${selectedPlaylistUri.replace('/', ':')}`;
-      
-      SpotifyService.play(formattedUri).then(ok => {
-        setStatusMessage(ok ? '🥋 Auto-DJ: Música iniciada para o Rola!' : '▶️ Enviado comando de reprodução ao Spotify');
+      SpotifyService.play(selectedPlaylistUri).then(ok => {
+        setStatusMessage(ok ? '🥋 Auto-DJ: Música iniciada para o Rola!' : '▶️ Enviado comando ao Spotify');
         setTimeout(() => setStatusMessage(null), 2500);
       });
     } else if (isTimerRunning && isResting) {
       if (autoDjMode === 'ducking') {
         SpotifyService.setVolume(20).then(() => {
-          setStatusMessage('🔉 Auto-DJ: Volume reduzido para 20% durante o descanso.');
+          setStatusMessage('🔉 Auto-DJ: Volume reduzido para 20% no descanso.');
           setTimeout(() => setStatusMessage(null), 2500);
         });
       } else {
@@ -289,7 +294,6 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
         });
       }
     } else {
-      // Cronômetro pausado
       SpotifyService.pause().then(() => {
         setStatusMessage('⏸️ Auto-DJ: Cronômetro pausado, som pausado.');
         setTimeout(() => setStatusMessage(null), 2500);
@@ -309,20 +313,13 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     const isRest = isResting;
     const wasRest = wasRestingRef.current;
 
-    // Caso 1: Cronômetro acabou de ser iniciado (Start / Resume no Round de Luta)
     if (isRunning && !wasRunning && !isRest) {
       triggerAutoDjSync();
-    }
-    // Caso 2: Transição de Descanso -> Novo Round de Luta
-    else if (isRunning && wasRest && !isRest) {
+    } else if (isRunning && wasRest && !isRest) {
       triggerAutoDjSync();
-    }
-    // Caso 3: Transição de Round de Luta -> Descanso (durante a contagem)
-    else if (isRunning && !wasRest && isRest) {
+    } else if (isRunning && !wasRest && isRest) {
       triggerAutoDjSync();
-    }
-    // Caso 4: Cronômetro pausado manualmente ou finalizado
-    else if (!isRunning && wasRunning) {
+    } else if (!isRunning && wasRunning) {
       SpotifyService.pause().then(() => {
         setStatusMessage('⏸️ Auto-DJ: Cronômetro pausado.');
         setTimeout(() => setStatusMessage(null), 2500);
@@ -333,13 +330,13 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     wasRestingRef.current = isRest;
   }, [isTimerRunning, isResting, autoSyncWithTimer, user, triggerAutoDjSync]);
 
-  // Handle Playlists selection
   const handleSelectPlaylist = (uri: string) => {
     setSelectedPlaylistUri(uri);
-    localStorage.setItem('bjjcron_spotify_selected', uri);
+    localStorage.setItem('bjjcron_spotify_selected_uri', uri);
     if (user) {
-      const formattedUri = uri.startsWith('spotify:') || uri.startsWith('http') ? uri : `spotify:${uri.replace('/', ':')}`;
-      SpotifyService.play(formattedUri);
+      SpotifyService.play(uri).then(() => {
+        setTimeout(() => SpotifyService.getPlaybackState().then(setPlayback), 800);
+      });
     }
   };
 
@@ -348,19 +345,66 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     if (!customInputUrl.trim()) return;
 
     let clean = customInputUrl.trim();
-    if (clean.includes('open.spotify.com/')) {
-      const parts = clean.split('open.spotify.com/')[1].split('?')[0];
-      clean = parts;
-    } else if (clean.startsWith('spotify:')) {
-      clean = clean.replace('spotify:', '').replace(/:/g, '/');
+    if (clean.includes('open.spotify.com/playlist/')) {
+      const id = clean.split('open.spotify.com/playlist/')[1].split('?')[0];
+      clean = `spotify:playlist:${id}`;
+    } else if (clean.includes('open.spotify.com/album/')) {
+      const id = clean.split('open.spotify.com/album/')[1].split('?')[0];
+      clean = `spotify:album:${id}`;
+    } else if (clean.includes('open.spotify.com/artist/')) {
+      const id = clean.split('open.spotify.com/artist/')[1].split('?')[0];
+      clean = `spotify:artist:${id}`;
+    } else if (!clean.startsWith('spotify:')) {
+      clean = `spotify:playlist:${clean}`;
     }
 
     if (clean) {
       setSelectedPlaylistUri(clean);
-      localStorage.setItem('bjjcron_spotify_selected', clean);
-      setCustomAddedMessage(true);
+      localStorage.setItem('bjjcron_spotify_selected_uri', clean);
       setCustomInputUrl('');
-      setTimeout(() => setCustomAddedMessage(false), 3000);
+      if (user) {
+        SpotifyService.play(clean);
+      }
+      setStatusMessage('✅ Playlist carregada e pronta para tocar!');
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  const handleTogglePlay = async () => {
+    if (!user) return;
+    if (playback?.is_playing) {
+      await SpotifyService.pause();
+    } else {
+      await SpotifyService.play(selectedPlaylistUri);
+    }
+    setTimeout(async () => {
+      const st = await SpotifyService.getPlaybackState();
+      setPlayback(st);
+    }, 600);
+  };
+
+  const handleNext = async () => {
+    if (!user) return;
+    await SpotifyService.nextTrack();
+    setTimeout(async () => {
+      const st = await SpotifyService.getPlaybackState();
+      setPlayback(st);
+    }, 600);
+  };
+
+  const handlePrevious = async () => {
+    if (!user) return;
+    await SpotifyService.previousTrack();
+    setTimeout(async () => {
+      const st = await SpotifyService.getPlaybackState();
+      setPlayback(st);
+    }, 600);
+  };
+
+  const handleVolumeChange = async (newVol: number) => {
+    setVolume(newVol);
+    if (user) {
+      await SpotifyService.setVolume(newVol);
     }
   };
 
@@ -369,6 +413,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     setUser(null);
     setPlayback(null);
     setUserPlaylists([]);
+    setDevices([]);
     setActiveTab('curated');
     setStatusMessage('Spotify desconectado.');
     setTimeout(() => setStatusMessage(null), 2500);
@@ -396,120 +441,370 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     setTimeout(() => setCopiedRedirect(false), 2000);
   };
 
-  const spotifyEmbedSrc = `https://open.spotify.com/embed/${selectedPlaylistUri}?utm_source=generator&theme=0`;
-
   return (
-    <div id="spotify-tatame-player-container" className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-3xl p-4 sm:p-6 text-white shadow-2xl space-y-4">
-      {/* Sleek Top Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-            <Disc className="w-5 h-5 animate-spin-slow text-emerald-400" />
+    <div id="spotify-tatame-player-container" className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-3xl p-5 sm:p-7 text-white shadow-2xl space-y-5">
+      {/* Header & Status Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-800/80 pb-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
+            <Disc className={`w-6 h-6 text-emerald-400 ${playback?.is_playing ? 'animate-spin-slow' : ''}`} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+              <h4 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                 <span>Spotify do Tatame</span>
               </h4>
-              <span className="text-[10px] uppercase tracking-wider bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>{autoSyncWithTimer ? 'Auto-DJ Ativo' : 'Player Integrado'}</span>
+              <span className="text-[10px] uppercase tracking-wider bg-emerald-500/15 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30 font-bold flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+                <span>{user ? 'Auto-DJ Conectado' : 'Aguardando Conexão'}</span>
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">
-              {isTimerRunning 
-                ? (isResting ? '🧘 Intervalo / Descanso' : '🥋 Rola em andamento') 
-                : 'Selecione uma playlist para tocar durante os treinos'}
+            <p className="text-xs text-slate-400 mt-0.5">
+              Sincronização musical inteligente: toca nos rounds e pausa/abaixa o som nos descansos.
             </p>
           </div>
         </div>
 
-        {/* Quick Playlist Selector Pills & Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {CURATED_PLAYLISTS.slice(0, 4).map(pl => {
-            const isSelected = selectedPlaylistUri === pl.embedUri;
-            return (
+        {/* Top Right Controls & Config */}
+        <div className="flex items-center gap-2.5">
+          {user ? (
+            <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-1.5 pr-3">
+              {user.images?.[0]?.url ? (
+                <img src={user.images[0].url} alt={user.display_name} className="w-7 h-7 rounded-xl object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center">
+                  {user.display_name?.charAt(0) || 'S'}
+                </div>
+              )}
+              <div className="text-left">
+                <p className="text-xs font-bold text-white truncate max-w-[120px]">{user.display_name}</p>
+                <span className="text-[9px] uppercase font-mono text-emerald-400">{user.product || 'Conectado'}</span>
+              </div>
               <button
-                key={pl.id}
-                onClick={() => handleSelectPlaylist(pl.embedUri)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-500 text-slate-950 shadow-md font-black shadow-emerald-500/20 scale-105'
-                    : 'bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                }`}
+                onClick={handleDisconnect}
+                className="ml-2 p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-slate-800"
+                title="Desconectar conta Spotify"
               >
-                <span>{pl.icon}</span>
-                <span>{pl.name}</span>
+                <LogOut className="w-3.5 h-3.5" />
               </button>
-            );
-          })}
-
-          <a
-            href={`https://open.spotify.com/${selectedPlaylistUri}`}
-            target="_blank"
-            rel="noreferrer"
-            className="p-2 bg-slate-800/80 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 rounded-xl border border-slate-700 transition-all text-xs font-bold flex items-center gap-1"
-            title="Abrir no Aplicativo do Spotify"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectSpotify}
+              disabled={isLoadingAuth}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-2xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              {isLoadingAuth ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+              <span>Entrar com Spotify</span>
+            </button>
+          )}
 
           <button
             onClick={() => setShowConfigModal(true)}
-            title="Configurações e personalização"
-            className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all cursor-pointer"
+            title="Configurações avançadas do Spotify"
+            className="p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-2xl border border-slate-700 transition-all cursor-pointer"
           >
-            <Settings2 className="w-3.5 h-3.5" />
+            <Settings2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {statusMessage && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-2xl text-xs text-emerald-300 flex items-center gap-2 animate-fadeIn shadow-lg">
-          <Zap className="w-3.5 h-3.5 shrink-0 text-emerald-400 fill-current" />
+        <div className="p-3.5 bg-emerald-950/70 border border-emerald-500/40 rounded-2xl text-xs text-emerald-200 flex items-center gap-2.5 animate-fadeIn shadow-lg">
+          <Zap className="w-4 h-4 shrink-0 text-emerald-400 fill-current" />
           <span className="font-semibold">{statusMessage}</span>
         </div>
       )}
 
-      {/* Main Spotify Player Embed */}
-      <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
-        <iframe
-          src={spotifyEmbedSrc}
-          width="100%"
-          height="352"
-          frameBorder="0"
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          title="Spotify Tatame Player"
-          className="w-full"
-        />
-      </div>
+      {/* Main Content Area */}
+      {!user ? (
+        /* DISCONNECTED STATE: PROMINENT LOGIN HERO */
+        <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-3xl p-8 text-center space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto shadow-xl shadow-emerald-950/50">
+            <Music className="w-10 h-10 text-emerald-400" />
+          </div>
 
-      {/* Subtle Custom Link Bar */}
-      <form onSubmit={handleApplyCustomUrl} className="flex gap-2 items-center pt-1">
-        <input
-          type="text"
-          placeholder="Ou cole o link de qualquer Playlist do Spotify..."
-          value={customInputUrl}
-          onChange={e => setCustomInputUrl(e.target.value)}
-          className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-        />
-        <button
-          type="submit"
-          className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-300 text-xs font-bold rounded-xl border border-emerald-500/40 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Carregar</span>
-        </button>
-      </form>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-xl font-black text-white">Conecte sua Conta Spotify</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Faça login para controlar as músicas do tatame pelo cronômetro. O som começa automaticamente no início do rola e diminui ou pausa no descanso.
+            </p>
+          </div>
 
-      {customAddedMessage && (
-        <p className="text-xs text-emerald-400 flex items-center gap-1 font-semibold animate-fadeIn">
-          <Check className="w-3.5 h-3.5" /> Playlist personalizada carregada com sucesso!
-        </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={handleConnectSpotify}
+              disabled={isLoadingAuth}
+              className="w-full sm:w-auto px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-black rounded-2xl shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+            >
+              {isLoadingAuth ? <RefreshCw className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
+              <span>Fazer Login com Spotify</span>
+            </button>
+
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className="w-full sm:w-auto px-5 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-2xl border border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <KeyRound className="w-4 h-4 text-emerald-400" />
+              <span>Configurar Client ID / Token</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 max-w-2xl mx-auto text-left">
+            <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl">
+              <span className="text-base mb-1 block">🥋</span>
+              <h5 className="text-xs font-bold text-white">Modo Auto-DJ</h5>
+              <p className="text-[11px] text-slate-400 mt-0.5">Sincronizado automaticamente com o apito e rounds do tatame.</p>
+            </div>
+            <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl">
+              <span className="text-base mb-1 block">📱</span>
+              <h5 className="text-xs font-bold text-white">Controle Multi-Dispositivo</h5>
+              <p className="text-[11px] text-slate-400 mt-0.5">Toca na caixa de som, na TV da academia, Alexa ou no computador.</p>
+            </div>
+            <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl">
+              <span className="text-base mb-1 block">⚡</span>
+              <h5 className="text-xs font-bold text-white">Playlists de Combate</h5>
+              <p className="text-[11px] text-slate-400 mt-0.5">Acesse suas playlists próprias ou use seleções de Jiu-Jitsu e Phonk.</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* CONNECTED STATE: INTERACTIVE MUSIC PLAYER & CONTROLS */
+        <div className="space-y-5">
+          {/* Active Track Card */}
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              {playback?.item?.album?.images?.[0]?.url ? (
+                <img 
+                  src={playback.item.album.images[0].url} 
+                  alt={playback.item.name} 
+                  className="w-20 h-20 rounded-2xl shadow-xl border border-slate-700 object-cover shrink-0" 
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 shrink-0">
+                  <Music className="w-8 h-8 text-emerald-400" />
+                </div>
+              )}
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`w-2 h-2 rounded-full ${playback?.is_playing ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    {playback?.is_playing ? 'Tocando no Tatame' : 'Em Pausa'}
+                  </span>
+                </div>
+                <h4 className="text-base font-black text-white truncate max-w-[280px] sm:max-w-md">
+                  {playback?.item?.name || 'Selecione uma playlist para iniciar'}
+                </h4>
+                <p className="text-xs text-slate-400 truncate mt-0.5">
+                  {playback?.item?.artists?.map(a => a.name).join(', ') || 'Spotify conectado e pronto'}
+                </p>
+                {playback?.device && (
+                  <p className="text-[10px] font-mono text-emerald-400 mt-1 flex items-center gap-1">
+                    <Radio className="w-3 h-3" />
+                    <span>Dispositivo: {playback.device.name}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Playback Controls */}
+            <div className="flex flex-col items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handlePrevious}
+                  className="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+                  title="Faixa anterior"
+                >
+                  <SkipBack className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={handleTogglePlay}
+                  className="p-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-xl shadow-emerald-500/20 font-black cursor-pointer hover:scale-105 active:scale-95"
+                  title={playback?.is_playing ? 'Pausar' : 'Tocar'}
+                >
+                  {playback?.is_playing ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
+                </button>
+
+                <button
+                  onClick={handleNext}
+                  className="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+                  title="Próxima faixa"
+                >
+                  <SkipForward className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Volume Slider */}
+              <div className="flex items-center gap-2 w-full max-w-[200px]">
+                <Volume1 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={e => handleVolumeChange(Number(e.target.value))}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <span className="text-[10px] font-mono text-slate-400 shrink-0">{volume}%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Auto-DJ Settings & Fine Tuning */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/80 border border-slate-800 rounded-3xl p-4">
+            <div className="flex items-center justify-between p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800/80">
+              <div>
+                <p className="text-xs font-bold text-white">Auto-DJ Sincronizado</p>
+                <p className="text-[10px] text-slate-400">Controla com o cronômetro</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoSyncWithTimer}
+                onChange={e => setAutoSyncWithTimer(e.target.checked)}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800/80">
+              <div>
+                <p className="text-xs font-bold text-white">No Descanso</p>
+                <p className="text-[10px] text-slate-400">{autoDjMode === 'pause' ? 'Pausar música' : 'Abaixar volume (20%)'}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const nextMode = autoDjMode === 'pause' ? 'ducking' : 'pause';
+                  setAutoDjMode(nextMode);
+                  localStorage.setItem('bjjcron_spotify_autodj_mode', nextMode);
+                }}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold rounded-lg text-emerald-400 border border-slate-700 cursor-pointer"
+              >
+                {autoDjMode === 'pause' ? 'Pausar' : 'Abaixar'}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800/80">
+              <div>
+                <p className="text-xs font-bold text-white">Trocar Música no Round</p>
+                <p className="text-[10px] text-slate-400">Pula faixa ao iniciar rola</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={skipTrackOnRound}
+                onChange={e => {
+                  setSkipTrackOnRound(e.target.checked);
+                  localStorage.setItem('bjjcron_spotify_autodj_skip', String(e.target.checked));
+                }}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Playlists Selector: Curated vs User's Own Playlists */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('curated')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'curated' 
+                      ? 'bg-emerald-500 text-slate-950 font-black' 
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🥋 Playlists Recomendadas
+                </button>
+                <button
+                  onClick={() => setActiveTab('my-playlists')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'my-playlists' 
+                      ? 'bg-emerald-500 text-slate-950 font-black' 
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🎵 Minhas Playlists ({userPlaylists.length})
+                </button>
+              </div>
+              <span className="text-[11px] text-slate-500">Clique para tocar</span>
+            </div>
+
+            {activeTab === 'curated' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                {CURATED_PLAYLISTS.map(pl => {
+                  const isSelected = selectedPlaylistUri === pl.uri;
+                  return (
+                    <button
+                      key={pl.id}
+                      onClick={() => handleSelectPlaylist(pl.uri)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-800/95 border-emerald-500 shadow-lg shadow-emerald-950/40 scale-[1.02]'
+                          : 'bg-slate-950/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-2xl mb-1.5">{pl.icon}</div>
+                        <p className="text-xs font-black text-white truncate">{pl.name}</p>
+                        <span className="text-[10px] text-emerald-400 block mt-0.5">{pl.category}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-2 line-clamp-2">{pl.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                {userPlaylists.map(pl => {
+                  const isSelected = selectedPlaylistUri === pl.uri;
+                  return (
+                    <button
+                      key={pl.id}
+                      onClick={() => handleSelectPlaylist(pl.uri)}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-800/95 border-emerald-500 shadow-lg text-white'
+                          : 'bg-slate-950/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {pl.images?.[0]?.url ? (
+                        <img src={pl.images[0].url} alt={pl.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
+                          <ListMusic className="w-5 h-5 text-emerald-400" />
+                        </div>
+                      )}
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-white truncate">{pl.name}</p>
+                        <span className="text-[10px] text-slate-400">{pl.tracks?.total || 0} faixas</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Custom Spotify URL Bar */}
+            <form onSubmit={handleApplyCustomUrl} className="flex gap-2 items-center pt-2">
+              <input
+                type="text"
+                placeholder="Ou cole o link de qualquer Playlist do Spotify (ex: https://open.spotify.com/playlist/...)"
+                value={customInputUrl}
+                onChange={e => setCustomInputUrl(e.target.value)}
+                className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-300 text-xs font-bold rounded-xl border border-emerald-500/40 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Carregar e Tocar</span>
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
-      {/* Modal de Configurações & Diagnóstico */}
+      {/* Modal de Configurações do Spotify */}
       {showConfigModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
@@ -520,7 +815,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
               </h4>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
+                className="text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -529,10 +824,10 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 text-xs text-slate-300">
               <p className="font-bold text-white flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-emerald-400" />
-                URI de Redirecionamento Atual:
+                URI de Redirecionamento (Redirect URI):
               </p>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Esta é a URL exata que o sistema está enviando para o Spotify:
+                Cadastre exatamente esta URL no seu aplicativo no Spotify Developer Dashboard se estiver usando Client ID próprio:
               </p>
               <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
                 <code className="text-[11px] text-emerald-300 font-mono flex-1 truncate">
@@ -565,16 +860,13 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
 
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Redirect URI Personalizada (Opcional):
+                  Token de Acesso Manual (Opcional):
                 </label>
                 <input
-                  type="text"
-                  placeholder="Deixe em branco para usar o automático..."
-                  value={customRedirectUri}
-                  onChange={e => {
-                    setCustomRedirectUri(e.target.value);
-                    localStorage.setItem('bjjcron_spotify_redirect_uri', e.target.value);
-                  }}
+                  type="password"
+                  placeholder="Cole um Access Token gerado no Spotify Console..."
+                  value={customTokenInput}
+                  onChange={e => setCustomTokenInput(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
@@ -583,7 +875,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}
-                  className="px-3.5 py-2 text-xs text-slate-400 hover:text-white"
+                  className="px-3.5 py-2 text-xs text-slate-400 hover:text-white cursor-pointer"
                 >
                   Fechar
                 </button>

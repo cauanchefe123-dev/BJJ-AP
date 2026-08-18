@@ -69,40 +69,43 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
   return (
     <div className="space-y-6">
       {/* Teacher Banner */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
-        <div className="space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Painel do Professor / Mestre
-          </span>
-          <h2 className="text-xl font-bold text-slate-100">
-            Controle de Tatame e Aulas
+      <div className="bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-950 border border-slate-800/90 rounded-3xl p-6 sm:p-7 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-lg">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              Painel do Mestre
+            </span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight">
+            Controle de Tatame e Treinos
           </h2>
-          <p className="text-xs text-slate-400">
-            Realize chamadas de aula, acompanhe a evolução técnica e agende exames de faixa.
+          <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
+            Realize chamadas rápidas, acompanhe a evolução técnica dos atletas e agende graduações.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => setIsNoticeModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
           >
-            <Megaphone className="w-4 h-4 text-slate-900" />
-            Disparar Comunicado
+            <Megaphone className="w-4 h-4 text-slate-950" />
+            <span>Disparar Comunicado</span>
           </button>
           <button
             onClick={onOpenCheckin}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all cursor-pointer active:scale-95"
           >
             <UserCheck className="w-4 h-4 text-slate-400" />
-            Registrar Presença
+            <span>Registrar Presença</span>
           </button>
           <button
             onClick={() => onNavigate('timer')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-semibold text-xs border border-slate-700/60 transition-all"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 transition-all cursor-pointer active:scale-95"
           >
-            <Flame className="w-4 h-4 text-slate-400" />
-            Cronômetro
+            <Flame className="w-4 h-4" />
+            <span>Cronômetro</span>
           </button>
         </div>
       </div>
@@ -110,29 +113,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       {/* Student Approvals Interface */}
       <PendingStudentApprovals />
 
-      {/* Classes Schedule Today */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Classes Schedule */}
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
           <div>
-            <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-amber-400" />
+            <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-amber-400" />
               Turmas Cadastradas
             </h3>
-            <p className="text-xs text-slate-400">Horários e categorias de aula na academia</p>
+            <p className="text-xs text-slate-400 mt-0.5">Horários, categorias de aula e foco técnico semanal</p>
           </div>
           <button
             onClick={() => onNavigate('classes')}
-            className="text-xs text-amber-400 font-semibold hover:underline"
+            className="text-xs text-amber-400 font-bold hover:underline cursor-pointer"
           >
-            Gerenciar Turmas
+            Gerenciar Turmas →
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {classes.map(c => (
-            <div key={c.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+            <div key={c.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 space-y-3 shadow-xs transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-amber-400 flex items-center gap-1">
+                <span className="text-xs font-black text-amber-400 flex items-center gap-1 font-mono">
                   <Clock className="w-3.5 h-3.5" />
                   {c.time} ({c.durationMinutes} min)
                 </span>
@@ -147,7 +150,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
               </div>
 
               {/* Foco da Semana */}
-              <div className="bg-amber-950/40 border border-amber-500/30 rounded-lg p-2.5 space-y-1.5">
+              <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase text-amber-400">
                     🎯 Foco & Vídeo da Semana:
@@ -158,24 +161,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                       setQuickFocusText(c.weeklyFocus || '');
                       setQuickFocusVideoUrl(c.weeklyFocusVideoUrl || '');
                     }}
-                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
+                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline cursor-pointer"
                     title="Editar Foco / Anexar Vídeo"
                   >
                     <Edit3 className="w-3 h-3" />
                     Editar
                   </button>
                 </div>
-                <p className="text-xs font-bold text-amber-100">
+                <p className="text-xs font-semibold text-slate-200">
                   {c.weeklyFocus || 'Nenhum foco definido.'}
                 </p>
 
                 {c.weeklyFocusVideoUrl && (
                   <button
                     onClick={() => setSelectedVideoClass(c)}
-                    className="w-full mt-1 py-1 px-2.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-1 transition-all"
+                    className="w-full mt-1 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Video className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Ver Vídeo Anexado</span>
+                    <span>Ver Vídeo da Posição</span>
                     <Play className="w-3 h-3 fill-amber-400 text-amber-400 ml-0.5" />
                   </button>
                 )}
@@ -185,7 +188,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                 <span>Capacidade: {c.maxCapacity} atletas</span>
                 <button
                   onClick={onOpenCheckin}
-                  className="text-amber-400 font-bold hover:underline"
+                  className="text-amber-400 font-bold hover:underline cursor-pointer"
                 >
                   Fazer Chamada →
                 </button>
@@ -196,28 +199,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       </div>
 
       {/* Recent Presences Today */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4">
-        <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-emerald-400" />
-          Presenças Registradas Hoje ({todayAttendances.length})
-        </h3>
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+        <div className="border-b border-slate-800/80 pb-3.5">
+          <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            Presenças Registradas Hoje ({todayAttendances.length})
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">Check-ins de atletas validados no dia de hoje</p>
+        </div>
 
         {todayAttendances.length === 0 ? (
-          <p className="text-xs text-slate-500 py-6 text-center">Nenhum check-in de atleta realizado hoje até o momento.</p>
+          <div className="p-8 text-center bg-slate-950/50 rounded-2xl border border-slate-800/60">
+            <p className="text-xs text-slate-400">Nenhum check-in de atleta realizado hoje até o momento.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {todayAttendances.map(a => {
               const student = students.find(s => s.id === a.studentId);
               return (
-                <div key={a.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <div key={a.id} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs">
                   <div className="flex items-center gap-2.5">
-                    <img src={student?.photoUrl} alt={a.studentName} className="w-8 h-8 rounded-full object-cover" />
+                    <img src={student?.photoUrl} alt={a.studentName} className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-900" />
                     <div>
                       <p className="text-xs font-bold text-slate-200">{a.studentName}</p>
                       <p className="text-[10px] text-slate-400">{a.className}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/40">
+                  <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
                     {new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -227,24 +235,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
         )}
       </div>
 
-      {/* Aptos a Graduar (Atletas que Atingiram a Meta de Treinos) */}
+      {/* Aptos a Graduar */}
       {(() => {
         const studentsReadyForGraduation = students.filter(s =>
           isStudentEligibleForGraduation(s, academyConfig)
         );
         return (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
               <div>
-                <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
-                  <Award className="w-5 h-5 text-amber-400" />
+                <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-400" />
                   Alunos Aptos a Graduar ({studentsReadyForGraduation.length})
                 </h3>
-                <p className="text-xs text-slate-400">Atletas que atingiram ou ultrapassaram a meta de treinos pós-grau</p>
+                <p className="text-xs text-slate-400 mt-0.5">Atletas que atingiram ou ultrapassaram a meta de treinos pós-grau</p>
               </div>
               <button
                 onClick={() => onNavigate('students')}
-                className="text-xs text-amber-400 font-semibold hover:underline flex items-center gap-1"
+                className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
                 Gerenciar Graduações <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
@@ -252,20 +260,22 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {studentsReadyForGraduation.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 col-span-full text-center">Nenhum aluno atingiu a meta de treinos no momento.</p>
+                <div className="p-8 text-center bg-slate-950/50 rounded-2xl border border-slate-800/60 col-span-full">
+                  <p className="text-xs text-slate-400">Nenhum aluno atingiu a meta de treinos no momento.</p>
+                </div>
               ) : (
                 studentsReadyForGraduation.map(s => {
                   const target = getStudentGraduationTarget(s, academyConfig);
                   const hasCustom = typeof s.customGraduationTargetClasses === 'number' && s.customGraduationTargetClasses > 0;
                   return (
-                    <div key={s.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                    <div key={s.id} className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs">
                       <div className="flex items-center gap-2.5">
-                        <img src={s.photoUrl} alt={s.name} className="w-10 h-10 rounded-full object-cover border border-amber-400/40" />
+                        <img src={s.photoUrl} alt={s.name} className="w-10 h-10 rounded-xl object-cover border border-amber-400/40 bg-slate-900" />
                         <div>
                           <div className="flex items-center gap-1">
                             <p className="text-xs font-bold text-slate-100 truncate max-w-[100px]">{s.name}</p>
                             {hasCustom && (
-                              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1 py-0.2 rounded font-bold" title="Meta individual de treinos">
+                              <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-bold" title="Meta individual de treinos">
                                 🎯
                               </span>
                             )}
@@ -277,10 +287,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                       </div>
 
                       <div className="text-right">
-                        <span className="text-xs font-extrabold text-emerald-400 block">
+                        <span className="text-xs font-black text-emerald-400 block font-mono">
                           {s.classesSinceLastGraduation}/{target}
                         </span>
-                        <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-black uppercase">
+                        <span className="text-[9px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-black uppercase">
                           Apto
                         </span>
                       </div>
@@ -296,29 +306,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       {/* Disparar Aviso Push Modal */}
       {isNoticeModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-md w-full p-6 text-white space-y-4 shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white space-y-4 shadow-2xl relative">
             <button
               onClick={() => setIsNoticeModalOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              className="absolute top-5 right-5 p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-2.5 text-amber-400">
-              <Megaphone className="w-6 h-6" />
-              <h3 className="font-extrabold text-lg text-slate-100">Disparar Aviso Push aos Alunos</h3>
+              <Megaphone className="w-5 h-5" />
+              <h3 className="font-black text-lg text-slate-100">Disparar Aviso aos Alunos</h3>
             </div>
             <p className="text-xs text-slate-400">
-              Sua mensagem será enviada instantaneamente para a Central de Notificações dos alunos e como Alerta Push no navegador.
+              Sua mensagem será enviada instantaneamente para a Central de Notificações dos alunos.
             </p>
 
-            <form onSubmit={handleSendNotice} className="space-y-4 text-xs">
+            <form onSubmit={handleSendNotice} className="space-y-3.5 text-xs">
               <div>
                 <label className="text-slate-300 font-bold block mb-1">Turma Destino *</label>
                 <select
                   value={noticeData.targetClassId}
                   onChange={e => setNoticeData({ ...noticeData, targetClassId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-amber-500 outline-none"
                 >
                   <option value="ALL">📢 Todas as Turmas e Alunos</option>
                   {classes.map(c => (
@@ -336,7 +346,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                   required
                   value={noticeData.title}
                   onChange={e => setNoticeData({ ...noticeData, title: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-amber-500 outline-none"
                   placeholder="Ex: Treino Especial de Sábado com Kimono Branco"
                 />
               </div>
@@ -348,51 +358,52 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                   rows={3}
                   value={noticeData.message}
                   onChange={e => setNoticeData({ ...noticeData, message: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                  placeholder="Ex: Pessoal, neste sábado teremos seminário de raspagens e entrega de graus às 10h. Não percam!"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-amber-500 outline-none"
+                  placeholder="Ex: Pessoal, neste sábado teremos seminário de raspagens às 10h. Não percam!"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsNoticeModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold shadow-md flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
-                  Enviar Notificação Push
+                  <span>Enviar Aviso</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* Quick Edit Focus & Video Modal */}
       {quickFocusClassId && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-md w-full p-6 text-white space-y-4 shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white space-y-4 shadow-2xl relative">
             <button
               onClick={() => setQuickFocusClassId(null)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              className="absolute top-5 right-5 p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-2 text-amber-400">
-              <Target className="w-6 h-6" />
-              <h3 className="font-bold text-lg text-slate-100">Foco Técnico & Vídeo da Semana</h3>
+              <Target className="w-5 h-5" />
+              <h3 className="font-black text-lg text-slate-100">Foco Técnico da Semana</h3>
             </div>
             <p className="text-xs text-slate-400">
-              Defina a técnica e anexe um link de vídeo para os alunos assistirem no aplicativo.
+              Defina a técnica e anexe um link de vídeo para os alunos assistirem.
             </p>
 
-            <form onSubmit={handleSaveQuickFocus} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveQuickFocus} className="space-y-3.5 text-xs">
               <div>
                 <label className="text-slate-300 font-bold block mb-1">Técnica / Posição da Semana *</label>
                 <textarea
@@ -400,32 +411,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                   rows={3}
                   value={quickFocusText}
                   onChange={e => setQuickFocusText(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-amber-500 outline-none"
                   placeholder="Ex: Passagem de Guarda Emborcada & Raspagem De La Riva"
                 />
               </div>
 
               <div>
-                <label className="text-slate-300 font-bold block mb-1">🎥 Vídeo da Posição (Link ou Upload de Arquivo)</label>
+                <label className="text-slate-300 font-bold block mb-1">🎥 Vídeo da Posição (Link ou Upload)</label>
                 
                 <input
                   type="url"
                   value={quickFocusVideoUrl}
                   onChange={e => setQuickFocusVideoUrl(e.target.value)}
                   disabled={isUploadingVideo}
-                  className="w-full bg-slate-950 border border-amber-500/30 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none mb-2 text-xs"
-                  placeholder="Cole um link do YouTube, Instagram, MP4 ou Google Drive"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-amber-500 outline-none mb-2 text-xs"
+                  placeholder="Cole um link do YouTube, Instagram ou Drive"
                 />
 
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 font-bold uppercase">ou</span>
-                  <label className={`flex-1 cursor-pointer bg-slate-950 border border-dashed border-amber-500/40 hover:border-amber-400 rounded-xl p-2 text-center text-xs text-amber-400 hover:text-amber-300 font-bold transition-all flex items-center justify-center gap-2 ${isUploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <label className={`flex-1 cursor-pointer bg-slate-950 border border-dashed border-amber-500/40 hover:border-amber-400 rounded-xl p-2.5 text-center text-xs text-amber-400 hover:text-amber-300 font-bold transition-all flex items-center justify-center gap-2 ${isUploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
                     {isUploadingVideo ? (
                       <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                     ) : (
                       <Video className="w-4 h-4" />
                     )}
-                    <span>{isUploadingVideo ? `Enviando Vídeo... (${uploadProgress}%)` : 'Anexar Arquivo de Vídeo do Dispositivo'}</span>
+                    <span>{isUploadingVideo ? `Enviando Vídeo... (${uploadProgress}%)` : 'Anexar Arquivo de Vídeo'}</span>
                     <input
                       type="file"
                       accept="video/*"
@@ -442,8 +453,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                             });
                             setQuickFocusVideoUrl(cloudUrl);
                           } catch (err: any) {
-                            console.error("Erro ao enviar vídeo para nuvem:", err);
-                            alert(err?.message || "Não foi possível processar o arquivo de vídeo. Tente colar o link do YouTube ou Drive.");
+                            console.error("Erro ao enviar vídeo:", err);
+                            alert(err?.message || "Não foi possível processar o arquivo de vídeo.");
                           } finally {
                             setIsUploadingVideo(false);
                             setUploadProgress(0);
@@ -457,12 +468,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                 {isUploadingVideo && (
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center justify-between text-[11px] text-amber-400 font-bold">
-                      <span>Processando e otimizando para celulares...</span>
+                      <span>Processando vídeo...</span>
                       <span>{uploadProgress}%</span>
                     </div>
                     <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                       <div
-                        className="bg-gradient-to-r from-amber-500 to-amber-400 h-full transition-all duration-300"
+                        className="bg-amber-500 h-full transition-all duration-300"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -470,37 +481,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                 )}
 
                 {quickFocusVideoUrl && !isUploadingVideo && (
-                  <div className="mt-2 text-[11px] text-emerald-400 font-bold flex items-center justify-between bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/30">
-                    <span className="truncate">✓ Vídeo pronto para os alunos ({quickFocusVideoUrl.startsWith('http') ? 'Cloud/Link' : 'Anexo Local'})</span>
+                  <div className="mt-2 text-[11px] text-emerald-400 font-bold flex items-center justify-between bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/30">
+                    <span className="truncate">✓ Vídeo pronto para os alunos</span>
                     <button
                       type="button"
                       onClick={() => setQuickFocusVideoUrl('')}
-                      className="text-rose-400 hover:underline ml-2 shrink-0"
+                      className="text-rose-400 hover:underline ml-2 shrink-0 cursor-pointer"
                     >
                       Remover
                     </button>
                   </div>
                 )}
-
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Alunos poderão assistir o vídeo diretamente no aplicativo na Central de Turmas.
-                </span>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setQuickFocusClassId(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold shadow-md flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Salvar Foco & Vídeo
+                  <span>Salvar Foco</span>
                 </button>
               </div>
             </form>

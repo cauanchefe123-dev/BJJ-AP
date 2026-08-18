@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, ShieldCheck, QrCode, Search, LogIn, UserCheck, Calendar } from 'lucide-react';
+import { Menu, Bell, ShieldCheck, QrCode, Search, LogIn, UserCheck, Calendar, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { DEFAULT_BLACK_GI_AVATAR, getUserAvatar, resolveStudentForUser } from '../../constants/avatar';
@@ -39,147 +39,125 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadNotifsCount = notifications.filter(n => !n.readBy.includes(userId)).length;
 
   const tabTitles: Record<string, string> = {
-    dashboard: 'Painel Principal',
-    'weekly-focus': 'Progresso de Aprendizagem',
+    dashboard: 'Painel Geral',
+    'weekly-focus': 'Progresso & Técnicas',
+    'students-dashboard': 'Dashboard dos Alunos',
     attendance: 'Controle de Frequência',
+    academies: 'Vincular Academia',
     students: 'Alunos & Graduações',
-    classes: 'Turmas & Horários de Treino',
-    card: 'Minha Carteirinha Digital',
-    journal: 'Diário de Treinos & Técnicas',
-    ranking: 'Ranking de Frequência',
-    timer: 'Cronômetro de Rola do Tatame',
-    reports: 'Relatórios & Desempenho',
-    settings: 'Configurações da Academia',
+    teachers: 'Professores & Staff',
+    classes: 'Turmas & Horários',
+    card: 'Carteirinha Digital',
+    journal: 'Diário de Treinos',
+    observations: 'Observações do Professor',
+    ranking: 'Ranking da Academia',
+    timer: 'Cronômetro do Tatame',
+    reports: 'Relatórios & Métricas',
+    settings: 'Configurações',
   };
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white px-3 sm:px-4 py-2.5 flex items-center justify-between print:hidden shadow-lg">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 text-white px-3.5 sm:px-6 py-3 flex items-center justify-between print:hidden shadow-md">
+        {/* Left: Mobile Toggle & Page Context */}
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onOpenSidebar}
-            className="p-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 active:bg-slate-800 lg:hidden shrink-0"
-            title="Abrir menu"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 active:bg-slate-800 lg:hidden shrink-0 transition-colors cursor-pointer"
+            title="Abrir menu lateral"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-            <img
-              src={academyConfig.logoUrl || '/logo.svg'}
-              alt="BJJCRON Logo"
-              className="w-8 h-8 rounded-lg object-contain bg-slate-950 p-0.5 border border-slate-700/80 shadow-xs shrink-0"
-            />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative">
+              <img
+                src={academyConfig.logoUrl || '/logo.svg'}
+                alt="Logo"
+                className="w-8 h-8 rounded-xl object-contain bg-slate-900 p-1 border border-slate-700/60 shadow-xs shrink-0"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950"></span>
+            </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 truncate">
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-100 tracking-tight truncate">
                 {tabTitles[activeTab] || 'BJJCRON'}
               </h2>
-              <p className="text-[10px] text-slate-400 hidden sm:block truncate">
+              <p className="text-[11px] text-slate-400 hidden sm:block truncate font-medium">
                 {academyConfig.fantasyName || academyConfig.name}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Right: Quick Actions & Profile */}
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           {/* Daily Attendance Modal Button for Teachers/Admins */}
           {(currentUser?.role === 'PROFESSOR' || currentUser?.role === 'ADMIN') && onOpenDailyAttendance && (
             <button
               onClick={onOpenDailyAttendance}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-xs border border-slate-700/60 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-xs border border-slate-800 hover:border-slate-700 transition-all active:scale-95 cursor-pointer shadow-xs"
               title="Ver Presenças do Dia"
             >
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span className="hidden md:inline">Quem Treinou Hoje</span>
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hidden md:inline">Treinos de Hoje</span>
             </button>
           )}
 
-          {/* Quick Checkin Button for Students */}
-          {currentUser?.role === 'ALUNO' && onOpenQuickScan && (
-            <>
-              {/* Mobile Icon-only Button */}
-              <button
-                onClick={onOpenQuickScan}
-                className="flex sm:hidden p-2 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
-                title="Bater Frequência"
-              >
-                <UserCheck className="w-4 h-4" />
-              </button>
-              {/* Desktop Full Button */}
-              <button
-                onClick={onOpenQuickScan}
-                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-white text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4" />
-                Bater Frequência
-              </button>
-            </>
+          {/* Quick Checkin Button */}
+          {onOpenQuickScan && (
+            <button
+              onClick={onOpenQuickScan}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-sm hover:shadow transition-all active:scale-95 cursor-pointer"
+              title={currentUser?.role === 'ALUNO' ? 'Bater Frequência' : 'Registrar Presença'}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-slate-950" />
+              <span className="hidden sm:inline">
+                {currentUser?.role === 'ALUNO' ? 'Bater Frequência' : 'Registrar Presença'}
+              </span>
+            </button>
           )}
 
-          {/* Quick Checkin Button for Professor/Admin */}
-          {(currentUser?.role === 'PROFESSOR' || currentUser?.role === 'ADMIN') && onOpenQuickScan && (
-            <>
-              {/* Mobile Icon-only Button */}
-              <button
-                onClick={onOpenQuickScan}
-                className="flex sm:hidden p-2 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
-                title="Registrar Presença"
-              >
-                <UserCheck className="w-4 h-4" />
-              </button>
-              {/* Desktop Full Button */}
-              <button
-                onClick={onOpenQuickScan}
-                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-white text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4" />
-                Registrar Presença
-              </button>
-            </>
-          )}
-
-          {/* Central Notification Bell for Students, Professors, Admins */}
+          {/* Notification Bell */}
           <button
             onClick={() => setIsNotifOpen(true)}
-            className="relative p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-amber-400 transition-all border border-slate-700/60"
-            title="Notificações e Alertas em Tempo Real"
+            className="relative p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white transition-all border border-slate-800 hover:border-slate-700 cursor-pointer shadow-xs"
+            title="Notificações e Avisos"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {unreadNotifsCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
                 {unreadNotifsCount}
               </span>
             )}
           </button>
 
-          {/* Account / Login Trigger */}
+          {/* Account / User Trigger Pill */}
           <button
             onClick={onOpenAuthModal}
-            className="flex items-center gap-2.5 pl-3 border-l border-slate-800 hover:opacity-80 transition-all text-left"
-            title="Entrar ou alterar conta"
+            className="flex items-center gap-2.5 pl-3 border-l border-slate-800/80 hover:opacity-90 transition-all text-left cursor-pointer group"
+            title="Gerenciar ou Trocar de Conta"
           >
             <div className="text-right hidden md:block">
-              <span className="text-xs font-bold text-slate-200 block truncate max-w-[140px]">
-                {currentUser?.name || 'Fazer Login'}
+              <span className="text-xs font-bold text-slate-200 block truncate max-w-[130px] group-hover:text-white transition-colors">
+                {currentUser?.name || 'Entrar'}
               </span>
-              <span className="text-[10px] text-amber-400 flex items-center justify-end gap-1 font-medium">
-                <LogIn className="w-3 h-3 text-amber-400" />
-                Entrar / Trocar
+              <span className="text-[10px] text-amber-400 font-semibold flex items-center justify-end gap-1">
+                <LogIn className="w-2.5 h-2.5" />
+                {currentUser?.role === 'ADMIN' ? 'Administrador' : currentUser?.role === 'PROFESSOR' ? 'Professor' : 'Atleta'}
               </span>
             </div>
 
             <img
               src={userAvatar}
               alt="Avatar"
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-amber-500/40 bg-slate-900"
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-slate-700 group-hover:ring-amber-500/50 bg-slate-900 transition-all shadow-xs"
             />
           </button>
         </div>
       </header>
 
-      {/* Notification Center Popover / Modal */}
+      {/* Notification Center Modal */}
       <NotificationCenter isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
     </>
   );
 };
-
