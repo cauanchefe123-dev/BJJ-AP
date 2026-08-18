@@ -108,9 +108,18 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const [customTokenInput, setCustomTokenInput] = useState('');
   const [copiedRedirect, setCopiedRedirect] = useState(false);
 
-  const redirectUri = typeof window !== 'undefined' 
-    ? `${window.location.origin}/api/spotify/callback` 
-    : '';
+  const [customRedirectUri, setCustomRedirectUri] = useState(() => {
+    return localStorage.getItem('bjjcron_spotify_redirect_uri') || '';
+  });
+
+  const getRedirectUri = () => {
+    if (customRedirectUri.trim()) return customRedirectUri.trim();
+    if (typeof window === 'undefined') return '';
+    const origin = window.location.origin.replace(/\/+$/, '');
+    return `${origin}/api/spotify/callback`;
+  };
+
+  const redirectUri = getRedirectUri();
 
   // Check if token exists on load and fetch profile
   const checkToken = useCallback(async () => {
@@ -380,26 +389,35 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
               </button>
             </div>
           ) : (
-            <button
-              id="spotify-login-button"
-              onClick={handleConnectSpotify}
-              disabled={isLoadingAuth}
-              className="px-4 py-2 bg-[#1DB954] hover:bg-[#1ed760] text-black font-black rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 transform active:scale-95 cursor-pointer hover:shadow-emerald-500/40"
-            >
-              {isLoadingAuth ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Conectando...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.216.354-.675.466-1.029.25-2.822-1.724-6.374-2.114-10.558-1.158-.403.093-.807-.16-.9-.562-.093-.404.16-.808.562-.901 4.577-1.047 8.508-.604 11.675 1.341.354.217.466.676.25 1.03zm1.47-3.268c-.272.443-.854.584-1.297.312-3.23-1.986-8.156-2.56-11.978-1.4-1.498.15-2.001-.225-2.152-.723-.15-.498.225-1.002.723-1.152 4.37-1.327 9.803-.687 13.492 1.58.443.272.584.854.312 1.297v.086zm.126-3.41c-3.873-2.3-10.264-2.512-13.978-1.384-.593.18-1.222-.16-1.402-.754-.18-.593.16-1.222.754-1.402 4.268-1.296 11.317-1.054 15.782 1.597.533.316.707 1.005.391 1.538-.316.533-1.005.707-1.538.391l-.009.014z" />
-                  </svg>
-                  <span>Entrar com Spotify</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                id="spotify-login-button"
+                onClick={handleConnectSpotify}
+                disabled={isLoadingAuth}
+                className="px-4 py-2 bg-[#1DB954] hover:bg-[#1ed760] text-black font-black rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 transform active:scale-95 cursor-pointer hover:shadow-emerald-500/40"
+              >
+                {isLoadingAuth ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Conectando...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.216.354-.675.466-1.029.25-2.822-1.724-6.374-2.114-10.558-1.158-.403.093-.807-.16-.9-.562-.093-.404.16-.808.562-.901 4.577-1.047 8.508-.604 11.675 1.341.354.217.466.676.25 1.03zm1.47-3.268c-.272.443-.854.584-1.297.312-3.23-1.986-8.156-2.56-11.978-1.4-1.498.15-2.001-.225-2.152-.723-.15-.498.225-1.002.723-1.152 4.37-1.327 9.803-.687 13.492 1.58.443.272.584.854.312 1.297v.086zm.126-3.41c-3.873-2.3-10.264-2.512-13.978-1.384-.593.18-1.222-.16-1.402-.754-.18-.593.16-1.222.754-1.402 4.268-1.296 11.317-1.054 15.782 1.597.533.316.707 1.005.391 1.538-.316.533-1.005.707-1.538.391l-.009.014z" />
+                    </svg>
+                    <span>Entrar com Spotify</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowConfigModal(true)}
+                title="Configurações e diagnóstico de conexão Spotify"
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all cursor-pointer"
+              >
+                <Settings2 className="w-4 h-4" />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -561,6 +579,96 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
           className="w-full"
         />
       </div>
+
+      {/* Modal de Configurações & Diagnóstico */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-emerald-400" />
+                Configurações da Conexão Spotify
+              </h4>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="text-slate-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 text-xs text-slate-300">
+              <p className="font-bold text-white flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-emerald-400" />
+                URI de Redirecionamento Atual:
+              </p>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Esta é a URL exata que o sistema está enviando para o Spotify:
+              </p>
+              <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                <code className="text-[11px] text-emerald-300 font-mono flex-1 truncate">
+                  {redirectUri}
+                </code>
+                <button
+                  type="button"
+                  onClick={copyRedirect}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedRedirect ? 'Copiado!' : 'Copiar'}</span>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveConfig} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Spotify Client ID:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Client ID..."
+                  value={customClientId}
+                  onChange={e => setCustomClientId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Redirect URI Personalizada (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Deixe em branco para usar o automático..."
+                  value={customRedirectUri}
+                  onChange={e => {
+                    setCustomRedirectUri(e.target.value);
+                    localStorage.setItem('bjjcron_spotify_redirect_uri', e.target.value);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="px-3.5 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all cursor-pointer"
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
