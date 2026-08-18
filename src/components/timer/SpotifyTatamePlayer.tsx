@@ -15,10 +15,11 @@ import {
   Check, 
   Copy, 
   AlertCircle,
-  ExternalLink,
+  Speaker,
   Laptop,
   Smartphone,
-  Speaker
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import { 
   SpotifyService, 
@@ -46,6 +47,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const [user, setUser] = useState<SpotifyUser | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
 
   // Connection Settings
   const [clientId, setClientId] = useState<string>(() => SpotifyService.getCustomClientId());
@@ -60,9 +62,11 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const [devices, setDevices] = useState<any[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [userPlaylists, setUserPlaylists] = useState<SpotifyPlaylistItem[]>([]);
+  const [activePlaylistUri, setActivePlaylistUri] = useState<string>('');
   const [volume, setVolume] = useState<number>(80);
   const [isMuted, setIsMuted] = useState(false);
   const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [isBrowserSdkReady, setIsBrowserSdkReady] = useState(false);
 
   // Auto-DJ settings
   const [autoPauseOnRest, setAutoPauseOnRest] = useState<boolean>(() => {
@@ -76,7 +80,76 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const previousRunningRef = useRef<boolean>(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check URL parameters for OAuth return (code / error)
+  // Load user data, devices & playlists
+  const loadUserData = useCallback(async () => {
+    const profile = await SpotifyService.getUserProfile();
+    if (profile) {
+      setUser(profile);
+
+      // Fetch Devices
+      const devList = await SpotifyService.getDevices();
+      setDevices(devList);
+      
+      const activeDev = devList.find(d => d.is_active) || devList[0];
+      if (activeDev) {
+        setSelectedDeviceId(activeDev.id);
+        if (typeof activeDev.volume_percent === 'number') {
+          setVolume(activeDev.volume_percent);
+        }
+      }
+
+      // Fetch Playlists
+      const plList = await SpotifyService.getUserPlaylists(30);
+      setUserPlaylists(plList);
+
+      // Fetch Current Playback
+      const state = await SpotifyService.getPlaybackState();
+      if (state) {
+        setPlayback(state);
+      }
+
+      // Initialize In-Browser Web Playback SDK for Premium users
+      if (profile.product === 'premium') {
+        SpotifyService.initWebPlaybackSDK({
+          onReady: (devId) => {
+            setIsBrowserSdkReady(true);
+            setSelectedDeviceId(devId);
+            // Refresh device list
+            SpotifyService.getDevices().then(setDevices);
+          },
+          onStateChange: (sdkState) => {
+            if (sdkState) {
+              setPlayback(prev => ({
+                is_playing: !sdkState.paused,
+                progress_ms: sdkState.position,
+                item: sdkState.track_window?.current_track ? {
+                  id: sdkState.track_window.current_track.id,
+                  name: sdkState.track_window.current_track.name,
+                  duration_ms: sdkState.track_window.current_track.duration_ms,
+                  uri: sdkState.track_window.current_track.uri,
+                  artists: sdkState.track_window.current_track.artists,
+                  album: {
+                    id: '',
+                    name: sdkState.track_window.current_track.album?.name || '',
+                    images: sdkState.track_window.current_track.album?.images || []
+                  }
+                } : null,
+                device: prev?.device
+              }));
+            }
+          },
+          onError: (errMsg) => {
+            console.warn('Spotify Web Playback SDK:', errMsg);
+          }
+        });
+      }
+    } else {
+      setUser(null);
+      setPlayback(null);
+    }
+  }, []);
+
+  // Check URL parameters for OAuth code / error on redirect
   useEffect(() => {
     const handleUrlCode = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -84,8 +157,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       const error = urlParams.get('error');
 
       if (error) {
-        setAuthError(`Erro na autorização do Spotify: ${error}`);
-        // Clean URL
+        setAuthError(`Erro na autorização: ${error}`);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
@@ -98,23 +170,24 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
           if (tokenData && tokenData.accessToken) {
             SpotifyService.setToken(tokenData.accessToken, tokenData.expiresIn, tokenData.refreshToken);
             await loadUserData();
+            setStatusFeedback('Conectado ao Spotify com sucesso!');
+            setTimeout(() => setStatusFeedback(null), 3000);
           } else {
-            setAuthError('Não foi possível obter o token do Spotify. Verifique se o Redirect URI está cadastrado.');
+            setAuthError('Não foi possível obter o token. Verifique se o Redirect URI está cadastrado no Spotify Developer Dashboard.');
           }
         } catch (e: any) {
           setAuthError(e?.message || 'Erro ao processar login do Spotify');
         } finally {
           setIsAuthenticating(false);
-          // Clean URL
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
     };
 
     handleUrlCode();
-  }, [clientId, customRedirectUri]);
+  }, [clientId, customRedirectUri, loadUserData]);
 
-  // Listen for popup window message
+  // Listen for popup message from /api/spotify/callback
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'SPOTIFY_AUTH_CODE' && event.data.code) {
@@ -129,6 +202,8 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
           if (tokenData && tokenData.accessToken) {
             SpotifyService.setToken(tokenData.accessToken, tokenData.expiresIn, tokenData.refreshToken);
             await loadUserData();
+            setStatusFeedback('Conectado ao Spotify com sucesso!');
+            setTimeout(() => setStatusFeedback(null), 3000);
           } else {
             setAuthError('Falha ao autenticar com o Spotify.');
           }
@@ -145,42 +220,14 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [clientId, customRedirectUri]);
+  }, [clientId, customRedirectUri, loadUserData]);
 
-  // Load User Data & Playlists on Mount if token exists
-  const loadUserData = useCallback(async () => {
-    const profile = await SpotifyService.getUserProfile();
-    if (profile) {
-      setUser(profile);
-      // Fetch devices
-      const devList = await SpotifyService.getDevices();
-      setDevices(devList);
-      const activeDev = devList.find(d => d.is_active) || devList[0];
-      if (activeDev) {
-        setSelectedDeviceId(activeDev.id);
-        if (typeof activeDev.volume_percent === 'number') {
-          setVolume(activeDev.volume_percent);
-        }
-      }
-      // Fetch Playlists
-      const plList = await SpotifyService.getUserPlaylists(20);
-      setUserPlaylists(plList);
-      // Fetch Current Playback
-      const state = await SpotifyService.getPlaybackState();
-      if (state) {
-        setPlayback(state);
-      }
-    } else {
-      setUser(null);
-      setPlayback(null);
-    }
-  }, []);
-
+  // Initial load
   useEffect(() => {
     loadUserData();
   }, [loadUserData]);
 
-  // Polling for playback state when connected
+  // Playback polling
   useEffect(() => {
     if (!user) {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -192,30 +239,32 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       if (state) {
         setPlayback(state);
       }
+      const devList = await SpotifyService.getDevices();
+      setDevices(devList);
     };
 
-    pollIntervalRef.current = setInterval(refreshPlayback, 3500);
+    pollIntervalRef.current = setInterval(refreshPlayback, 3000);
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, [user]);
 
-  // Auto-DJ sync with MatTimer
+  // Auto-DJ sync with Tatame Timer
   useEffect(() => {
-    if (!user || !playback) return;
+    if (!user) return;
 
-    // Transition into Rest
+    // Transition into Rest (Pause music)
     if (autoPauseOnRest && isResting && !previousRestRef.current && isTimerRunning) {
-      if (playback.is_playing) {
+      if (playback?.is_playing) {
         SpotifyService.pause(selectedDeviceId);
         setPlayback(prev => prev ? { ...prev, is_playing: false } : null);
       }
     }
 
-    // Transition out of Rest back into Round
+    // Transition out of Rest back into Round (Resume music)
     if (autoPauseOnRest && !isResting && previousRestRef.current && isTimerRunning) {
       if (skipOnRoundStart) {
-        SpotifyService.nextTrack();
+        SpotifyService.nextTrack(selectedDeviceId);
       }
       SpotifyService.play(undefined, selectedDeviceId);
       setPlayback(prev => prev ? { ...prev, is_playing: true } : null);
@@ -248,7 +297,6 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       );
 
       if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        // Fallback: full redirect if popup blocked
         window.location.href = authUrl;
       }
     } catch (e: any) {
@@ -264,16 +312,70 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     setUserPlaylists([]);
   };
 
+  // Device selection & transfer
+  const handleSelectDevice = async (devId: string) => {
+    setSelectedDeviceId(devId);
+    setIsLoadingAction(true);
+    const ok = await SpotifyService.transferPlayback(devId, playback?.is_playing ?? true);
+    if (ok) {
+      setStatusFeedback('Dispositivo ativado com sucesso!');
+      setTimeout(() => setStatusFeedback(null), 2500);
+    }
+    setIsLoadingAction(false);
+  };
+
   // Playback actions
   const handleTogglePlay = async () => {
     if (!user) return;
     setIsLoadingAction(true);
+    setAuthError(null);
+
     if (playback?.is_playing) {
       await SpotifyService.pause(selectedDeviceId);
       setPlayback(prev => prev ? { ...prev, is_playing: false } : null);
     } else {
-      await SpotifyService.play(undefined, selectedDeviceId);
-      setPlayback(prev => prev ? { ...prev, is_playing: true } : null);
+      const res = await SpotifyService.play(activePlaylistUri || undefined, selectedDeviceId);
+      if (res.success) {
+        setPlayback(prev => prev ? { ...prev, is_playing: true } : null);
+      } else {
+        // If no active device, instruct user
+        if (devices.length === 0) {
+          setAuthError('Nenhum dispositivo Spotify detectado. Abra o aplicativo do Spotify no seu celular ou computador para iniciar.');
+        } else {
+          setAuthError(`Não foi possível iniciar: ${res.error || 'Selecione um dispositivo ativo'}`);
+        }
+      }
+    }
+    setIsLoadingAction(false);
+  };
+
+  const handlePlayPlaylist = async (playlist: SpotifyPlaylistItem) => {
+    if (!user) return;
+    setIsLoadingAction(true);
+    setActivePlaylistUri(playlist.uri);
+    setAuthError(null);
+    setStatusFeedback(`Iniciando playlist: ${playlist.name}...`);
+
+    let targetDev = selectedDeviceId;
+    if (!targetDev && devices.length > 0) {
+      targetDev = devices[0].id;
+      setSelectedDeviceId(targetDev);
+    }
+
+    const result = await SpotifyService.play(playlist.uri, targetDev);
+    if (result.success) {
+      setStatusFeedback(`▶️ Tocando: ${playlist.name}`);
+      setTimeout(() => setStatusFeedback(null), 3000);
+      setTimeout(async () => {
+        const state = await SpotifyService.getPlaybackState();
+        if (state) setPlayback(state);
+      }, 600);
+    } else {
+      if (devices.length === 0) {
+        setAuthError('Abra o aplicativo Spotify em seu celular ou PC (ou toque em "Ativar Player do Navegador") para ouvir a música.');
+      } else {
+        setAuthError(`Erro ao tocar playlist: ${result.error}`);
+      }
     }
     setIsLoadingAction(false);
   };
@@ -281,7 +383,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const handleNext = async () => {
     if (!user) return;
     setIsLoadingAction(true);
-    await SpotifyService.nextTrack();
+    await SpotifyService.nextTrack(selectedDeviceId);
     setTimeout(async () => {
       const state = await SpotifyService.getPlaybackState();
       if (state) setPlayback(state);
@@ -292,7 +394,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   const handlePrevious = async () => {
     if (!user) return;
     setIsLoadingAction(true);
-    await SpotifyService.previousTrack();
+    await SpotifyService.previousTrack(selectedDeviceId);
     setTimeout(async () => {
       const state = await SpotifyService.getPlaybackState();
       if (state) setPlayback(state);
@@ -300,30 +402,19 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
     }, 400);
   };
 
-  const handlePlayPlaylist = async (uri: string) => {
-    if (!user) return;
-    setIsLoadingAction(true);
-    await SpotifyService.play(uri, selectedDeviceId);
-    setTimeout(async () => {
-      const state = await SpotifyService.getPlaybackState();
-      if (state) setPlayback(state);
-      setIsLoadingAction(false);
-    }, 500);
-  };
-
   const handleVolumeChange = async (newVol: number) => {
     setVolume(newVol);
     setIsMuted(newVol === 0);
-    await SpotifyService.setVolume(newVol);
+    await SpotifyService.setVolume(newVol, selectedDeviceId);
   };
 
   const handleToggleMute = async () => {
     if (isMuted) {
       setIsMuted(false);
-      await SpotifyService.setVolume(volume || 80);
+      await SpotifyService.setVolume(volume || 80, selectedDeviceId);
     } else {
       setIsMuted(true);
-      await SpotifyService.setVolume(0);
+      await SpotifyService.setVolume(0, selectedDeviceId);
     }
   };
 
@@ -389,14 +480,22 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
         </div>
       </div>
 
-      {/* Auth Error Banner */}
+      {/* Success/Action Feedback */}
+      {statusFeedback && (
+        <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{statusFeedback}</span>
+        </div>
+      )}
+
+      {/* Auth / Playback Error Banner */}
       {authError && (
         <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-          <div className="flex-1">
+          <div className="flex-1 space-y-1">
             <p className="font-semibold">{authError}</p>
-            <p className="text-[11px] text-rose-300/80 mt-1">
-              Dica: Certifique-se de que a Redirect URI do seu aplicativo no Spotify Developer Dashboard corresponde à URL deste app.
+            <p className="text-[11px] text-rose-300/80">
+              💡 Abra o app do Spotify no seu celular, computador ou caixa de som para começar a tocar.
             </p>
           </div>
         </div>
@@ -440,7 +539,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
             </div>
           </div>
 
-          {/* Connection Settings (Expandable) */}
+          {/* Connection Settings */}
           {showSettings && (
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -498,36 +597,49 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       {/* STATE 2: LOGGED IN WITH REAL SPOTIFY */}
       {user && (
         <div className="space-y-4">
-          {/* Active Device Selector */}
+          {/* Active Device Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800/80 rounded-2xl px-4 py-2.5 text-xs">
             <div className="flex items-center gap-2 text-slate-300">
               <Speaker className="w-4 h-4 text-[#1DB954]" />
-              <span className="font-semibold">Dispositivo de Reprodução:</span>
+              <span className="font-semibold">Dispositivo de Som:</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {devices.length > 0 ? (
-                <select
-                  value={selectedDeviceId}
-                  onChange={e => setSelectedDeviceId(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-[#1DB954]"
-                >
-                  {devices.map(dev => (
-                    <option key={dev.id} value={dev.id}>
-                      {dev.name} {dev.is_active ? '(Ativo)' : ''} ({dev.type})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedDeviceId}
+                    onChange={e => handleSelectDevice(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#1DB954] cursor-pointer"
+                  >
+                    {devices.map(dev => (
+                      <option key={dev.id} value={dev.id}>
+                        {dev.name} {dev.is_active ? '● (Ativo)' : ''} ({dev.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : (
-                <span className="text-slate-500 italic">
-                  Abra o Spotify no celular/PC para conectar
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 text-[11px] font-medium">
+                    Abra o Spotify no celular ou PC
+                  </span>
+                  <a
+                    href="https://open.spotify.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-all"
+                  >
+                    <span>Abrir Spotify Web</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               )}
 
               <button
                 onClick={loadUserData}
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                title="Atualizar dispositivos"
+                title="Atualizar lista de dispositivos"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -556,7 +668,7 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
                     {playback?.item?.name || 'Nenhuma música tocando agora'}
                   </p>
                   <p className="text-xs text-[#1DB954] truncate">
-                    {playback?.item?.artists?.map(a => a.name).join(', ') || 'Selecione uma playlist abaixo'}
+                    {playback?.item?.artists?.map(a => a.name).join(', ') || 'Clique em uma playlist abaixo para tocar'}
                   </p>
                   {playback?.item && (
                     <p className="text-[10px] text-slate-500 font-mono mt-0.5">
@@ -635,39 +747,46 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
                 Suas Playlists do Spotify
               </h4>
               <span className="text-[10px] text-slate-500">
-                1-Clique para tocar no dispositivo ativo
+                1-Clique para tocar
               </span>
             </div>
 
             {userPlaylists.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-                {userPlaylists.map(pl => (
-                  <button
-                    key={pl.id}
-                    onClick={() => handlePlayPlaylist(pl.uri)}
-                    className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-[#1DB954]/50 transition-all text-left flex items-center gap-2 cursor-pointer group"
-                  >
-                    {pl.images?.[0]?.url ? (
-                      <img
-                        src={pl.images[0].url}
-                        alt={pl.name}
-                        className="w-8 h-8 rounded-lg object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-                        <Music className="w-4 h-4" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                {userPlaylists.map(pl => {
+                  const isCurrent = activePlaylistUri === pl.uri;
+                  return (
+                    <button
+                      key={pl.id}
+                      onClick={() => handlePlayPlaylist(pl)}
+                      className={`p-2.5 rounded-2xl border transition-all text-left flex items-center gap-2.5 cursor-pointer group ${
+                        isCurrent
+                          ? 'bg-[#1DB954]/15 border-[#1DB954] shadow-md shadow-[#1DB954]/10'
+                          : 'bg-slate-950/80 hover:bg-slate-800/90 border-slate-800 hover:border-[#1DB954]/50'
+                      }`}
+                    >
+                      {pl.images?.[0]?.url ? (
+                        <img
+                          src={pl.images[0].url}
+                          alt={pl.name}
+                          className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
+                          <Music className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-200 group-hover:text-white truncate">
+                          {pl.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {pl.tracks?.total || 0} faixas
+                        </p>
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-slate-200 group-hover:text-white truncate">
-                        {pl.name}
-                      </p>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        {pl.tracks?.total || 0} faixas
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/60 text-center text-xs text-slate-500">
