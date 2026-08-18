@@ -19,12 +19,24 @@ function base64encode(input: ArrayBuffer): string {
     .replace(/\//g, '_');
 }
 
-export async function createSpotifyAuthUrl(clientId: string, redirectUri: string): Promise<{ authUrl: string; codeVerifier: string }> {
+export function getDefaultRedirectUri(): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}/api/spotify/callback`;
+}
+
+export async function createSpotifyAuthUrl(clientId: string, redirectUri?: string): Promise<{ authUrl: string; codeVerifier: string; redirectUri: string }> {
+  const effectiveRedirectUri = redirectUri || getDefaultRedirectUri();
   const codeVerifier = generateRandomString(64);
   const hashed = await sha256(codeVerifier);
   const codeChallenge = base64encode(hashed);
 
-  sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+  try {
+    sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+    localStorage.setItem('spotify_code_verifier', codeVerifier);
+    localStorage.setItem('spotify_redirect_uri', effectiveRedirectUri);
+  } catch (e) {
+    // Ignore storage quota errors
+  }
 
   const scopes = [
     'streaming',
@@ -40,7 +52,7 @@ export async function createSpotifyAuthUrl(clientId: string, redirectUri: string
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
-    redirect_uri: redirectUri,
+    redirect_uri: effectiveRedirectUri,
     scope: scopes,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,
@@ -49,23 +61,53 @@ export async function createSpotifyAuthUrl(clientId: string, redirectUri: string
 
   return {
     authUrl: `https://accounts.spotify.com/authorize?${params.toString()}`,
-    codeVerifier
+    codeVerifier,
+    redirectUri: effectiveRedirectUri
   };
 }
 
 export async function exchangeSpotifyCodeForToken(
   code: string, 
   clientId: string, 
-  redirectUri: string,
+  redirectUri?: string,
   codeVerifier?: string
 ): Promise<{ accessToken: string; expiresIn: number; refreshToken?: string } | null> {
-  const verifier = codeVerifier || sessionStorage.getItem('spotify_code_verifier') || '';
+  const verifier = codeVerifier || sessionStorage.getItem('spotify_code_verifier') || localStorage.getItem('spotify_code_verifier') || '';
+  const effectiveRedirectUri = redirectUri || localStorage.getItem('spotify_redirect_uri') || getDefaultRedirectUri();
 
+  // Try 1: Server-side proxy /api/spotify/exchange (avoids CORS and issues)
+  try {
+    const proxyRes = await fetch('/api/spotify/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        client_id: clientId,
+        redirect_uri: effectiveRedirectUri,
+        code_verifier: verifier
+      })
+    });
+
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data.access_token) {
+        return {
+          accessToken: data.access_token,
+          expiresIn: data.expires_in || 3600,
+          refreshToken: data.refresh_token
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Server proxy exchange attempt failed, falling back to direct exchange:', err);
+  }
+
+  // Try 2: Direct call to accounts.spotify.com
   const params = new URLSearchParams({
     client_id: clientId,
     grant_type: 'authorization_code',
     code,
-    redirect_uri: redirectUri,
+    redirect_uri: effectiveRedirectUri,
     code_verifier: verifier
   });
 
@@ -80,14 +122,14 @@ export async function exchangeSpotifyCodeForToken(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Spotify token exchange failed:', errorText);
+      console.error('Direct Spotify token exchange failed:', errorText);
       return null;
     }
 
     const data = await response.json();
     return {
       accessToken: data.access_token,
-      expiresIn: data.expires_in,
+      expiresIn: data.expires_in || 3600,
       refreshToken: data.refresh_token
     };
   } catch (err) {
