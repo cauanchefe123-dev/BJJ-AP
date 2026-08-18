@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "students": {
+      "title": "Students",
+      "description": "Registered students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "belt": { "type": "string" },
+        "stripes": { "type": "number" },
+        "approvalStatus": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "name"]
+    },
+    "teachers": {
+      "title": "Teachers",
+      "description": "Registered instructors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "belt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "classes": {
+      "title": "Classes",
+      "description": "BJJ Classes and schedules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "attendances": {
+      "title": "Attendances",
+      "description": "Attendance check-in records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "studentId", "classId"]
+    },
+    "payments": {
+      "title": "Payments",
+      "description": "Tuition and payment records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "studentId"]
+    },
+    "academyConfig": {
+      "title": "Academy Config",
+      "description": "Academy general settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Belt {
+  BRANCA
+  CINZA
+  AMARELA
+  LARANJA
+  VERDE
+  AZUL
+  ROXA
+  MARROM
+  PRETA
+  CORAL
+  VERMELHA
+}
+
+enum Role {
+  ADMIN
+  PROFESSOR
+  ALUNO
+}
+
+enum ApprovalStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+model Academy {
+  id            Int       @id @default(autoincrement())
+  name          String
+  fantasyName   String    @map("fantasy_name")
+  cnpj          String?
+  headCoachName String?   @map("head_coach_name")
+  headCoachBelt Belt      @default(PRETA) @map("head_coach_belt")
+  phone         String?
+  email         String?
+  address       String?
+  logoUrl       String?   @map("logo_url")
+  pixKey        String?   @map("pix_key")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  users         User[]
+  students      Student[]
+
+  @@map("academies")
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  uid            String         @unique
+  name           String
+  email          String         @unique
+  role           Role           @default(ALUNO)
+  avatarUrl      String?        @map("avatar_url")
+  studentId      String?        @map("student_id")
+  phone          String?
+  approvalStatus ApprovalStatus @default(APPROVED) @map("approval_status")
+  academyId      Int?           @map("academy_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  academy        Academy?       @relation(fields: [academyId], references: [id])
+
+  @@map("users")
+}
+
+model Student {
+  id                         Int            @id @default(autoincrement())
+  registrationNumber         String         @unique @map("registration_number")
+  name                       String
+  email                      String
+  phone                      String?
+  cpf                        String?
+  birthDate                  String?        @map("birth_date")
+  photoUrl                   String?        @map("photo_url")
+  belt                       Belt           @default(BRANCA)
+  stripes                    Int            @default(0)
+  startDate                  String?        @map("start_date")
+  totalClassesAttended       Int            @default(0) @map("total_classes_attended")
+  classesSinceLastGraduation Int            @default(0) @map("classes_since_last_graduation")
+  weightCategory             String         @default("MÉDIO") @map("weight_category")
+  ageCategory                String         @default("ADULTO") @map("age_category")
+  active                     Boolean        @default(true)
+  notes                      String?
+  emergencyContact           String?        @map("emergency_contact")
+  planName                   String         @default("Mensal Padrão") @map("plan_name")
+  planPrice                  Float          @default(150.0) @map("plan_price")
+  paymentDueDateDay          Int            @default(10) @map("payment_due_date_day")
+  paymentStatus              String         @default("PAGO") @map("payment_status")
+  lastPaymentDate            String?        @map("last_payment_date")
+  qrCodeToken                String         @map("qr_code_token")
+  approvalStatus             ApprovalStatus @default(APPROVED) @map("approval_status")
+  academyId                  Int?           @map("academy_id")
+  createdAt                  DateTime       @default(now()) @map("created_at")
+  updatedAt                  DateTime       @updatedAt @map("updated_at")
+
+  academy                    Academy?       @relation(fields: [academyId], references: [id])
+
+  @@map("students")
+}

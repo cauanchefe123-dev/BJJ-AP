@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR" translate="no" class="notranslate">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BJJCRON - Academia de Jiu-Jitsu & Ranking</title>
+    <meta name="description" content="BJJCRON - Sistema completo de gestão de academia de Jiu-Jitsu, com chamada por QR Code, ranking, financeiro e controle de graduação." />
+    <meta name="google-site-verification" content="jvyVDIa8psfmrQckqpRpmUYNiD-sRn_YeTjlaMpXtJU" />
+    <meta name="google" content="notranslate" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BJJCRON" />
+    
+    <!-- Icons & Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="shortcut icon" href="/icon-512.png" />
+    <link rel="apple-touch-icon" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
+    <!-- Open Graph & Social sharing / Google Search Card -->
+    <meta property="og:title" content="BJJCRON - Academia de Jiu-Jitsu & Ranking" />
+    <meta property="og:description" content="Sistema completo de gestão de academia de Jiu-Jitsu, com chamada por QR Code, ranking, financeiro e controle de graduação." />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BJJCRON - Gestão de Jiu-Jitsu" />
+    <meta name="twitter:image" content="/icon-512.png" />
+
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body class="notranslate">
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        let refreshing = false;
+
+        // When a new Service Worker activates and takes control, reload cleanly once
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            console.log('[BJJCRON] Nova versão do aplicativo ativada. Atualizando tela...');
+            window.location.reload();
+          }
+        });
+
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            console.log('SW BJJCRON registrado com sucesso:', reg.scope);
+
+            // Check for updates on load
+            reg.update().catch(() => {});
+
+            // Check for updates every 60 seconds
+            setInterval(() => {
+              reg.update().catch(() => {});
+            }, 60000);
+
+            // Check for updates when user brings app back to focus / unminimizes
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                reg.update().catch(() => {});
+              }
+            });
+            window.addEventListener('focus', () => {
+              reg.update().catch(() => {});
+            });
+
+            // Handle when a new worker is discovered
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[BJJCRON] Nova versão pronta para instalação.');
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              }
+            });
+          }).catch((err) => {
+            console.log('Erro ao registrar SW:', err);
+          });
+        });
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

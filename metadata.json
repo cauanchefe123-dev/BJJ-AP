@@ -1,0 +1,6 @@
+{
+  "name": "BJJCRON",
+  "description": "Sistema profissional de gestão de academia de Jiu-Jitsu com controle de frequência, graduação, mensalidades, carteirinha digital, QR Code de presença e ranking.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

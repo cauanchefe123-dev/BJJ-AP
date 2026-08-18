@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </radialGradient>
+
+    <!-- Gold Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#facc15"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+
+    <!-- White Metal Gradient -->
+    <linearGradient id="whiteGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background Card -->
+  <rect width="512" height="512" rx="96" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="92" fill="none" stroke="#334155" stroke-width="2" opacity="0.4"/>
+
+  <g filter="url(#dropShadow)" transform="translate(0, -10)">
+    <!-- Arc Timer Lines & Ticks -->
+    <path d="M 215 145 A 125 125 0 0 1 450 270" fill="none" stroke="url(#goldGrad)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 225 160 A 110 110 0 0 1 435 270" fill="none" stroke="url(#whiteGrad)" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Timer Ticks -->
+    <line x1="326" y1="135" x2="326" y2="148" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="375" y1="152" x2="369" y2="164" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="412" y1="190" x2="401" y2="198" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="428" y1="238" x2="415" y2="238" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- BJJ Stylized Text -->
+    <g transform="skewX(-12)">
+      <!-- B -->
+      <path d="M 100 170 L 175 170 C 195 170 205 180 200 195 C 196 207 186 213 172 215 C 190 217 198 227 193 243 C 187 260 172 265 150 265 L 78 265 L 100 170 Z M 122 188 L 115 210 L 155 210 C 163 210 168 206 170 199 C 172 192 168 188 160 188 L 122 188 Z M 110 226 L 102 248 L 148 248 C 157 248 162 244 164 237 C 166 230 162 226 153 226 L 110 226 Z" fill="url(#whiteGrad)"/>
+      <!-- J 1 -->
+      <path d="M 205 170 L 232 170 L 214 246 C 210 261 198 266 180 265 L 165 265 L 171 248 L 180 248 C 188 248 193 245 195 238 L 205 170 Z" fill="url(#whiteGrad)"/>
+      <!-- J 2 -->
+      <path d="M 238 170 L 265 170 L 247 246 C 243 261 231 266 213 265 L 198 265 L 204 248 L 213 248 C 221 248 226 245 228 238 L 238 170 Z" fill="url(#whiteGrad)"/>
+    </g>
+
+    <!-- CRON Text -->
+    <g transform="translate(0, 95)">
+      <!-- C -->
+      <path d="M 125 185 C 105 185 88 195 80 215 C 72 235 78 253 98 253 C 112 253 125 246 132 235 L 112 235 C 107 240 101 242 96 242 C 87 242 83 234 87 224 C 91 214 99 208 108 208 C 115 208 120 211 123 218 L 142 218 C 137 198 125 185 105 185 Z" fill="url(#goldGrad)" transform="scale(1.4, 1.2) translate(-35, -30)"/>
+
+      <!-- R -->
+      <path d="M 148 192 L 182 192 C 196 192 204 198 201 210 C 198 220 190 225 180 226 L 196 252 L 175 252 L 162 228 L 158 228 L 152 252 L 133 252 L 148 192 Z M 159 206 L 154 220 L 172 220 C 178 220 182 217 183 213 C 184 209 181 206 175 206 L 159 206 Z" fill="url(#goldGrad)" transform="scale(1.2, 1.15) translate(-15, -20)"/>
+
+      <!-- O (Clock) -->
+      <g transform="translate(255, 272)">
+        <rect x="-30" y="-30" width="60" height="60" rx="14" fill="none" stroke="url(#goldGrad)" stroke-width="12"/>
+        <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+        <!-- Clock hands -->
+        <line x1="0" y1="0" x2="-8" y2="-12" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="0" y1="0" x2="12" y2="-4" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+      </g>
+
+      <!-- N -->
+      <path d="M 305 195 L 324 195 L 342 235 L 346 195 L 365 195 L 350 255 L 331 255 L 313 215 L 309 255 L 290 255 Z" fill="url(#goldGrad)" transform="scale(1.15, 1.15) translate(-20, -22)"/>
+
+      <!-- White Belt Tied Around N -->
+      <g transform="translate(370, 260) rotate(-22)">
+        <!-- Belt loop/knot -->
+        <path d="M -20 -10 C -10 -25 10 -25 20 -10 C 25 5 15 20 0 25 C -15 20 -25 5 -20 -10 Z" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <!-- Belt ends -->
+        <path d="M -5 15 L -25 55 L -5 58 L 10 20 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+        <path d="M 5 15 L 30 50 L 15 54 L -2 18 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+        <!-- Black/Red Sleeve on Belt End -->
+        <rect x="-22" y="38" width="18" height="14" fill="#0f172a" rx="1" transform="rotate(-18)"/>
+        <!-- Degree Stripes -->
+        <line x1="-18" y1="41" x2="-18" y2="49" stroke="#f59e0b" stroke-width="2.5" transform="rotate(-18)"/>
+        <line x1="-14" y1="41" x2="-14" y2="49" stroke="#ffffff" stroke-width="2" transform="rotate(-18)"/>
+        <line x1="-10" y1="41" x2="-10" y2="49" stroke="#ffffff" stroke-width="2" transform="rotate(-18)"/>
+        <line x1="-6" y1="41" x2="-6" y2="49" stroke="#ffffff" stroke-width="2" transform="rotate(-18)"/>
+      </g>
+    </g>
+
+    <!-- Subtitle: GESTÃO • PERFORMANCE • EVOLUÇÃO -->
+    <text x="256" y="415" text-anchor="middle" font-size="17" font-weight="800" fill="#f8fafc" font-family="'Montserrat', 'Arial Black', sans-serif" letter-spacing="4">
+      GESTÃO <tspan fill="#eab308">•</tspan> PERFORMANCE <tspan fill="#eab308">•</tspan> EVOLUÇÃO
+    </text>
+  </g>
+</svg>
