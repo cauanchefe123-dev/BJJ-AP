@@ -1489,6 +1489,78 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // SPOTIFY INTEGRATION ENDPOINTS
+  // ==========================================
+  app.get('/api/spotify/auth-url', (req, res) => {
+    const clientId = process.env.SPOTIFY_CLIENT_ID || req.query.client_id || '98dc96a5b6f3458dbf436e2f1e67bfd9';
+    const redirectUri = (process.env.APP_URL ? `${process.env.APP_URL}/api/spotify/callback` : `${req.protocol}://${req.get('host')}/api/spotify/callback`);
+    const scopes = [
+      'streaming',
+      'user-read-email',
+      'user-read-private',
+      'user-read-playback-state',
+      'user-modify-playback-state',
+      'user-read-currently-playing',
+      'playlist-read-private',
+      'playlist-read-collaborative'
+    ].join(' ');
+
+    const params = new URLSearchParams({
+      client_id: String(clientId),
+      response_type: 'token',
+      redirect_uri: redirectUri,
+      scope: scopes,
+      show_dialog: 'true'
+    });
+
+    res.json({ url: `https://accounts.spotify.com/authorize?${params.toString()}`, redirectUri });
+  });
+
+  app.get('/api/spotify/callback', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html>
+<head><title>BJJCRON Spotify Auth</title></head>
+<body style="background:#090d16;color:#10b981;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <div style="text-align:center;">
+    <h2 style="margin-bottom:8px;">Conectando Spotify ao Tatame...</h2>
+    <p style="color:#94a3b8;font-size:14px;">Autenticado com sucesso! Fechando janela...</p>
+  </div>
+  <script>
+    try {
+      var hash = window.location.hash.substring(1);
+      var params = new URLSearchParams(hash);
+      var accessToken = params.get('access_token');
+      var expiresIn = params.get('expires_in') || '3600';
+      var error = params.get('error') || new URLSearchParams(window.location.search).get('error');
+
+      if (window.opener) {
+        if (accessToken) {
+          window.opener.postMessage({ 
+            type: 'SPOTIFY_AUTH_SUCCESS', 
+            accessToken: accessToken, 
+            expiresIn: parseInt(expiresIn, 10) 
+          }, '*');
+        } else if (error) {
+          window.opener.postMessage({ type: 'SPOTIFY_AUTH_ERROR', error: error }, '*');
+        }
+        setTimeout(function() { window.close(); }, 800);
+      } else {
+        if (accessToken) {
+          localStorage.setItem('bjjcron_spotify_access_token', accessToken);
+          localStorage.setItem('bjjcron_spotify_expires_at', String(Date.now() + parseInt(expiresIn, 10) * 1000));
+        }
+        window.location.href = '/';
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  </script>
+</body>
+</html>`);
+  });
+
   // Version check endpoint for PWA / Mobile live updates
   const SERVER_BUILD_ID = Date.now().toString();
   app.get('/api/version', (req, res) => {
