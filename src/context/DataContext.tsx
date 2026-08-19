@@ -571,13 +571,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (existingIdx !== -1) {
             const localSt = merged[existingIdx];
-            merged[existingIdx] = {
-              ...cloudSt,
-              ...localSt,
-              photoUrl: (localSt?.photoUrl && !localSt.photoUrl.includes('unsplash.com')) ? localSt.photoUrl : (cloudSt.photoUrl || DEFAULT_BLACK_GI_AVATAR),
-              totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
-              classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
-            };
+            const localUpdatedAt = localSt?.updatedAt ? new Date(localSt.updatedAt).getTime() : 0;
+            const cloudUpdatedAt = cloudSt?.updatedAt ? new Date(cloudSt.updatedAt).getTime() : 0;
+
+            // If local record has been updated more recently than the incoming cloud record, keep local fields
+            if (localUpdatedAt > cloudUpdatedAt && (Date.now() - localUpdatedAt < 60000)) {
+              merged[existingIdx] = {
+                ...cloudSt,
+                ...localSt,
+                totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
+                classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
+              };
+            } else {
+              // Cloud update is newer or matches: apply cloud data, keeping any locally customized photo if cloud is missing
+              merged[existingIdx] = {
+                ...localSt,
+                ...cloudSt,
+                photoUrl: (cloudSt.photoUrl && !cloudSt.photoUrl.includes('unsplash.com')) ? cloudSt.photoUrl : (localSt?.photoUrl || DEFAULT_BLACK_GI_AVATAR),
+                totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
+                classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
+              };
+            }
           } else {
             merged.push(cloudSt);
           }
@@ -827,6 +841,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateStudent = (id: string, updates: Partial<Student>) => {
     let updatedStudent: Student | null = null;
     const cleanId = id.trim().toLowerCase();
+    const nowIso = new Date().toISOString();
+    const enrichedUpdates = { ...updates, updatedAt: nowIso };
 
     setStudents(prev => {
       const updated = prev.map(s => {
@@ -835,7 +851,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           (s.email && s.email.trim().toLowerCase() === cleanId) ||
           (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
         ) {
-          updatedStudent = { ...s, ...updates };
+          updatedStudent = { ...s, ...enrichedUpdates };
           return updatedStudent;
         }
         return s;
@@ -915,7 +931,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetch(`/api/students/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
+      body: JSON.stringify(enrichedUpdates),
     }).catch(() => {});
 
     window.dispatchEvent(new Event('bjjcron_students_updated'));
@@ -993,12 +1009,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     saveToFirestore('graduations', newGraduation);
 
+    const nowIso = new Date().toISOString();
     const updatedStudentObj: Student = {
       ...student,
       belt: newBelt,
       stripes: newStripes,
       classesSinceLastGraduation: 0,
       lastGraduationDate: graduationDate,
+      updatedAt: nowIso,
     };
 
     setStudents(prev => {
@@ -1024,6 +1042,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         belt: newBelt,
         stripes: newStripes,
         classesSinceLastGraduation: 0,
+        lastGraduationDate: graduationDate,
+        updatedAt: nowIso,
       }),
     }).catch(() => {});
 

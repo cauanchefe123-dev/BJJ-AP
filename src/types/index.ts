@@ -125,6 +125,7 @@ export interface Student {
   paymentStatus: PaymentStatus;
   lastPaymentDate?: string;
   lastGraduationDate?: string; // YYYY-MM-DD
+  updatedAt?: string; // ISO string or timestamp of last change for cloud conflict resolution
   qrCodeToken: string;
   approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
   hasActivatedAccount?: boolean;
