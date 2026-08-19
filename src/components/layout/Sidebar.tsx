@@ -49,6 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const userAvatar = getUserAvatar(currentUser, currentStudent);
   const role = currentUser.role;
 
+  const isPendingStudent = currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING');
+
   // Categorized Navigation Items for pristine organization & easy visual scanning
   const mainNav = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },
@@ -78,6 +80,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const renderNavGroup = (title: string, items: typeof mainNav) => {
+    if (isPendingStudent) {
+      return null;
+    }
     const visible = items.filter(item => item.roles.includes(role));
     if (visible.length === 0) return null;
 

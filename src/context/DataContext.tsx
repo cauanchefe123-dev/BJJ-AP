@@ -612,8 +612,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const unsubAttendances = subscribeFirestoreCollection<AttendanceRecord>('attendances', (data) => {
-      setAttendances(data);
       if (data && data.length > 0) {
+        setAttendances(prev => {
+          const merged = [...data];
+          // Preserve any newly recorded local attendance that hasn't synced yet
+          prev.forEach(localAtt => {
+            if (!merged.some(m => m.id === localAtt.id)) {
+              merged.unshift(localAtt);
+            }
+          });
+          safeSave('bjjcron_attendances', merged);
+          return merged;
+        });
+
         setStudents(prev => {
           let updated = false;
           const newList = prev.map(s => {

@@ -24,15 +24,25 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Robust ISO / YYYY-MM-DD date normalizer
+  const normalizeDateStr = (dStr: string) => {
+    if (!dStr) return '';
+    if (dStr.includes('T')) return dStr.split('T')[0];
+    return dStr.trim();
+  };
+
   // Filter attendances by selected date and class/search
-  const dayAttendances = attendances.filter(a => a.date === selectedDate);
+  const dayAttendances = attendances.filter(a => {
+    const recordDate = normalizeDateStr(a.date) || (a.timestamp ? normalizeDateStr(a.timestamp) : '');
+    return recordDate === selectedDate;
+  });
 
   const filtered = dayAttendances.filter(a => {
-    const matchesClass = selectedClassId === 'ALL' || a.classId === selectedClassId;
+    const matchesClass = selectedClassId === 'ALL' || a.classId === selectedClassId || a.className === selectedClassId;
     const student = students.find(s => s.id === a.studentId);
-    const nameToMatch = student?.name || a.studentName;
+    const nameToMatch = student?.name || a.studentName || '';
     const matchesSearch = nameToMatch.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          a.className.toLowerCase().includes(searchTerm.toLowerCase());
+                          (a.className || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesClass && matchesSearch;
   });
 

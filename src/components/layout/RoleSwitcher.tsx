@@ -8,6 +8,11 @@ export const RoleSwitcher: React.FC = () => {
 
   if (!currentUser) return null;
 
+  // Do not show role switcher for pending students so they cannot bypass gatekeeping
+  if (currentUser.approvalStatus === 'PENDING' || currentUser.role === 'ALUNO') {
+    return null;
+  }
+
   return (
     <div className="bg-slate-950 text-slate-200 border-b border-slate-800 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-inner z-50">
       <div className="flex items-center gap-2">

@@ -21,18 +21,26 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
 
   const currentStudent = students.find(s => s.id === currentUser?.studentId || s.email.toLowerCase() === currentUser?.email.toLowerCase());
 
+  // Robust ISO / YYYY-MM-DD date normalizer
+  const normalizeDateStr = (dStr: string) => {
+    if (!dStr) return '';
+    if (dStr.includes('T')) return dStr.split('T')[0];
+    return dStr.trim();
+  };
+
   const filteredAttendances = attendances.filter(a => {
     // Student view isolation
     if (currentUser?.role === 'ALUNO') {
       if (a.studentId !== currentStudent?.id) return false;
     }
 
-    const matchesDate = dateFilterMode === 'ALL' || a.date === selectedDate;
-    const matchesClass = selectedClass === 'ALL' || a.classId === selectedClass;
+    const recordDate = normalizeDateStr(a.date) || (a.timestamp ? normalizeDateStr(a.timestamp) : '');
+    const matchesDate = dateFilterMode === 'ALL' || recordDate === selectedDate;
+    const matchesClass = selectedClass === 'ALL' || a.classId === selectedClass || a.className === selectedClass;
     const student = students.find(s => s.id === a.studentId);
-    const studentName = student?.name || a.studentName;
+    const studentName = student?.name || a.studentName || '';
     const matchesSearch = studentName.toLowerCase().includes(search.toLowerCase()) ||
-                          a.className.toLowerCase().includes(search.toLowerCase());
+                          (a.className || '').toLowerCase().includes(search.toLowerCase());
 
     return matchesDate && matchesClass && matchesSearch;
   });

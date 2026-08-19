@@ -103,8 +103,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Quick Checkin Button */}
-          {onOpenQuickScan && (
+          {/* Quick Checkin Button (Only for approved members) */}
+          {onOpenQuickScan && !(currentUser?.role === 'ALUNO' && (currentUser?.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING')) && (
             <button
               onClick={onOpenQuickScan}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-sm hover:shadow transition-all active:scale-95 cursor-pointer"

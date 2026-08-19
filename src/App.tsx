@@ -41,6 +41,7 @@ import { AdminStudentDashboardView } from './components/dashboard/AdminStudentDa
 import { WeeklyFocusPositionsView } from './components/positions/WeeklyFocusPositionsView';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
+import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
 import { PaymentRecord, Student } from './types';
 import { AuthModal } from './components/auth/AuthModal';
 import { resolveStudentForUser } from './constants/avatar';
@@ -117,8 +118,11 @@ function MainApp() {
 
           {/* Page Content */}
           <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
-            <ErrorBoundary onNavigateHome={() => setActiveTab('dashboard')}>
-              <div key={activeTab} className="w-full">
+            {currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING') ? (
+              <PendingApprovalScreen onOpenAuthModal={() => setIsAuthModalOpen(true)} />
+            ) : (
+              <ErrorBoundary onNavigateHome={() => setActiveTab('dashboard')}>
+                <div key={activeTab} className="w-full">
                 {activeTab === 'dashboard' && (
                   currentUser.role === 'ADMIN' ? (
                     <AdminDashboard
@@ -216,6 +220,7 @@ function MainApp() {
                 {activeTab === 'settings' && <AcademySettings />}
               </div>
             </ErrorBoundary>
+            )}
           </main>
         </div>
       </div>
