@@ -132,7 +132,7 @@ interface AcademyLinkViewProps {
 
 export const AcademyLinkView: React.FC<AcademyLinkViewProps> = ({ onNavigateHome }) => {
   const { currentUser } = useAuth();
-  const { academyConfig, students, updateStudent, updateAcademyConfig } = useData();
+  const { academyConfig, students, updateStudent, updateAcademyConfig, addNotification } = useData();
 
   const currentStudent = resolveStudentForUser(currentUser, students);
   const [searchTerm, setSearchTerm] = useState('');
@@ -233,6 +233,15 @@ export const AcademyLinkView: React.FC<AcademyLinkViewProps> = ({ onNavigateHome
           ? `Solicitou vínculo com a equipe ${academy.name} (Prof. ${academy.headCoachName}). Aguardando aprovação.`
           : `Atuando pela equipe ${academy.name}.`
       });
+
+      if (isAluno) {
+        addNotification({
+          title: '🥋 Nova Solicitação de Vínculo',
+          message: `O atleta ${currentStudent.name} solicitou vínculo com a equipe ${academy.name} e aguarda aprovação do professor.`,
+          type: 'GENERAL',
+          authorName: currentStudent.name,
+        });
+      }
     }
 
     // Also update current active view so they see this academy's name/logo if desired

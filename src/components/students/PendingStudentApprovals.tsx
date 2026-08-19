@@ -1,15 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
-import { Users, UserCheck, UserX, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Student } from '../../types';
+import { DEFAULT_BLACK_GI_AVATAR } from '../../constants/avatar';
+import { Users, UserCheck, UserX, CheckCircle2, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
 
 export const PendingStudentApprovals: React.FC = () => {
   const { students, updateStudent, deleteStudent } = useData();
-  const { approveUser, rejectUser } = useAuth();
+  const { approveUser, rejectUser, users } = useAuth();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const pendingStudents = students.filter(s => s.approvalStatus === 'PENDING');
+  // Robust combination of pending students from DataContext and AuthContext
+  const pendingStudents: Student[] = useMemo(() => {
+    const list: Student[] = [];
+    const addedIds = new Set<string>();
+
+    // 1. Check all students in students context
+    students.forEach(s => {
+      if (s.approvalStatus === 'PENDING') {
+        list.push(s);
+        addedIds.add(s.id);
+        if (s.email) addedIds.add(s.email.trim().toLowerCase());
+      }
+    });
+
+    // 2. Also check all users with role 'ALUNO' and approvalStatus 'PENDING' that might not be in students list
+    users.forEach(u => {
+      if (u.role === 'ALUNO' && u.approvalStatus === 'PENDING') {
+        const emailKey = u.email ? u.email.trim().toLowerCase() : '';
+        if ((u.studentId && addedIds.has(u.studentId)) || (emailKey && addedIds.has(emailKey)) || addedIds.has(u.id)) {
+          return;
+        }
+        // Synthesize student record so the professor can approve them immediately
+        list.push({
+          id: u.studentId || u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '',
+          registrationNumber: 'SOLICITAÇÃO',
+          qrCodeToken: `BJJCRON-${u.id}`,
+          birthDate: '2000-01-01',
+          photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+          belt: 'BRANCA',
+          stripes: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          totalClassesAttended: 0,
+          classesSinceLastGraduation: 0,
+          weightCategory: 'MÉDIO',
+          ageCategory: 'ADULTO',
+          active: true,
+          planName: 'Plano Mensal Padrão',
+          planPrice: 240,
+          paymentDueDateDay: 10,
+          paymentStatus: 'PENDENTE',
+          approvalStatus: 'PENDING',
+          notes: 'Novo cadastro aguardando aprovação no tatame.',
+          hasActivatedAccount: true,
+        });
+      }
+    });
+
+    return list;
+  }, [students, users]);
 
   const handleApprove = (studentId: string, studentName: string) => {
     approveUser(studentId);
@@ -58,7 +111,7 @@ export const PendingStudentApprovals: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-slate-400">
-              Gerencie solicitações de vínculo e novos cadastros aguardando liberação para o tatame
+              Gerencie solicitações de matrícula e vínculos aguardando autorização do professor
             </p>
           </div>
         </div>
@@ -105,7 +158,7 @@ export const PendingStudentApprovals: React.FC = () => {
               {/* Student Info */}
               <div className="flex items-start gap-3.5 flex-1 min-w-0">
                 <img
-                  src={student.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'}
+                  src={student.photoUrl || DEFAULT_BLACK_GI_AVATAR}
                   alt={student.name}
                   className="w-12 h-12 rounded-xl object-cover border-2 border-amber-400/80 shrink-0 shadow-sm"
                 />

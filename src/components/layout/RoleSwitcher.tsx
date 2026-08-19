@@ -49,32 +49,6 @@ export const RoleSwitcher: React.FC = () => {
         </button>
 
         <button
-          onClick={() => switchRole('ALUNO')}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all font-medium ${
-            currentUser.role === 'ALUNO'
-              ? 'bg-emerald-600 text-white font-bold shadow-xs'
-              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
-          }`}
-        >
-          <UserCheck className="w-3.5 h-3.5" />
-          Aluno
-        </button>
-
-        {currentUser.role === 'ALUNO' && (
-          <select
-            value={currentUser.id}
-            onChange={(e) => switchUser(e.target.value)}
-            className="bg-slate-900 text-slate-200 border border-slate-700 rounded-md px-2 py-0.5 text-xs focus:ring-1 focus:ring-amber-400 outline-none"
-          >
-            {users.filter(u => u.role === 'ALUNO').map(u => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <button
           onClick={() => {
             deleteMyAccount();
           }}

@@ -699,6 +699,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => [...prev, newUser]);
     const updatedUsers = [...users, newUser];
     localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
+    saveToFirestore('users', newUser);
     fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -733,7 +734,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       paymentStatus: 'PENDENTE',
       qrCodeToken: `BJJCRON-${newStudentId}`,
       approvalStatus: 'PENDING',
-      notes: 'Nova solicitação de vínculo aguardando aprovação na equipe.',
+      notes: 'Nova solicitação de matrícula aguardando aprovação na equipe.',
       hasActivatedAccount: true,
       password: studentData.password
     };
@@ -741,11 +742,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const filteredStudents = studentsList.filter((s: any) => s.email && s.email.trim().toLowerCase() !== cleanEmail);
     filteredStudents.unshift(newStudentObj);
     localStorage.setItem('bjjcron_students', JSON.stringify(filteredStudents));
+    saveToFirestore('students', newStudentObj);
     fetch('/api/students', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newStudentObj)
     }).catch(() => {});
+
+    // Create a real-time notification in Firestore so all Teachers & Admins see the request immediately
+    const notifObj = {
+      id: `notif-reg-${Date.now()}`,
+      title: '🥋 Nova Solicitação de Matrícula',
+      message: `O atleta ${studentData.name} solicitou vínculo com a equipe e aguarda aprovação para acessar o tatame.`,
+      type: 'GENERAL',
+      createdAt: new Date().toISOString(),
+      readBy: []
+    };
+    saveToFirestore('notifications', notifObj);
+    try {
+      const savedNotifs = localStorage.getItem('bjjcron_notifications');
+      const notifsList = savedNotifs ? JSON.parse(savedNotifs) : [];
+      notifsList.unshift(notifObj);
+      localStorage.setItem('bjjcron_notifications', JSON.stringify(notifsList));
+    } catch (e) {}
 
     window.dispatchEvent(new Event('bjjcron_users_updated'));
     window.dispatchEvent(new Event('bjjcron_students_updated'));
@@ -794,6 +813,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => [...prev, newUser]);
     const updatedUsers = [...users, newUser];
     localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
+    saveToFirestore('users', newUser);
     fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -806,7 +826,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedTeachers = localStorage.getItem('bjjcron_teachers');
     const teachersList = savedTeachers ? JSON.parse(savedTeachers) : [];
 
-    teachersList.push({
+    const newTeacherObj = {
       id: newTeacherId,
       name: teacherData.name,
       email: cleanEmail,
@@ -816,7 +836,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       specialty: teacherData.specialty || 'Jiu-Jitsu / No-Gi',
       activeClassesCount: 2,
       avatarUrl: newUser.avatarUrl
-    });
+    };
+    teachersList.push(newTeacherObj);
+    saveToFirestore('teachers', newTeacherObj);
 
     localStorage.setItem('bjjcron_teachers', JSON.stringify(teachersList));
     setCurrentUser(newUser);

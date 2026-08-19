@@ -24,14 +24,57 @@ export const StudentList: React.FC<StudentListProps> = ({
   onOpenEditModal,
 }) => {
   const { students, attendances, deleteStudent, updateStudent, academyConfig } = useData();
-  const { approveUser, rejectUser, currentUser } = useAuth();
+  const { approveUser, rejectUser, currentUser, users } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [beltFilter, setBeltFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [emailStudent, setEmailStudent] = useState<Student | null>(null);
 
-  const pendingStudents = students.filter(s => s.approvalStatus === 'PENDING');
+  // Consolidate students list including any pending ALUNO accounts from users
+  const allStudentsCombined: Student[] = React.useMemo(() => {
+    const list: Student[] = [...students];
+    const addedIds = new Set(students.map(s => s.id));
+    const addedEmails = new Set(students.map(s => s.email?.trim().toLowerCase()).filter(Boolean));
+
+    users.forEach(u => {
+      if (u.role === 'ALUNO' && u.approvalStatus === 'PENDING') {
+        const emailKey = u.email ? u.email.trim().toLowerCase() : '';
+        if ((u.studentId && addedIds.has(u.studentId)) || (emailKey && addedEmails.has(emailKey)) || addedIds.has(u.id)) {
+          return;
+        }
+        list.push({
+          id: u.studentId || u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '',
+          registrationNumber: 'SOLICITAÇÃO',
+          qrCodeToken: `BJJCRON-${u.id}`,
+          birthDate: '2000-01-01',
+          photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+          belt: 'BRANCA',
+          stripes: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          totalClassesAttended: 0,
+          classesSinceLastGraduation: 0,
+          weightCategory: 'MÉDIO',
+          ageCategory: 'ADULTO',
+          active: true,
+          planName: 'Plano Mensal Padrão',
+          planPrice: 240,
+          paymentDueDateDay: 10,
+          paymentStatus: 'PENDENTE',
+          approvalStatus: 'PENDING',
+          notes: 'Novo cadastro aguardando aprovação no tatame.',
+          hasActivatedAccount: true,
+        });
+      }
+    });
+
+    return list;
+  }, [students, users]);
+
+  const pendingStudents = allStudentsCombined.filter(s => s.approvalStatus === 'PENDING');
   const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
 
   const handleApprove = (student: Student) => {
@@ -44,7 +87,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     deleteStudent(student.id);
   };
 
-  const filteredStudents = students.filter(s => {
+  const filteredStudents = allStudentsCombined.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           s.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (s.email && s.email.toLowerCase().includes(searchTerm.toLowerCase()));
