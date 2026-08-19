@@ -437,7 +437,9 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
       <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#1DB954]/15 border border-[#1DB954]/30 flex items-center justify-center text-[#1DB954] shrink-0">
-            <Radio className="w-5 h-5" />
+            <svg className="w-5 h-5 text-[#1DB954] fill-current" viewBox="0 0 24 24">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.498 17.306c-.216.353-.674.464-1.027.248-2.812-1.718-6.351-2.107-10.521-1.155-.403.092-.807-.16-.899-.562-.092-.403.16-.807.562-.899 4.568-1.044 8.487-.604 11.637 1.341.353.216.464.674.248 1.027zm1.467-3.262c-.272.443-.853.582-1.296.31-3.219-1.979-8.125-2.552-11.933-1.396-.499.151-1.031-.133-1.182-.631-.151-.499.133-1.031.631-1.182 4.356-1.322 9.774-.683 13.47 1.587.443.272.582.853.31 1.296zm.126-3.398c-3.86-2.292-10.229-2.503-13.907-1.387-.593.18-1.222-.155-1.402-.748-.18-.593.155-1.222.748-1.402 4.234-1.285 11.266-1.039 15.698 1.59.534.317.709 1.011.392 1.545-.317.534-1.011.709-1.545.392z" />
+            </svg>
           </div>
           <div>
             <div className="flex items-center gap-2">

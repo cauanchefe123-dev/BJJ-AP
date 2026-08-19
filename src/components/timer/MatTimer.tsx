@@ -9,9 +9,21 @@ import {
   Minimize2, 
   Flame, 
   Music,
-  Clock
+  Clock,
+  Tv,
+  Cast,
+  Smartphone,
+  Laptop,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  X,
+  Share2,
+  SkipForward,
+  SkipBack
 } from 'lucide-react';
 import { SpotifyTatamePlayer } from './SpotifyTatamePlayer';
+import { SpotifyService, SpotifyPlaybackState } from '../../lib/spotifyService';
 
 export const MatTimer: React.FC = () => {
   const [roundTimeMinutes, setRoundTimeMinutes] = useState(6);
@@ -25,6 +37,10 @@ export const MatTimer: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSpotifyPanel, setShowSpotifyPanel] = useState(true);
+  const [showCastModal, setShowCastModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [playback, setPlayback] = useState<SpotifyPlaybackState | null>(null);
 
   const timerContainerRef = useRef<HTMLDivElement>(null);
   const soundEnabledRef = useRef<boolean>(soundEnabled);
@@ -173,6 +189,43 @@ export const MatTimer: React.FC = () => {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  // Listen for fullscreen change events (ESC key, browser exit, etc.)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Poll Spotify Playback State for Fullscreen Mini Player
+  useEffect(() => {
+    const fetchPlayback = async () => {
+      try {
+        const state = await SpotifyService.getPlaybackState();
+        if (state) {
+          setPlayback(state);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchPlayback();
+    const timer = setInterval(fetchPlayback, 2500);
+    return () => clearInterval(timer);
+  }, []);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       timerContainerRef.current?.requestFullscreen().catch(() => {});
@@ -181,6 +234,38 @@ export const MatTimer: React.FC = () => {
       document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
     }
+  };
+
+  const handleStartScreenShare = async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        setIsScreenSharing(true);
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            displaySurface: 'browser'
+          },
+          audio: true
+        });
+        
+        // Listen for user stopping stream via browser UI
+        stream.getVideoTracks()[0].onended = () => {
+          setIsScreenSharing(false);
+        };
+      } else {
+        setShowCastModal(true);
+      }
+    } catch {
+      setIsScreenSharing(false);
+      setShowCastModal(true);
+    }
+  };
+
+  const handleCopyDirectLink = () => {
+    const fullUrl = window.location.origin + window.location.pathname;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }).catch(() => {});
   };
 
   const isWarningTime = !isResting && timeLeft > 0 && timeLeft <= 60;
@@ -216,12 +301,14 @@ export const MatTimer: React.FC = () => {
             onClick={() => setShowSpotifyPanel(!showSpotifyPanel)}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer ${
               showSpotifyPanel
-                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-sm'
+                ? 'bg-[#1DB954]/15 text-[#1DB954] border-[#1DB954]/40 shadow-sm'
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
             }`}
             title="Conectar / Alternar Spotify do Tatame"
           >
-            <Music className="w-4 h-4 text-emerald-400" />
+            <svg className="w-4 h-4 text-[#1DB954] fill-current" viewBox="0 0 24 24">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.498 17.306c-.216.353-.674.464-1.027.248-2.812-1.718-6.351-2.107-10.521-1.155-.403.092-.807-.16-.899-.562-.092-.403.16-.807.562-.899 4.568-1.044 8.487-.604 11.637 1.341.353.216.464.674.248 1.027zm1.467-3.262c-.272.443-.853.582-1.296.31-3.219-1.979-8.125-2.552-11.933-1.396-.499.151-1.031-.133-1.182-.631-.151-.499.133-1.031.631-1.182 4.356-1.322 9.774-.683 13.47 1.587.443.272.582.853.31 1.296zm.126-3.398c-3.86-2.292-10.229-2.503-13.907-1.387-.593.18-1.222-.155-1.402-.748-.18-.593.155-1.222.748-1.402 4.234-1.285 11.266-1.039 15.698 1.59.534.317.709 1.011.392 1.545-.317.534-1.011.709-1.545.392z" />
+            </svg>
             <span>Spotify {showSpotifyPanel ? 'Ativo' : 'Oculto'}</span>
           </button>
 
@@ -244,6 +331,15 @@ export const MatTimer: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setShowCastModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-sm hover:shadow-cyan-500/20"
+            title="Espelhar na TV, Chromecast ou Projetor do Tatame"
+          >
+            <Tv className="w-4 h-4 text-cyan-400" />
+            <span>Espelhar TV</span>
+          </button>
+
+          <button
             onClick={toggleFullscreen}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer shadow-sm hover:border-slate-600"
             title="Modo Tela Cheia (Ideal para TVs da Academia)"
@@ -258,6 +354,8 @@ export const MatTimer: React.FC = () => {
         ref={timerContainerRef}
         translate="no"
         className={`rounded-3xl border-2 p-6 sm:p-10 transition-all flex flex-col items-center justify-between text-white shadow-2xl relative overflow-hidden notranslate ${
+          isFullscreen ? 'h-screen w-screen justify-around p-8 sm:p-12' : ''
+        } ${
           timeLeft === 0
             ? 'bg-gradient-to-b from-amber-950/90 via-slate-950 to-slate-950 border-amber-500/80 shadow-amber-500/10'
             : isResting
@@ -279,6 +377,90 @@ export const MatTimer: React.FC = () => {
             ? 'bg-rose-500' 
             : 'bg-emerald-400'
         }`} />
+
+        {/* Small Corner Spotify Player (visible when fullscreen or whenever track is active) */}
+        {playback?.item && (
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md border border-slate-800/90 rounded-2xl p-2 sm:p-2.5 max-w-[280px] sm:max-w-[340px] shadow-2xl transition-all hover:border-[#1DB954]/50 group">
+            {/* Album Art or Spotify Icon */}
+            <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-slate-900 shrink-0 border border-slate-800 flex items-center justify-center">
+              {playback.item.album?.images?.[0]?.url ? (
+                <img
+                  src={playback.item.album.images[0].url}
+                  alt={playback.item.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <svg className="w-5 h-5 text-[#1DB954] fill-current" viewBox="0 0 24 24">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.498 17.306c-.216.353-.674.464-1.027.248-2.812-1.718-6.351-2.107-10.521-1.155-.403.092-.807-.16-.899-.562-.092-.403.16-.807.562-.899 4.568-1.044 8.487-.604 11.637 1.341.353.216.464.674.248 1.027zm1.467-3.262c-.272.443-.853.582-1.296.31-3.219-1.979-8.125-2.552-11.933-1.396-.499.151-1.031-.133-1.182-.631-.151-.499.133-1.031.631-1.182 4.356-1.322 9.774-.683 13.47 1.587.443.272.582.853.31 1.296zm.126-3.398c-3.86-2.292-10.229-2.503-13.907-1.387-.593.18-1.222-.155-1.402-.748-.18-.593.155-1.222.748-1.402 4.234-1.285 11.266-1.039 15.698 1.59.534.317.709 1.011.392 1.545-.317.534-1.011.709-1.545.392z" />
+                </svg>
+              )}
+              {playback.is_playing && (
+                <div className="absolute inset-0 bg-slate-950/20 flex items-center justify-center pointer-events-none">
+                  <span className="w-2 h-2 rounded-full bg-[#1DB954] animate-ping" />
+                </div>
+              )}
+            </div>
+
+            {/* Track Info */}
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <svg className="w-3 h-3 text-[#1DB954] fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.498 17.306c-.216.353-.674.464-1.027.248-2.812-1.718-6.351-2.107-10.521-1.155-.403.092-.807-.16-.899-.562-.092-.403.16-.807.562-.899 4.568-1.044 8.487-.604 11.637 1.341.353.216.464.674.248 1.027zm1.467-3.262c-.272.443-.853.582-1.296.31-3.219-1.979-8.125-2.552-11.933-1.396-.499.151-1.031-.133-1.182-.631-.151-.499.133-1.031.631-1.182 4.356-1.322 9.774-.683 13.47 1.587.443.272.582.853.31 1.296zm.126-3.398c-3.86-2.292-10.229-2.503-13.907-1.387-.593.18-1.222-.155-1.402-.748-.18-.593.155-1.222.748-1.402 4.234-1.285 11.266-1.039 15.698 1.59.534.317.709 1.011.392 1.545-.317.534-1.011.709-1.545.392z" />
+                </svg>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#1DB954]">
+                  {playback.is_playing ? 'Tocando no Spotify' : 'Pausado no Spotify'}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-white truncate leading-tight">
+                {playback.item.name}
+              </p>
+              <p className="text-[11px] text-slate-400 truncate leading-tight">
+                {playback.item.artists?.map(a => a.name).join(', ')}
+              </p>
+            </div>
+
+            {/* Mini Quick Controls (Skip/Pause directly in Fullscreen) */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={async () => {
+                  try {
+                    if (playback.is_playing) {
+                      await SpotifyService.pause();
+                    } else {
+                      await SpotifyService.play();
+                    }
+                    const state = await SpotifyService.getPlaybackState();
+                    if (state) setPlayback(state);
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-slate-850 hover:bg-[#1DB954] text-slate-200 hover:text-slate-950 transition-all cursor-pointer"
+                title={playback.is_playing ? 'Pausar' : 'Play'}
+              >
+                {playback.is_playing ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await SpotifyService.nextTrack();
+                    setTimeout(async () => {
+                      const state = await SpotifyService.getPlaybackState();
+                      if (state) setPlayback(state);
+                    }, 500);
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-slate-850 hover:bg-slate-750 text-slate-300 hover:text-white transition-all cursor-pointer"
+                title="Próxima faixa"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Phase Header Badge */}
         <div className="z-10 flex items-center gap-3">
@@ -486,6 +668,147 @@ export const MatTimer: React.FC = () => {
           isTimerRunning={isRunning}
           isResting={isResting}
         />
+      )}
+
+      {/* TV & Screencast Modal */}
+      {showCastModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full text-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <Tv className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Espelhar Cronômetro na TV</h3>
+                  <p className="text-xs text-slate-400">Transmita o placar e rounds para qualquer TV ou projetor do tatame.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCastModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 sm:p-6 space-y-5">
+              {/* Direct Screen Share Button (Browser Cast) */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-900 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      Modo Rápido
+                    </span>
+                    <h4 className="text-sm font-bold text-white">Transmitir Aba / Tela Diretamente</h4>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Abre a janela de seleção do Chrome/Edge para transmitir esta tela para Chromecast, Smart TV ou monitor sem fio.
+                  </p>
+                </div>
+                <button
+                  onClick={handleStartScreenShare}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <Cast className="w-4 h-4" />
+                  <span>{isScreenSharing ? 'Compartilhando Tela...' : 'Iniciar Transmissão'}</span>
+                </button>
+              </div>
+
+              {/* Step by Step Guide for all Devices */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Android / Smart View */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                    <Smartphone className="w-4 h-4" />
+                    <span>Celular Android</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    1. Arraste a barra do topo do celular para baixo.<br/>
+                    2. Toque em <strong>Smart View</strong> ou <strong>Transmitir</strong>.<br/>
+                    3. Selecione a TV do tatame.
+                  </p>
+                </div>
+
+                {/* iPhone / AirPlay */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs">
+                    <Share2 className="w-4 h-4" />
+                    <span>iPhone / iPad</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    1. Abra a Central de Controle do iOS.<br/>
+                    2. Toque em <strong>Espelhar a Tela</strong> (dois retângulos).<br/>
+                    3. Escolha a sua TV ou Apple TV.
+                  </p>
+                </div>
+
+                {/* Notebook / HDMI / Chromecast */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                    <Laptop className="w-4 h-4" />
+                    <span>PC / TV Box / HDMI</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    1. No Chrome do PC: Menu ⋮ &gt; <strong>Transmitir (Cast)</strong>.<br/>
+                    2. Ou plugue um cabo HDMI direto na TV.<br/>
+                    3. Ou abra no navegador da TV Box / FireStick.
+                  </p>
+                </div>
+              </div>
+
+              {/* Direct Access Link Box */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400">Link direto para abrir no navegador da TV:</span>
+                  {copiedLink && (
+                    <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Link copiado!
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={window.location.origin}
+                    className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleCopyDirectLink}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    title="Copiar Link"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copiar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowCastModal(false);
+                  toggleFullscreen();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>Colocar em Tela Cheia na TV</span>
+              </button>
+              <button
+                onClick={() => setShowCastModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
