@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, BeltType, AgeCategory, WeightCategory } from '../types';
+import { User, UserRole, BeltType, AgeCategory, WeightCategory, Student } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore } from '../lib/firebaseStore';
@@ -899,6 +899,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const approveUser = (identifier: string) => {
     const cleanId = identifier.trim().toLowerCase();
+    let approvedUserObj: User | null = null;
 
     // 1. Update Users in React state, Firestore, localStorage, and API
     setUsers(prev => {
@@ -910,6 +911,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           (u.studentId && u.studentId.trim().toLowerCase() === cleanId)
         ) {
           const updatedUser = { ...u, approvalStatus: 'APPROVED' as const, isActivated: true };
+          approvedUserObj = updatedUser;
           saveToFirestore('users', updatedUser);
           fetch(`/api/users/${encodeURIComponent(u.id)}`, {
             method: 'PUT',
@@ -924,25 +926,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedList;
     });
 
-    // 2. Update Students in localStorage, Firestore, and API
+    // 2. Update or Create Student in localStorage, Firestore, and API
     try {
       const savedStudents = localStorage.getItem('bjjcron_students');
-      if (savedStudents) {
-        const studentsList = JSON.parse(savedStudents);
-        const updatedStudents = studentsList.map((s: any) => {
-          if (
-            s.id === identifier || 
-            (s.email && s.email.trim().toLowerCase() === cleanId) ||
-            (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
-          ) {
-            const updatedSt = { ...s, approvalStatus: 'APPROVED', active: true };
-            saveToFirestore('students', updatedSt);
-            return updatedSt;
-          }
-          return s;
-        });
-        localStorage.setItem('bjjcron_students', JSON.stringify(updatedStudents));
+      const studentsList: any[] = savedStudents ? JSON.parse(savedStudents) : [];
+      let foundStudent = false;
+
+      const updatedStudents = studentsList.map((s: any) => {
+        if (
+          s.id === identifier || 
+          (s.email && s.email.trim().toLowerCase() === cleanId) ||
+          (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
+        ) {
+          foundStudent = true;
+          const updatedSt = { ...s, approvalStatus: 'APPROVED', active: true, updatedAt: new Date().toISOString() };
+          saveToFirestore('students', updatedSt);
+          return updatedSt;
+        }
+        return s;
+      });
+
+      // If student was not yet in studentsList, synthesize full student object from the approved user
+      if (!foundStudent) {
+        const u = approvedUserObj || users.find(usr => usr.id === identifier || usr.studentId === identifier || (usr.email && usr.email.trim().toLowerCase() === cleanId));
+        if (u) {
+          const newStObj: Student = {
+            id: u.studentId || u.id,
+            registrationNumber: (u.studentId && u.studentId.startsWith('BJJ-')) ? u.studentId : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            birthDate: '2000-01-01',
+            photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+            belt: 'BRANCA',
+            stripes: 0,
+            startDate: new Date().toISOString().split('T')[0],
+            totalClassesAttended: 0,
+            classesSinceLastGraduation: 0,
+            weightCategory: 'MÉDIO',
+            ageCategory: 'ADULTO',
+            active: true,
+            planName: 'Plano Mensal Padrão',
+            planPrice: 240,
+            paymentDueDateDay: 10,
+            paymentStatus: 'PAGO',
+            qrCodeToken: `BJJCRON-${u.id}`,
+            approvalStatus: 'APPROVED',
+            notes: 'Atleta aprovado na equipe.',
+            hasActivatedAccount: true,
+            updatedAt: new Date().toISOString()
+          };
+          updatedStudents.unshift(newStObj);
+          saveToFirestore('students', newStObj);
+        }
       }
+
+      localStorage.setItem('bjjcron_students', JSON.stringify(updatedStudents));
     } catch (e) {
       console.error('Error updating students in approveUser:', e);
     }

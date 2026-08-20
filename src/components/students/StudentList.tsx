@@ -31,24 +31,25 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [emailStudent, setEmailStudent] = useState<Student | null>(null);
 
-  // Consolidate students list including any pending ALUNO accounts from users
+  // Consolidate students list including any ALUNO accounts from users
   const allStudentsCombined: Student[] = React.useMemo(() => {
     const list: Student[] = [...students];
     const addedIds = new Set(students.map(s => s.id));
     const addedEmails = new Set(students.map(s => s.email?.trim().toLowerCase()).filter(Boolean));
 
     users.forEach(u => {
-      if (u.role === 'ALUNO' && u.approvalStatus === 'PENDING') {
+      if (u.role === 'ALUNO') {
         const emailKey = u.email ? u.email.trim().toLowerCase() : '';
         if ((u.studentId && addedIds.has(u.studentId)) || (emailKey && addedEmails.has(emailKey)) || addedIds.has(u.id)) {
           return;
         }
+        const isApproved = u.approvalStatus === 'APPROVED' || (!u.approvalStatus && u.isActivated);
         list.push({
           id: u.studentId || u.id,
           name: u.name,
           email: u.email,
           phone: u.phone || '',
-          registrationNumber: 'SOLICITAÇÃO',
+          registrationNumber: u.studentId || `BJJ-${new Date().getFullYear()}-${u.id.slice(-4)}`,
           qrCodeToken: `BJJCRON-${u.id}`,
           birthDate: '2000-01-01',
           photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
@@ -59,13 +60,13 @@ export const StudentList: React.FC<StudentListProps> = ({
           classesSinceLastGraduation: 0,
           weightCategory: 'MÉDIO',
           ageCategory: 'ADULTO',
-          active: true,
+          active: isApproved,
           planName: 'Plano Mensal Padrão',
           planPrice: 240,
           paymentDueDateDay: 10,
-          paymentStatus: 'PENDENTE',
-          approvalStatus: 'PENDING',
-          notes: 'Novo cadastro aguardando aprovação no tatame.',
+          paymentStatus: 'PAGO',
+          approvalStatus: isApproved ? 'APPROVED' : (u.approvalStatus || 'PENDING'),
+          notes: isApproved ? 'Atleta da equipe.' : 'Novo cadastro aguardando aprovação no tatame.',
           hasActivatedAccount: true,
         });
       }
@@ -79,7 +80,14 @@ export const StudentList: React.FC<StudentListProps> = ({
 
   const handleApprove = (student: Student) => {
     approveUser(student.id);
-    updateStudent(student.id, { approvalStatus: 'APPROVED', active: true });
+    updateStudent(student.id, {
+      ...student,
+      approvalStatus: 'APPROVED',
+      active: true,
+      registrationNumber: (student.registrationNumber && student.registrationNumber !== 'SOLICITAÇÃO')
+        ? student.registrationNumber
+        : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+    });
   };
 
   const handleReject = (student: Student) => {
@@ -88,9 +96,15 @@ export const StudentList: React.FC<StudentListProps> = ({
   };
 
   const filteredStudents = allStudentsCombined.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          s.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (s.email && s.email.toLowerCase().includes(searchTerm.toLowerCase()));
+    const sName = s.name || '';
+    const sReg = s.registrationNumber || '';
+    const sEmail = s.email || '';
+    const sPhone = s.phone || '';
+
+    const matchesSearch = sName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          sReg.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          sEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          sPhone.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesBelt = beltFilter === 'ALL' || s.belt === beltFilter;
 

@@ -804,9 +804,75 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
     );
 
+    // If student not in state, look in users to populate initial profile data
+    let fallbackUserData: Partial<Student> = {};
+    if (!existing) {
+      try {
+        const savedUsers = localStorage.getItem('bjjcron_users');
+        if (savedUsers) {
+          const usersList = JSON.parse(savedUsers);
+          const matchedUser = usersList.find((u: any) => 
+            u.id === id || 
+            u.studentId === id || 
+            (u.email && u.email.trim().toLowerCase() === cleanId)
+          );
+          if (matchedUser) {
+            fallbackUserData = {
+              name: matchedUser.name,
+              email: matchedUser.email,
+              phone: matchedUser.phone || '',
+              photoUrl: matchedUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+              registrationNumber: `BJJ-${new Date().getFullYear()}-${id.slice(-4)}`,
+              qrCodeToken: `BJJCRON-${id}`,
+              birthDate: '2000-01-01',
+              belt: 'BRANCA',
+              stripes: 0,
+              startDate: new Date().toISOString().split('T')[0],
+              totalClassesAttended: 0,
+              classesSinceLastGraduation: 0,
+              weightCategory: 'MÉDIO',
+              ageCategory: 'ADULTO',
+              active: true,
+              planName: 'Plano Mensal Padrão',
+              planPrice: 240,
+              paymentDueDateDay: 10,
+              paymentStatus: 'PAGO',
+              approvalStatus: 'APPROVED',
+              hasActivatedAccount: true
+            };
+          }
+        }
+      } catch (e) {}
+    }
+
     const mergedStudent: Student = existing 
       ? { ...existing, ...enrichedUpdates }
-      : ({ id, ...enrichedUpdates } as Student);
+      : ({
+          id,
+          name: 'Atleta',
+          email: '',
+          phone: '',
+          registrationNumber: `BJJ-${new Date().getFullYear()}-${id.slice(-4)}`,
+          qrCodeToken: `BJJCRON-${id}`,
+          birthDate: '2000-01-01',
+          photoUrl: DEFAULT_BLACK_GI_AVATAR,
+          belt: 'BRANCA',
+          stripes: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          totalClassesAttended: 0,
+          classesSinceLastGraduation: 0,
+          weightCategory: 'MÉDIO',
+          ageCategory: 'ADULTO',
+          active: true,
+          planName: 'Plano Mensal Padrão',
+          planPrice: 240,
+          paymentDueDateDay: 10,
+          paymentStatus: 'PAGO',
+          approvalStatus: 'APPROVED',
+          hasActivatedAccount: true,
+          ...fallbackUserData,
+          ...enrichedUpdates
+        } as Student);
 
     // 1. Direct write to Firestore students
     await saveToFirestore('students', mergedStudent);

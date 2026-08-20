@@ -64,10 +64,17 @@ export const PendingStudentApprovals: React.FC = () => {
     return list;
   }, [students, users]);
 
-  const handleApprove = (studentId: string, studentName: string) => {
-    approveUser(studentId);
-    updateStudent(studentId, { approvalStatus: 'APPROVED', active: true });
-    setToastMsg(`✅ Atleta ${studentName} aceito(a) na equipe com sucesso!`);
+  const handleApprove = (student: Student) => {
+    approveUser(student.id);
+    updateStudent(student.id, {
+      ...student,
+      approvalStatus: 'APPROVED',
+      active: true,
+      registrationNumber: (student.registrationNumber && student.registrationNumber !== 'SOLICITAÇÃO')
+        ? student.registrationNumber
+        : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+    });
+    setToastMsg(`✅ Atleta ${student.name} aceito(a) na equipe com sucesso!`);
     setTimeout(() => setToastMsg(null), 5000);
   };
 
@@ -75,7 +82,14 @@ export const PendingStudentApprovals: React.FC = () => {
     if (window.confirm(`Deseja aprovar todos os ${pendingStudents.length} atletas pendentes de uma vez?`)) {
       pendingStudents.forEach(st => {
         approveUser(st.id);
-        updateStudent(st.id, { approvalStatus: 'APPROVED', active: true });
+        updateStudent(st.id, {
+          ...st,
+          approvalStatus: 'APPROVED',
+          active: true,
+          registrationNumber: (st.registrationNumber && st.registrationNumber !== 'SOLICITAÇÃO')
+            ? st.registrationNumber
+            : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+        });
       });
       setToastMsg(`✅ Todos os ${pendingStudents.length} atletas foram aprovados na equipe!`);
       setTimeout(() => setToastMsg(null), 5000);
@@ -191,7 +205,7 @@ export const PendingStudentApprovals: React.FC = () => {
               <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 border-t border-slate-800/80 sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
                 <button
                   type="button"
-                  onClick={() => handleApprove(student.id, student.name)}
+                  onClick={() => handleApprove(student)}
                   className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                 >
                   <UserCheck className="w-4 h-4" />
