@@ -55,6 +55,8 @@ export interface User {
   password?: string;
   approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
   isActivated?: boolean;
+  authProvider?: 'email_password' | 'google';
+  googleUid?: string;
 }
 
 export interface Teacher {
