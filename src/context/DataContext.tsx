@@ -539,66 +539,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real-time Firestore Cloud Synchronization
   useEffect(() => {
     const unsubStudents = subscribeFirestoreCollection<Student>('students', (data) => {
-      if (!data || data.length === 0) return;
+      if (!data) return;
+      const validCloudStudents = (data || []).filter(cloudSt =>
+        !isTestMockRecord(cloudSt.id) && 
+        !isTestMockRecord(cloudSt.email) && 
+        !isTestMockRecord(cloudSt.name) && 
+        !isTestMockRecord(cloudSt.registrationNumber) && 
+        !isDeletedRecord(cloudSt.id, cloudSt.email, cloudSt.registrationNumber)
+      ).map(s => ({
+        ...s,
+        photoUrl: (s.photoUrl && !s.photoUrl.includes('unsplash.com')) ? s.photoUrl : DEFAULT_BLACK_GI_AVATAR
+      }));
+
       setStudents(prev => {
-        const prefix = environmentMode === 'HOMOLOG' ? 'bjjcron_homolog_' : 'bjjcron_';
-        const saved = localStorage.getItem(`${prefix}students`) || localStorage.getItem('bjjcron_students');
-        let localList: Student[] = prev;
-        if (saved) { try { localList = JSON.parse(saved); } catch (e) {} }
-
-        const cloudItems = data || [];
-        const merged: Student[] = [...localList];
-
-        cloudItems.forEach(cloudSt => {
-          if (
-            isTestMockRecord(cloudSt.id) || 
-            isTestMockRecord(cloudSt.email) ||
-            isTestMockRecord(cloudSt.name) ||
-            isTestMockRecord(cloudSt.registrationNumber) ||
-            isDeletedRecord(cloudSt.id, cloudSt.email, cloudSt.registrationNumber)
-          ) {
-            return;
-          }
-
-          const cleanCloudEmail = cloudSt.email ? cloudSt.email.trim().toLowerCase() : '';
-          const cleanCloudName = cloudSt.name ? cloudSt.name.trim().toLowerCase() : '';
-
-          const existingIdx = merged.findIndex(m => 
-            m.id === cloudSt.id || 
-            (cleanCloudEmail && m.email && m.email.trim().toLowerCase() === cleanCloudEmail) ||
-            (cleanCloudName && m.name && m.name.trim().toLowerCase() === cleanCloudName)
-          );
-
-          if (existingIdx !== -1) {
-            const localSt = merged[existingIdx];
-            const localUpdatedAt = localSt?.updatedAt ? new Date(localSt.updatedAt).getTime() : 0;
-            const cloudUpdatedAt = cloudSt?.updatedAt ? new Date(cloudSt.updatedAt).getTime() : 0;
-
-            // If local record has been updated more recently than the incoming cloud record, keep local fields
-            if (localUpdatedAt > cloudUpdatedAt && (Date.now() - localUpdatedAt < 60000)) {
-              merged[existingIdx] = {
-                ...cloudSt,
-                ...localSt,
-                totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
-                classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
-              };
-            } else {
-              // Cloud update is newer or matches: apply cloud data, keeping any locally customized photo if cloud is missing
-              merged[existingIdx] = {
-                ...localSt,
-                ...cloudSt,
-                photoUrl: (cloudSt.photoUrl && !cloudSt.photoUrl.includes('unsplash.com')) ? cloudSt.photoUrl : (localSt?.photoUrl || DEFAULT_BLACK_GI_AVATAR),
-                totalClassesAttended: Math.max(localSt?.totalClassesAttended || 0, cloudSt.totalClassesAttended || 0),
-                classesSinceLastGraduation: Math.max(localSt?.classesSinceLastGraduation || 0, cloudSt.classesSinceLastGraduation || 0),
-              };
+        if (validCloudStudents.length > 0) {
+          const merged: Student[] = [...validCloudStudents];
+          prev.forEach(localSt => {
+            if (!merged.some(m => m.id === localSt.id || (m.email && localSt.email && m.email.trim().toLowerCase() === localSt.email.trim().toLowerCase()))) {
+              merged.push(localSt);
             }
-          } else {
-            merged.push(cloudSt);
-          }
-        });
-
-        safeSave('bjjcron_students', merged);
-        return merged;
+          });
+          safeSave('bjjcron_students', merged);
+          return merged;
+        }
+        return prev;
       });
       window.dispatchEvent(new Event('bjjcron_students_updated'));
     });
@@ -742,27 +706,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Sync state when students or users are updated in localStorage by AuthContext or another tab
-  useEffect(() => {
-    const syncStudentsFromStorage = () => {
-      const saved = localStorage.getItem('bjjcron_students');
-      if (saved) {
-        try {
-          const rawList: Student[] = JSON.parse(saved);
-          setStudents(rawList.map(s => ({
-            ...s,
-            photoUrl: (!s.photoUrl || s.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : s.photoUrl
-          })));
-        } catch (e) {}
-      }
-    };
-    window.addEventListener('storage', syncStudentsFromStorage);
-    window.addEventListener('bjjcron_students_updated', syncStudentsFromStorage);
-    return () => {
-      window.removeEventListener('storage', syncStudentsFromStorage);
-      window.removeEventListener('bjjcron_students_updated', syncStudentsFromStorage);
-    };
-  }, []);
 
   // Student CRUD
   const addStudent = (studentData: Omit<Student, 'id' | 'registrationNumber' | 'qrCodeToken' | 'totalClassesAttended' | 'classesSinceLastGraduation'>): Student => {
@@ -849,94 +792,95 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newStudent;
   };
 
-  const updateStudent = (id: string, updates: Partial<Student>) => {
-    let updatedStudent: Student | null = null;
+  const updateStudent = async (id: string, updates: Partial<Student>) => {
     const cleanId = id.trim().toLowerCase();
     const nowIso = new Date().toISOString();
     const enrichedUpdates = { ...updates, updatedAt: nowIso };
 
+    // Get current student
+    const existing = students.find(s => 
+      s.id === id || 
+      (s.email && s.email.trim().toLowerCase() === cleanId) ||
+      (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
+    );
+
+    const mergedStudent: Student = existing 
+      ? { ...existing, ...enrichedUpdates }
+      : ({ id, ...enrichedUpdates } as Student);
+
+    // 1. Direct write to Firestore students
+    await saveToFirestore('students', mergedStudent);
+
+    // 2. Update local state
     setStudents(prev => {
-      const updated = prev.map(s => {
-        if (
-          s.id === id || 
-          (s.email && s.email.trim().toLowerCase() === cleanId) ||
-          (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
-        ) {
-          updatedStudent = { ...s, ...enrichedUpdates };
-          return updatedStudent;
-        }
-        return s;
-      });
+      const exists = prev.some(s => s.id === mergedStudent.id);
+      const updated = exists 
+        ? prev.map(s => (s.id === mergedStudent.id ? mergedStudent : s))
+        : [mergedStudent, ...prev];
       safeSave('bjjcron_students', updated);
       return updated;
     });
 
-    if (updatedStudent) {
-      const st = updatedStudent as Student;
-      saveToFirestore('students', st);
+    // 3. If belt, stripes or lastGraduationDate were modified, automatically generate/update Graduation record
+    if (updates.belt !== undefined || updates.stripes !== undefined || updates.lastGraduationDate !== undefined) {
+      const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || new Date().toISOString().split('T')[0];
+      const gradRec: Graduation = {
+        id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        studentId: mergedStudent.id,
+        belt: mergedStudent.belt,
+        stripes: mergedStudent.stripes,
+        promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
+        promotedAt: gradDate,
+        notes: updates.notes || 'Atualização de faixa/graduação do cadastro.',
+        classesCountAtPromotion: mergedStudent.totalClassesAttended,
+      };
+      setGraduations(gPrev => {
+        const nextGrads = [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)];
+        safeSave('bjjcron_graduations', nextGrads);
+        return nextGrads;
+      });
+      saveToFirestore('graduations', gradRec);
+    }
 
-      // If belt, stripes or lastGraduationDate were modified, automatically generate/update Graduation record
-      if (updates.belt !== undefined || updates.stripes !== undefined || updates.lastGraduationDate !== undefined) {
-        const gradDate = updates.lastGraduationDate || st.lastGraduationDate || new Date().toISOString().split('T')[0];
-        const gradRec: Graduation = {
-          id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          studentId: st.id,
-          belt: st.belt,
-          stripes: st.stripes,
-          promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
-          promotedAt: gradDate,
-          notes: updates.notes || 'Atualização de faixa/graduação do cadastro.',
-          classesCountAtPromotion: st.totalClassesAttended,
-        };
-        setGraduations(gPrev => {
-          const nextGrads = [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)];
-          safeSave('bjjcron_graduations', nextGrads);
-          return nextGrads;
-        });
-        saveToFirestore('graduations', gradRec);
+    // 4. Sync corresponding user in Firestore users
+    const targetEmail = mergedStudent.email ? mergedStudent.email.trim().toLowerCase() : '';
+    try {
+      const savedUsers = localStorage.getItem('bjjcron_users');
+      if (savedUsers) {
+        const usersList = JSON.parse(savedUsers);
+        const userIdx = usersList.findIndex((u: any) => 
+          (u.studentId === mergedStudent.id) || 
+          (u.role === 'ALUNO' && targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail)
+        );
+        if (userIdx !== -1) {
+          if (updates.name) usersList[userIdx].name = updates.name.trim();
+          if (updates.email) usersList[userIdx].email = updates.email.trim().toLowerCase();
+          if (updates.phone) usersList[userIdx].phone = updates.phone;
+          if (updates.photoUrl !== undefined) usersList[userIdx].avatarUrl = updates.photoUrl;
+          if (updates.approvalStatus) usersList[userIdx].approvalStatus = updates.approvalStatus;
+          localStorage.setItem('bjjcron_users', JSON.stringify(usersList));
+          saveToFirestore('users', usersList[userIdx]);
+        }
       }
 
-      // Sync corresponding user in bjjcron_users and bjjcron_current_user
-      try {
-        const savedUsers = localStorage.getItem('bjjcron_users');
-        if (savedUsers) {
-          const targetEmail = st.email ? st.email.trim().toLowerCase() : '';
-          const usersList = JSON.parse(savedUsers);
-          const userIdx = usersList.findIndex((u: any) => 
-            (u.studentId === st.id) || 
-            (u.role === 'ALUNO' && targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail)
-          );
-          if (userIdx !== -1) {
-            if (updates.name) usersList[userIdx].name = updates.name;
-            if (updates.email) usersList[userIdx].email = updates.email.trim().toLowerCase();
-            if (updates.phone) usersList[userIdx].phone = updates.phone;
-            if (updates.photoUrl !== undefined) usersList[userIdx].avatarUrl = updates.photoUrl;
-            if (updates.approvalStatus) usersList[userIdx].approvalStatus = updates.approvalStatus;
-            localStorage.setItem('bjjcron_users', JSON.stringify(usersList));
-            saveToFirestore('users', usersList[userIdx]);
-          }
+      // Update current user if matching
+      const savedCurr = localStorage.getItem('bjjcron_current_user');
+      if (savedCurr) {
+        const curr = JSON.parse(savedCurr);
+        if (
+          curr.studentId === mergedStudent.id ||
+          (curr.role === 'ALUNO' && targetEmail && curr.email && curr.email.trim().toLowerCase() === targetEmail)
+        ) {
+          if (updates.name) curr.name = updates.name.trim();
+          if (updates.email) curr.email = updates.email.trim().toLowerCase();
+          if (updates.phone) curr.phone = updates.phone;
+          if (updates.photoUrl !== undefined) curr.avatarUrl = updates.photoUrl;
+          localStorage.setItem('bjjcron_current_user', JSON.stringify(curr));
         }
-
-        // Update current user if matching
-        const savedCurr = localStorage.getItem('bjjcron_current_user');
-        if (savedCurr) {
-          const curr = JSON.parse(savedCurr);
-          const targetEmail = st.email ? st.email.trim().toLowerCase() : '';
-          if (
-            curr.studentId === st.id ||
-            (curr.role === 'ALUNO' && targetEmail && curr.email && curr.email.trim().toLowerCase() === targetEmail)
-          ) {
-            if (updates.name) curr.name = updates.name;
-            if (updates.email) curr.email = updates.email.trim().toLowerCase();
-            if (updates.phone) curr.phone = updates.phone;
-            if (updates.photoUrl !== undefined) curr.avatarUrl = updates.photoUrl;
-            localStorage.setItem('bjjcron_current_user', JSON.stringify(curr));
-          }
-        }
-        window.dispatchEvent(new Event('bjjcron_users_updated'));
-      } catch (e) {
-        console.error('Error updating user in bjjcron_users:', e);
       }
+      window.dispatchEvent(new Event('bjjcron_users_updated'));
+    } catch (e) {
+      console.error('Error updating user in bjjcron_users:', e);
     }
 
     fetch(`/api/students/${encodeURIComponent(id)}`, {

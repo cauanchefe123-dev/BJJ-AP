@@ -50,6 +50,8 @@ interface AuthContextType {
   logout: () => void;
   deleteMyAccount: () => { success: boolean; message: string };
   refreshUsersFromStorage: () => void;
+  updateUserProfile: (updates: Partial<User>) => Promise<boolean>;
+  updateUser: (userId: string, updates: Partial<User>) => Promise<boolean>;
   requestPasswordRecovery: (email: string) => { success: boolean; code?: string; message: string };
   resetPasswordWithCode: (email: string, code: string, expectedCode: string, newPassword: string) => { success: boolean; message: string };
 }
@@ -232,82 +234,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsubFirestoreUsers = subscribeFirestoreCollection<User>('users', (cloudUsers) => {
       if (!cloudUsers || cloudUsers.length === 0) return;
+      
+      const validCloudUsers = cloudUsers.filter((u: User) => 
+        !isTestMockRecord(u.id) &&
+        !isTestMockRecord(u.email) &&
+        !isTestMockRecord(u.name) &&
+        !isDeletedRecord(u.id, u.email, u.studentId)
+      ).map((u: User) => ({
+        ...u,
+        approvalStatus: u.approvalStatus || 'APPROVED',
+        isActivated: u.approvalStatus === 'APPROVED' ? true : (u.isActivated ?? true),
+        avatarUrl: (u.avatarUrl && !u.avatarUrl.includes('unsplash.com')) ? u.avatarUrl : DEFAULT_BLACK_GI_AVATAR
+      }));
+
       setUsers(prev => {
-        const savedStudents = localStorage.getItem('bjjcron_students');
-        const savedCurr = localStorage.getItem('bjjcron_current_user');
-        let currUser: any = null;
-        let studentsList: any[] = [];
-        if (savedCurr) { try { currUser = JSON.parse(savedCurr); } catch(e){} }
-        if (savedStudents) { try { studentsList = JSON.parse(savedStudents); } catch(e){} }
-
-        const cList = cloudUsers || [];
-        const merged: User[] = [...prev];
-
-        cList.forEach((u: User) => {
-          if (
-            isTestMockRecord(u.id) ||
-            isTestMockRecord(u.email) ||
-            isTestMockRecord(u.name) ||
-            isDeletedRecord(u.id, u.email, u.studentId)
-          ) {
-            return;
-          }
-
-          const stMatch = studentsList.find((s: any) => 
-            (s.id && u.studentId && s.id === u.studentId) || 
-            (s.email && u.email && s.email.trim().toLowerCase() === u.email.trim().toLowerCase())
-          );
-          const isCurr = currUser && (
-            currUser.id === u.id || 
-            (currUser.email && u.email && currUser.email.trim().toLowerCase() === u.email.trim().toLowerCase())
-          );
-          const localPrevIdx = merged.findIndex(p => p.id === u.id || (p.email && u.email && p.email.trim().toLowerCase() === u.email.trim().toLowerCase()));
-          const localPrev = localPrevIdx !== -1 ? merged[localPrevIdx] : undefined;
-          const isApproved = u.approvalStatus === 'APPROVED' || (stMatch && stMatch.approvalStatus === 'APPROVED') || (localPrev && localPrev.approvalStatus === 'APPROVED') || (!u.approvalStatus && u.approvalStatus !== 'PENDING' && u.approvalStatus !== 'REJECTED');
-          const bestApproval = isApproved ? 'APPROVED' : (u.approvalStatus || (stMatch && stMatch.approvalStatus) || (localPrev && localPrev.approvalStatus) || 'APPROVED');
-
-          const userObj: User = {
-            ...u,
-            approvalStatus: bestApproval,
-            isActivated: bestApproval === 'APPROVED' ? true : u.isActivated,
-            name: (isCurr && currUser.name) ? currUser.name : (stMatch && stMatch.name) ? stMatch.name : (localPrev && localPrev.name) ? localPrev.name : u.name,
-            email: (isCurr && currUser.email) ? currUser.email : (stMatch && stMatch.email) ? stMatch.email : (localPrev && localPrev.email) ? localPrev.email : u.email,
-            phone: (isCurr && currUser.phone) ? currUser.phone : (stMatch && stMatch.phone) ? stMatch.phone : (localPrev && localPrev.phone) ? localPrev.phone : u.phone,
-            avatarUrl: (isCurr && currUser.avatarUrl) ? currUser.avatarUrl : (stMatch && stMatch.photoUrl) ? stMatch.photoUrl : (localPrev && localPrev.avatarUrl) ? localPrev.avatarUrl : u.avatarUrl
-          };
-
-          if (localPrevIdx !== -1) {
-            merged[localPrevIdx] = userObj;
-          } else {
-            merged.push(userObj);
+        const merged: User[] = [...validCloudUsers];
+        // Keep any transient user that hasn't synced yet
+        prev.forEach(localU => {
+          if (!merged.some(m => m.id === localU.id || (m.email && localU.email && m.email.trim().toLowerCase() === localU.email.trim().toLowerCase()))) {
+            merged.push(localU);
           }
         });
-
         localStorage.setItem('bjjcron_users', JSON.stringify(merged));
         return merged;
+      });
+
+      // Synchronize active currentUser if their profile was updated in cloud
+      setCurrentUser(prevCurr => {
+        if (!prevCurr) return prevCurr;
+        const cleanCurrEmail = prevCurr.email ? prevCurr.email.trim().toLowerCase() : '';
+        const matchingCloud = validCloudUsers.find(cu => 
+          cu.id === prevCurr.id || 
+          (cleanCurrEmail && cu.email && cu.email.trim().toLowerCase() === cleanCurrEmail) ||
+          (prevCurr.studentId && cu.studentId && cu.studentId === prevCurr.studentId)
+        );
+        if (matchingCloud) {
+          const updatedCurr: User = {
+            ...prevCurr,
+            ...matchingCloud,
+            name: matchingCloud.name || prevCurr.name,
+            phone: matchingCloud.phone !== undefined ? matchingCloud.phone : prevCurr.phone,
+            avatarUrl: matchingCloud.avatarUrl || prevCurr.avatarUrl
+          };
+          localStorage.setItem('bjjcron_current_user', JSON.stringify(updatedCurr));
+          return updatedCurr;
+        }
+        return prevCurr;
       });
     });
 
     const syncFromStorage = () => {
       fetchUsersFromApi();
-      setUsers(getSyncedInitialUsers());
-      const savedCurr = localStorage.getItem('bjjcron_current_user');
-      if (savedCurr) {
-        try {
-          const curr = JSON.parse(savedCurr);
-          if (curr) setCurrentUser(curr);
-        } catch (e) {}
-      }
     };
     window.addEventListener('storage', syncFromStorage);
-    window.addEventListener('bjjcron_users_updated', syncFromStorage);
-    window.addEventListener('bjjcron_students_updated', syncFromStorage);
     window.addEventListener('bjjcron_env_changed', syncFromStorage);
     return () => {
       unsubFirestoreUsers();
       window.removeEventListener('storage', syncFromStorage);
-      window.removeEventListener('bjjcron_users_updated', syncFromStorage);
-      window.removeEventListener('bjjcron_students_updated', syncFromStorage);
       window.removeEventListener('bjjcron_env_changed', syncFromStorage);
     };
   }, []);
@@ -1203,6 +1186,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  const updateUserProfile = async (updates: Partial<User>): Promise<boolean> => {
+    if (!currentUser) return false;
+    const cleanId = currentUser.id;
+    const cleanEmail = currentUser.email ? currentUser.email.trim().toLowerCase() : '';
+    const nowIso = new Date().toISOString();
+
+    const updatedUser: User = {
+      ...currentUser,
+      ...updates,
+      avatarUrl: updates.avatarUrl || currentUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR
+    };
+
+    // 1. Direct write to Firestore users collection
+    await saveToFirestore('users', updatedUser);
+
+    // 2. Direct write to Firestore students collection if ALUNO
+    if (currentUser.studentId || cleanEmail) {
+      const studentId = currentUser.studentId || cleanId;
+      await saveToFirestore('students', {
+        id: studentId,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        photoUrl: updatedUser.avatarUrl,
+        updatedAt: nowIso
+      } as any);
+    }
+
+    // 3. Update local state
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => 
+      (u.id === cleanId || (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail))
+        ? updatedUser 
+        : u
+    ));
+    localStorage.setItem('bjjcron_current_user', JSON.stringify(updatedUser));
+    window.dispatchEvent(new Event('bjjcron_users_updated'));
+    window.dispatchEvent(new Event('bjjcron_students_updated'));
+
+    return true;
+  };
+
+  const updateUser = async (userId: string, updates: Partial<User>): Promise<boolean> => {
+    const userToUpdate = users.find(u => u.id === userId);
+    if (!userToUpdate) return false;
+
+    const merged: User = { ...userToUpdate, ...updates };
+    await saveToFirestore('users', merged);
+
+    if (merged.studentId) {
+      await saveToFirestore('students', {
+        id: merged.studentId,
+        name: merged.name,
+        email: merged.email,
+        phone: merged.phone,
+        photoUrl: merged.avatarUrl,
+        approvalStatus: merged.approvalStatus,
+        updatedAt: new Date().toISOString()
+      } as any);
+    }
+
+    setUsers(prev => prev.map(u => (u.id === userId ? merged : u)));
+    if (currentUser?.id === userId) {
+      setCurrentUser(merged);
+      localStorage.setItem('bjjcron_current_user', JSON.stringify(merged));
+    }
+    window.dispatchEvent(new Event('bjjcron_users_updated'));
+    return true;
+  };
+
   return (
     <AuthContext.Provider value={{
       currentUser,
@@ -1219,6 +1272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       deleteMyAccount,
       refreshUsersFromStorage,
+      updateUserProfile,
+      updateUser,
       requestPasswordRecovery,
       resetPasswordWithCode
     }}>

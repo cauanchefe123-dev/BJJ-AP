@@ -5,6 +5,7 @@ import {
   deleteDoc, 
   onSnapshot, 
   getDocs,
+  getDoc,
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -22,41 +23,83 @@ function checkQuotaExhausted(): boolean {
 function handleFirestoreError(err: any, context: string) {
   const errMsg = String(err?.message || err || '');
   if (errMsg.includes('resource-exhausted') || errMsg.includes('Quota limit exceeded') || errMsg.includes('quota')) {
-    // Suppress repeated console noise and pause outgoing Firestore network writes for 5 minutes
     quotaExhaustedUntil = Date.now() + 5 * 60 * 1000;
-    console.warn(`[Firestore Quota] Limite diário do plano gratuito atingido. Operando em modo seguro Offline-First (LocalStorage ativo).`);
+    console.warn(`[Firestore Quota] Limite diário atingido. Operando em modo offline.`);
     return;
   }
   console.warn(`[Firestore] Erro em ${context}:`, err);
 }
 
-export async function saveToFirestore<T extends { id: string }>(collectionName: string, item: T) {
-  if (checkQuotaExhausted()) return;
+/**
+ * Deeply sanitizes an object for Firestore by removing all `undefined` values,
+ * converting them to `null` or omitting keys, preventing Firestore SDK crashes.
+ */
+export function sanitizeForFirestore<T>(input: T): any {
+  if (input === undefined) return null;
+  if (input === null || typeof input !== 'object') return input;
+
+  if (Array.isArray(input)) {
+    return input.map(item => sanitizeForFirestore(item)).filter(v => v !== undefined);
+  }
+
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(input)) {
+    const val = (input as any)[key];
+    if (val !== undefined) {
+      cleaned[key] = sanitizeForFirestore(val);
+    }
+  }
+  return cleaned;
+}
+
+export async function saveToFirestore<T extends { id: string }>(collectionName: string, item: T): Promise<boolean> {
+  if (checkQuotaExhausted()) return false;
   try {
+    const sanitized = sanitizeForFirestore(item);
     const ref = doc(db, collectionName, item.id);
-    await setDoc(ref, item, { merge: true });
+    await setDoc(ref, sanitized, { merge: true });
+    return true;
   } catch (err) {
-    handleFirestoreError(err, `salvar em ${collectionName}`);
+    handleFirestoreError(err, `salvar em ${collectionName} (id: ${item.id})`);
+    return false;
   }
 }
 
-export async function removeFromFirestore(collectionName: string, id: string) {
-  if (checkQuotaExhausted()) return;
+export async function updateDocInFirestore(collectionName: string, id: string, updates: Record<string, any>): Promise<boolean> {
+  if (checkQuotaExhausted()) return false;
+  try {
+    const sanitized = sanitizeForFirestore(updates);
+    const ref = doc(db, collectionName, id);
+    await setDoc(ref, sanitized, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, `atualizar em ${collectionName} (id: ${id})`);
+    return false;
+  }
+}
+
+export async function removeFromFirestore(collectionName: string, id: string): Promise<boolean> {
+  if (checkQuotaExhausted()) return false;
   try {
     const ref = doc(db, collectionName, id);
     await deleteDoc(ref);
+    return true;
   } catch (err) {
-    handleFirestoreError(err, `remover de ${collectionName}`);
+    handleFirestoreError(err, `remover de ${collectionName} (id: ${id})`);
+    return false;
   }
 }
 
-export async function saveConfigToFirestore(configData: any) {
-  if (checkQuotaExhausted()) return;
+export async function saveConfigToFirestore(configData: any): Promise<boolean> {
+  if (checkQuotaExhausted()) return false;
   try {
+    const sanitized = sanitizeForFirestore(configData);
     const ref = doc(db, 'config', 'academyConfig');
-    await setDoc(ref, configData, { merge: true });
+    await setDoc(ref, sanitized, { merge: true });
+    return true;
   } catch (err) {
     handleFirestoreError(err, 'salvar configurações da academia');
+    return false;
   }
 }
 

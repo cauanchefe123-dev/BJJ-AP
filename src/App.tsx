@@ -44,7 +44,7 @@ import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
 import { PaymentRecord, Student } from './types';
 import { AuthModal } from './components/auth/AuthModal';
-import { resolveStudentForUser } from './constants/avatar';
+import { resolveStudentForUser, DEFAULT_BLACK_GI_AVATAR } from './constants/avatar';
 import { InAppToastNotification } from './components/notifications/InAppToastNotification';
 import { PWAUpdateManager } from './components/pwa/PWAUpdateManager';
 
@@ -100,7 +100,32 @@ function MainApp() {
           setActiveTab={setActiveTab}
           isOpen={isSidebarOpen}
           setIsOpen={setIsSidebarOpen}
-          onOpenEditProfile={() => currentStudent && handleOpenEditStudent(currentStudent)}
+          onOpenEditProfile={() => {
+            const st = currentStudent || (currentUser ? {
+              id: currentUser.studentId || currentUser.id,
+              registrationNumber: 'STAFF',
+              name: currentUser.name,
+              email: currentUser.email,
+              phone: currentUser.phone || '',
+              birthDate: '1990-01-01',
+              photoUrl: currentUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+              belt: (currentUser.role === 'ADMIN' || currentUser.role === 'PROFESSOR') ? 'PRETA' : 'BRANCA',
+              stripes: 0,
+              startDate: new Date().toISOString().split('T')[0],
+              totalClassesAttended: 0,
+              classesSinceLastGraduation: 0,
+              weightCategory: 'MÉDIO',
+              ageCategory: 'ADULTO',
+              active: true,
+              planName: 'Staff',
+              planPrice: 0,
+              paymentDueDateDay: 10,
+              paymentStatus: 'PAGO',
+              qrCodeToken: `BJJCRON-${currentUser.id}`,
+              approvalStatus: 'APPROVED',
+            } as Student : null);
+            if (st) handleOpenEditStudent(st);
+          }}
         />
 
         {/* Main Content Area */}

@@ -38,7 +38,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   student,
   onClose,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, updateUserProfile } = useAuth();
   const { updateStudent, beltRequests, requestBeltChange, approveBeltChange, rejectBeltChange } = useData();
   const availableAcademies = getStoredAcademiesList();
 
@@ -147,12 +147,20 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
       name: (formData.name && formData.name.trim()) ? formData.name.trim() : student.name
     };
 
-    updateStudent(student.id, dataToSave);
+    await updateStudent(student.id, dataToSave);
+    if (isStudentUser && currentUser) {
+      await updateUserProfile({
+        name: dataToSave.name,
+        phone: dataToSave.phone,
+        avatarUrl: dataToSave.photoUrl
+      });
+    }
+
     setSuccessMsg('Cadastro atualizado com sucesso!');
     setTimeout(() => {
       setSuccessMsg(null);
       onClose();
-    }, 1000);
+    }, 800);
   };
 
   return (
