@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Pure cloud mode: real-time listeners are active automatically
   };
 
-  const loginWithPassword = async (email: string, password?: string): Promise<LoginResult> => {
+  const loginWithPassword = async (email: string, password?: string, rememberMe: boolean = true): Promise<LoginResult> => {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
       return {
@@ -239,10 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveToFirestore('users', found);
     }
 
-    try {
-      sessionStorage.setItem('bjjcron_auth_uid', found.id);
-      sessionStorage.setItem('bjjcron_auth_email', found.email);
-    } catch (e) {}
+    persistUserSession(found, rememberMe);
 
     setCurrentUser(found);
     return {
@@ -312,10 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    try {
-      sessionStorage.setItem('bjjcron_auth_uid', updatedUser.id);
-      sessionStorage.setItem('bjjcron_auth_email', updatedUser.email);
-    } catch (e) {}
+    persistUserSession(updatedUser, true);
 
     setCurrentUser(updatedUser);
 
