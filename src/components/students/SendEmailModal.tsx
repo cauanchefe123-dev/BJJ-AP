@@ -52,14 +52,6 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ student, onClose
     setLoading(true);
     setFeedback(null);
 
-    let smtpConfig = null;
-    try {
-      const savedLocal = localStorage.getItem('bjjcron_smtp_config');
-      if (savedLocal) {
-        smtpConfig = JSON.parse(savedLocal);
-      }
-    } catch (e) {}
-
     try {
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -70,7 +62,6 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ student, onClose
           subject,
           body,
           academyName: academyConfig.name || 'BJJCRON Jiu-Jitsu',
-          smtpConfig,
         }),
       });
 

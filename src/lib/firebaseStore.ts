@@ -9,7 +9,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { isTestMockRecord, isDeletedRecord } from './deletionTracker';
+import { isDeletedRecord } from './deletionTracker';
 
 let quotaExhaustedUntil: number = 0;
 
@@ -137,7 +137,7 @@ export function subscribeFirestoreConfig(callback: (config: any) => void) {
   }
 }
 
-export async function purgeTestMockDataFromFirestore() {
+export async function purgeDeletedRecordsFromFirestore() {
   const collectionsToCheck = [
     'students',
     'users',
@@ -168,14 +168,7 @@ export async function purgeTestMockDataFromFirestore() {
         const studentId = d.studentId || '';
         const regNum = d.registrationNumber || '';
 
-        if (
-          isTestMockRecord(id) ||
-          isTestMockRecord(name) ||
-          isTestMockRecord(email) ||
-          isTestMockRecord(studentId) ||
-          isTestMockRecord(regNum) ||
-          isDeletedRecord(id, email, studentId, regNum)
-        ) {
+        if (isDeletedRecord(id, email, studentId, regNum)) {
           batch.delete(docSnap.ref);
           count++;
         }
@@ -222,44 +215,20 @@ export async function clearAllFirestoreCollections() {
   }
 }
 
-export async function seedInitialFirestoreData(data: {
-  students: any[];
-  teachers: any[];
-  classes: any[];
-  attendances: any[];
-  payments: any[];
-  graduations: any[];
-  beltRequests: any[];
-  trainingLogs: any[];
-  teacherObservations: any[];
-  academyConfig: any;
-}) {
+export function purgeAllLegacyLocalStorage() {
   try {
-    // Check if Firestore already has students
-    const snap = await getDocs(collection(db, 'students'));
-    if (!snap.empty) {
-      console.log('[Firestore] Banco em nuvem já contém dados salvos.');
-      return;
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('bjjcron_') || key.startsWith('bjj_'))) {
+        keysToRemove.push(key);
+      }
     }
-
-    console.log('[Firestore] Inicializando primeira carga no banco em nuvem...');
-    const batch = writeBatch(db);
-
-    data.students.forEach(item => batch.set(doc(db, 'students', item.id), item));
-    data.teachers.forEach(item => batch.set(doc(db, 'teachers', item.id), item));
-    data.classes.forEach(item => batch.set(doc(db, 'classes', item.id), item));
-    data.attendances.forEach(item => batch.set(doc(db, 'attendances', item.id), item));
-    data.payments.forEach(item => batch.set(doc(db, 'payments', item.id), item));
-    data.graduations.forEach(item => batch.set(doc(db, 'graduations', item.id), item));
-    data.beltRequests.forEach(item => batch.set(doc(db, 'beltRequests', item.id), item));
-    data.trainingLogs.forEach(item => batch.set(doc(db, 'trainingLogs', item.id), item));
-    data.teacherObservations.forEach(item => batch.set(doc(db, 'teacherObservations', item.id), item));
-    batch.set(doc(db, 'config', 'academyConfig'), data.academyConfig);
-
-    await batch.commit();
-    console.log('[Firestore] Dados iniciais salvos com sucesso na nuvem!');
-  } catch (err) {
-    console.warn('[Firestore] Erro ao popular carga inicial na nuvem:', err);
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    console.log('[Firestore Sync] LocalStorage de dados removido definitivamente. Operando 100% no Firestore em tempo real.');
+  } catch (e) {
+    console.warn('Erro ao limpar localStorage:', e);
   }
 }
+
 

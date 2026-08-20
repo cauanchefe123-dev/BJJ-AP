@@ -40,54 +40,16 @@ const TEST_ACADEMY_NAMES = [
 ];
 
 export const getStoredAcademiesList = (): AcademyItem[] => {
-  try {
-    const saved = localStorage.getItem('bjjcron_academies_list');
-    const parsed: AcademyItem[] = saved ? JSON.parse(saved) : [];
-    
-    // Filter out any previously stored test/mock academies (isDefault or matching test names)
-    const realOnly = parsed.filter(a => 
-      !a.isDefault && 
-      !TEST_ACADEMY_NAMES.includes(a.name.toLowerCase())
-    );
-
-    // Get current academy configured in system
-    const savedConfig = localStorage.getItem('bjjcron_academy_config');
-    const config = savedConfig ? JSON.parse(savedConfig) : {
-      name: 'BJJCRON ACADEMY',
-      fantasyName: 'BJJCRON Jiu-Jitsu Headquarter',
-      logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200',
-      headCoachName: 'Mestre Gabriel "Fera" Santos',
-      address: 'São Paulo - SP'
-    };
-
-    // Ensure the real configured academy is always listed first
-    if (config.name && !realOnly.some(a => a.name.toLowerCase() === config.name.toLowerCase())) {
-      realOnly.unshift({
-        id: 'real-academy-matriz',
-        name: config.name,
-        fantasyName: config.fantasyName || config.name,
-        logoUrl: config.logoUrl || 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200',
-        headCoachName: config.headCoachName || 'Professor Responsável',
-        city: config.address || 'São Paulo - SP',
-        address: config.address,
-        studentsCount: 1,
-        isDefault: false
-      });
-    }
-
-    return realOnly;
-  } catch (e) {
-    return [{
-      id: 'real-academy-matriz',
-      name: 'BJJCRON ACADEMY',
-      fantasyName: 'BJJCRON Jiu-Jitsu Headquarter',
-      logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200',
-      headCoachName: 'Mestre Gabriel "Fera" Santos',
-      city: 'São Paulo - SP',
-      studentsCount: 1,
-      isDefault: false
-    }];
-  }
+  return [{
+    id: 'real-academy-matriz',
+    name: 'BJJCRON ACADEMY',
+    fantasyName: 'BJJCRON Jiu-Jitsu Headquarter',
+    logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200',
+    headCoachName: 'Mestre Gabriel "Fera" Santos',
+    city: 'São Paulo - SP',
+    studentsCount: 1,
+    isDefault: false
+  }];
 };
 
 export const saveAcademyToList = (academy: {
@@ -97,33 +59,7 @@ export const saveAcademyToList = (academy: {
   headCoachName?: string;
   address?: string;
 }) => {
-  try {
-    const list = getStoredAcademiesList();
-    const existingIndex = list.findIndex(
-      a => a.name.toLowerCase() === academy.name.toLowerCase() || a.fantasyName?.toLowerCase() === academy.fantasyName?.toLowerCase()
-    );
-    const id = existingIndex >= 0 ? list[existingIndex].id : `acad-${Date.now()}`;
-    const newItem: AcademyItem = {
-      id,
-      name: academy.name || 'Jiu-Jitsu Academy',
-      fantasyName: academy.fantasyName || academy.name || 'BJJ Team',
-      logoUrl: academy.logoUrl || 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&q=80&w=300',
-      headCoachName: academy.headCoachName || 'Professor Responsável',
-      city: academy.address || 'São Paulo - SP',
-      address: academy.address,
-      studentsCount: existingIndex >= 0 ? list[existingIndex].studentsCount : 15,
-      isDefault: false
-    };
-
-    if (existingIndex >= 0) {
-      list[existingIndex] = { ...list[existingIndex], ...newItem };
-    } else {
-      list.unshift(newItem);
-    }
-    localStorage.setItem('bjjcron_academies_list', JSON.stringify(list));
-  } catch (e) {
-    console.error('Erro ao salvar academia:', e);
-  }
+  // Pure cloud configuration
 };
 
 interface AcademyLinkViewProps {
@@ -152,7 +88,6 @@ export const AcademyLinkView: React.FC<AcademyLinkViewProps> = ({ onNavigateHome
 
   const handleUnlinkAcademy = (academy: AcademyItem) => {
     setLinkedAcademyId('');
-    localStorage.setItem(`bjjcron_student_academy_${currentUser?.id}`, '');
 
     if (currentStudent) {
       updateStudent(currentStudent.id, {
@@ -204,23 +139,14 @@ export const AcademyLinkView: React.FC<AcademyLinkViewProps> = ({ onNavigateHome
       list.unshift(currentItem);
     }
     setAcademiesList(list);
-
-    // Determine stored linked academy ID
-    const savedLinked = localStorage.getItem(`bjjcron_student_academy_${currentUser?.id}`);
-    if (savedLinked) {
-      setLinkedAcademyId(savedLinked);
-    } else {
-      // Check if one matches academyConfig
-      const match = list.find(a => a.name.toLowerCase() === academyConfig.name.toLowerCase());
-      if (match) {
-        setLinkedAcademyId(match.id);
-      }
+    const match = list.find(a => a.name.toLowerCase() === academyConfig.name.toLowerCase());
+    if (match) {
+      setLinkedAcademyId(match.id);
     }
   }, [academyConfig, students.length, currentUser?.id]);
 
   const handleSelectAcademy = (academy: AcademyItem) => {
     setLinkedAcademyId(academy.id);
-    localStorage.setItem(`bjjcron_student_academy_${currentUser?.id}`, academy.id);
 
     const isAluno = currentUser?.role === 'ALUNO';
     const newStatus = isAluno ? 'PENDING' : 'APPROVED';

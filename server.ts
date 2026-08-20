@@ -17,7 +17,7 @@ import {
   INITIAL_TEACHER_OBSERVATIONS,
   INITIAL_ACADEMY_CONFIG,
   INITIAL_USERS,
-} from './src/data/mockData.ts';
+} from './src/data/initialData.ts';
 
 // Ensure uploads/videos directory exists on server
 const uploadsDir = path.join(process.cwd(), 'uploads', 'videos');

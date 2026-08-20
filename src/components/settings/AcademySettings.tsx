@@ -67,18 +67,6 @@ export const AcademySettings: React.FC = () => {
   const [savingSmtp, setSavingSmtp] = useState(false);
 
   React.useEffect(() => {
-    // Try fetching from server first, fallback to localStorage
-    const savedLocal = localStorage.getItem('bjjcron_smtp_config');
-    if (savedLocal) {
-      try {
-        const parsed = JSON.parse(savedLocal);
-        setSmtpData(prev => ({
-          ...prev,
-          ...parsed,
-        }));
-      } catch (e) {}
-    }
-
     fetch('/api/config/smtp')
       .then(r => r.json())
       .then(data => {
@@ -104,11 +92,6 @@ export const AcademySettings: React.FC = () => {
       ...smtpData,
       fromName: smtpData.fromName || formData.fantasyName || formData.name || 'BJJCRON ACADEMY'
     };
-
-    // Always persist locally for immediate resilience
-    try {
-      localStorage.setItem('bjjcron_smtp_config', JSON.stringify(payload));
-    } catch (e) {}
 
     try {
       // First save config
@@ -619,7 +602,7 @@ export const AcademySettings: React.FC = () => {
               </h4>
             </div>
             <p className="text-slate-400 text-[11px]">
-              O BJJCRON utiliza armazenamento persistente local (`localStorage`). Se desejar conectar a um projeto Supabase real, insira suas credenciais abaixo:
+              O BJJCRON utiliza sincronização na nuvem em tempo real com o Firestore. Se desejar conectar a um projeto Supabase adicional, insira suas credenciais abaixo:
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

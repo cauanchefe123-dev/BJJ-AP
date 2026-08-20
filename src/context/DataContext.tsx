@@ -1,52 +1,96 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
-  AcademyConfig,
-  AppNotification,
-  AttendanceRecord,
-  BeltChangeRequest,
-  BeltType,
-  BJJClass,
-  Graduation,
-  PaymentRecord,
-  PaymentStatus,
   Student,
   Teacher,
-  TeacherObservation,
+  BJJClass,
+  AttendanceRecord,
+  PaymentRecord,
+  Graduation,
+  BeltChangeRequest,
   TrainingLog,
+  TeacherObservation,
+  AcademyConfig,
+  AppNotification,
   WeeklyPosition,
+  BeltType,
 } from '../types';
-import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
-import { checkClassCheckinAvailability } from '../utils/checkin';
-import { markAsDeleted, isDeletedRecord, isTestMockRecord } from '../lib/deletionTracker';
-import { getStudentAttendances } from '../utils/ranking';
-
-const getLocalDateStr = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 import {
   INITIAL_ACADEMY_CONFIG,
-  INITIAL_ATTENDANCE,
-  INITIAL_BELT_REQUESTS,
-  INITIAL_CLASSES,
-  INITIAL_GRADUATIONS,
-  INITIAL_PAYMENTS,
   INITIAL_STUDENTS,
   INITIAL_TEACHERS,
-  INITIAL_TEACHER_OBSERVATIONS,
+  INITIAL_CLASSES,
+  INITIAL_ATTENDANCE,
+  INITIAL_PAYMENTS,
+  INITIAL_GRADUATIONS,
+  INITIAL_BELT_REQUESTS,
   INITIAL_TRAINING_LOGS,
-} from '../data/mockData';
+  INITIAL_TEACHER_OBSERVATIONS,
+} from '../data/initialData';
+import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import {
+  subscribeFirestoreCollection,
+  subscribeFirestoreConfig,
   saveToFirestore,
   removeFromFirestore,
   saveConfigToFirestore,
-  subscribeFirestoreCollection,
-  subscribeFirestoreConfig,
   clearAllFirestoreCollections,
-  purgeTestMockDataFromFirestore,
+  purgeAllLegacyLocalStorage,
 } from '../lib/firebaseStore';
+import { isDeletedRecord, markAsDeleted } from '../lib/deletionTracker';
+
+const getLocalDateStr = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const checkClassCheckinAvailability = (bjjClass?: BJJClass): { isAvailable: boolean; reason?: string } => {
+  if (!bjjClass) return { isAvailable: true };
+
+  const now = new Date();
+  const currentDay = now.getDay();
+
+  if (Array.isArray(bjjClass.daysOfWeek) && bjjClass.daysOfWeek.length > 0) {
+    if (!bjjClass.daysOfWeek.includes(currentDay)) {
+      const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+      const classDays = bjjClass.daysOfWeek.map(d => dayNames[d]).join(', ');
+      return {
+        isAvailable: false,
+        reason: `A aula "${bjjClass.title}" ocorre em: ${classDays}. Hoje é ${dayNames[currentDay]}.`,
+      };
+    }
+  }
+
+  if (bjjClass.time) {
+    const [startH, startM] = bjjClass.time.split(':').map(Number);
+    if (!isNaN(startH) && !isNaN(startM)) {
+      const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
+      const duration = bjjClass.durationMinutes || 60;
+      const classEnd = new Date(classStart.getTime() + duration * 60 * 1000);
+
+      const windowStart = new Date(classStart.getTime() - 45 * 60 * 1000);
+      const windowEnd = new Date(classEnd.getTime() + 60 * 60 * 1000);
+
+      if (now < windowStart) {
+        return {
+          isAvailable: false,
+          reason: `O check-in para esta aula estará liberado a partir das ${windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (45 min antes do início).`,
+        };
+      }
+
+      if (now > windowEnd) {
+        return {
+          isAvailable: false,
+          reason: `O período de check-in para a aula das ${bjjClass.time} já foi encerrado.`,
+        };
+      }
+    }
+  }
+
+  return { isAvailable: true };
+};
 
 interface DataContextType {
   students: Student[];
@@ -118,7 +162,7 @@ interface DataContextType {
   // Config Actions
   updateAcademyConfig: (updates: Partial<AcademyConfig>) => void;
 
-  // Environment Mode (Homologação vs Operação Real)
+  // Environment Mode
   environmentMode: 'PROD' | 'HOMOLOG';
   isHomologationMode: boolean;
   setEnvironmentMode: (mode: 'PROD' | 'HOMOLOG') => void;
@@ -156,139 +200,23 @@ export const getBeltWeight = (belt?: string, stripes?: number): number => {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [environmentMode, setEnvironmentModeState] = useState<'PROD' | 'HOMOLOG'>(() => {
-    return 'PROD';
-  });
+  const [environmentMode, setEnvironmentMode] = useState<'PROD' | 'HOMOLOG'>('PROD');
 
-  const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('bjjcron_students');
-    let rawList: Student[] = saved ? JSON.parse(saved) : INITIAL_STUDENTS;
-
-    rawList = rawList.filter(s => 
-      !isTestMockRecord(s.id) &&
-      !isTestMockRecord(s.email) &&
-      !isTestMockRecord(s.name) &&
-      !isTestMockRecord(s.registrationNumber) &&
-      !isDeletedRecord(s.id, s.email, s.registrationNumber)
-    );
-
-    const processed = rawList.map(s => ({
-      ...s,
-      approvalStatus: s.approvalStatus || 'APPROVED',
-      active: s.approvalStatus === 'APPROVED' || s.active !== false,
-      photoUrl: (!s.photoUrl || s.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : s.photoUrl
-    }));
-
-    localStorage.setItem('bjjcron_students', JSON.stringify(processed));
-    return processed;
-  });
-
-  const [teachers, setTeachers] = useState<Teacher[]>(() => {
-    const saved = localStorage.getItem('bjjcron_teachers');
-    const rawList: Teacher[] = saved ? JSON.parse(saved) : INITIAL_TEACHERS;
-    return rawList
-      .filter(t => !isTestMockRecord(t.id) && !isTestMockRecord(t.email) && !isTestMockRecord(t.name))
-      .map(t => ({
-        ...t,
-        photoUrl: (!t.photoUrl || t.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : t.photoUrl
-      }));
-  });
-
-  const [classes, setClasses] = useState<BJJClass[]>(() => {
-    const saved = localStorage.getItem('bjjcron_classes');
-    const rawList: BJJClass[] = saved ? JSON.parse(saved) : INITIAL_CLASSES;
-    return rawList.filter(c => !isTestMockRecord(c.id) && !isTestMockRecord(c.title));
-  });
-
-  const [attendances, setAttendances] = useState<AttendanceRecord[]>(() => {
-    const saved = localStorage.getItem('bjjcron_attendances');
-    const rawList: AttendanceRecord[] = saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
-    return rawList.filter(a => !isTestMockRecord(a.id) && !isTestMockRecord(a.studentId) && !isTestMockRecord(a.studentName));
-  });
-
-  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
-    const saved = localStorage.getItem('bjjcron_payments');
-    const rawList: PaymentRecord[] = saved ? JSON.parse(saved) : [];
-    return rawList.filter(p => !isTestMockRecord(p.id) && !isTestMockRecord(p.studentId) && !isTestMockRecord(p.studentName));
-  });
-
-  const [graduations, setGraduations] = useState<Graduation[]>(() => {
-    const saved = localStorage.getItem('bjjcron_graduations');
-    const rawList: Graduation[] = saved ? JSON.parse(saved) : [];
-    return rawList.filter(g => !isTestMockRecord(g.id) && !isTestMockRecord(g.studentId));
-  });
-
-  const [beltRequests, setBeltRequests] = useState<BeltChangeRequest[]>(() => {
-    const saved = localStorage.getItem('bjjcron_belt_requests');
-    const rawList: BeltChangeRequest[] = saved ? JSON.parse(saved) : [];
-    return rawList.filter(b => !isTestMockRecord(b.id) && !isTestMockRecord(b.studentId) && !isTestMockRecord(b.studentName));
-  });
-
-  const [trainingLogs, setTrainingLogs] = useState<TrainingLog[]>(() => {
-    const saved = localStorage.getItem('bjjcron_training_logs');
-    const parsed: TrainingLog[] = saved ? JSON.parse(saved) : [];
-    const cleanLogs = parsed.filter(l => 
-      !isTestMockRecord(l.id) && 
-      !isTestMockRecord(l.studentId) &&
-      l.id !== '1' &&
-      l.id !== '2' &&
-      l.id !== 'log-1' &&
-      l.id !== 'log-2' &&
-      l.notes !== 'gostei' &&
-      l.notes !== 'Oss!!!' &&
-      !(typeof l.notes === 'string' && (l.notes.toLowerCase().includes('raspagem de aranha') || l.notes.toLowerCase().includes('posicionamento de calcanhar'))) &&
-      !(Array.isArray(l.techniquesLearned) && l.techniquesLearned.some(t => {
-        const lower = (t || '').toLowerCase();
-        return lower.includes('passagem de guarda emborcando') || lower.includes('ogoshi') || lower.includes('triângulo ajustado') || lower.includes('leg lock no-gi');
-      }))
-    );
-    if (saved && cleanLogs.length !== parsed.length) {
-      localStorage.setItem('bjjcron_training_logs', JSON.stringify(cleanLogs));
-    }
-    return cleanLogs;
-  });
-
-  const [teacherObservations, setTeacherObservations] = useState<TeacherObservation[]>(() => {
-    const saved = localStorage.getItem('bjjcron_teacher_observations');
-    const rawList: TeacherObservation[] = saved ? JSON.parse(saved) : [];
-    return rawList.filter(o => !isTestMockRecord(o.id) && !isTestMockRecord(o.studentId) && !isTestMockRecord(o.studentName));
-  });
-
-  const INITIAL_WEEKLY_POSITIONS: WeeklyPosition[] = [];
-
-  const [weeklyPositions, setWeeklyPositions] = useState<WeeklyPosition[]>(() => {
-    const saved = localStorage.getItem('bjjcron_weekly_positions');
-    const rawList: WeeklyPosition[] = saved ? JSON.parse(saved) : INITIAL_WEEKLY_POSITIONS;
-    return rawList.filter(p =>
-      p.id !== 'pos-1' &&
-      p.id !== 'pos-2' &&
-      p.id !== 'pos-3' &&
-      !p.title.includes('Raspagem de De La Riva com Tomada') &&
-      !p.title.includes('Passagem de Guarda Emborcando') &&
-      !p.title.includes('Guilhotina da Guarda Aberta') &&
-      !isTestMockRecord(p.id) &&
-      !isTestMockRecord(p.title)
-    );
-  });
-
-  const INITIAL_DEFAULT_NOTIFICATIONS: AppNotification[] = [];
-
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem('bjjcron_notifications');
-    if (saved) {
-      try {
-        const parsed: AppNotification[] = JSON.parse(saved);
-        // Clean out legacy mock notifications
-        return parsed.filter(n => n.id !== 'notif-1' && n.id !== 'notif-2' && !n.authorName?.includes('Carlos Gracie'));
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  // Pure cloud states (No localStorage)
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [classes, setClasses] = useState<BJJClass[]>([]);
+  const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [graduations, setGraduations] = useState<Graduation[]>([]);
+  const [beltRequests, setBeltRequests] = useState<BeltChangeRequest[]>([]);
+  const [trainingLogs, setTrainingLogs] = useState<TrainingLog[]>([]);
+  const [teacherObservations, setTeacherObservations] = useState<TeacherObservation[]>([]);
+  const [weeklyPositions, setWeeklyPositions] = useState<WeeklyPosition[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [academyConfig, setAcademyConfig] = useState<AcademyConfig>(INITIAL_ACADEMY_CONFIG);
 
   const [activeToastNotif, setActiveToastNotif] = useState<AppNotification | null>(null);
-
   const [pushPermissionStatus, setPushPermissionStatus] = useState<NotificationPermission>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       return Notification.permission;
@@ -296,398 +224,93 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return 'default';
   });
 
-  const [academyConfig, setAcademyConfig] = useState<AcademyConfig>(() => {
-    const saved = localStorage.getItem('bjjcron_academy_config');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return {
-          ...INITIAL_ACADEMY_CONFIG,
-          ...parsed,
-          graduationCriteria: parsed.graduationCriteria || INITIAL_ACADEMY_CONFIG.graduationCriteria,
-        };
-      } catch {
-        return INITIAL_ACADEMY_CONFIG;
-      }
-    }
-    return INITIAL_ACADEMY_CONFIG;
-  });
+  const isFirstMount = useRef(true);
 
-  // Safe Local Storage Persistence
-  const safeSave = (baseKeyName: string, val: any) => {
-    try {
-      const prefix = environmentMode === 'HOMOLOG' ? 'bjjcron_homolog_' : 'bjjcron_';
-      const cleanName = baseKeyName.startsWith('bjjcron_') ? baseKeyName.replace('bjjcron_', '') : baseKeyName;
-      const targetKey = `${prefix}${cleanName}`;
-      const serialized = JSON.stringify(val);
-      if (serialized.length > 4000000) { // Limit to ~4MB to prevent browser tab crash
-        console.warn(`[Storage] Dados para ${targetKey} excedem 4MB, ignorando persistência.`);
-        return;
-      }
-      localStorage.setItem(targetKey, serialized);
-    } catch (e) {
-      console.warn(`[Offline-First] Aviso ao salvar chave no localStorage:`, e);
-    }
-  };
-
-  const setEnvironmentMode = (mode: 'PROD' | 'HOMOLOG') => {
-    localStorage.setItem('bjjcron_env_mode', mode);
-    setEnvironmentModeState(mode);
-
-    const prefix = mode === 'HOMOLOG' ? 'bjjcron_homolog_' : 'bjjcron_';
-
-    if (mode === 'HOMOLOG') {
-      const existing = localStorage.getItem('bjjcron_homolog_students');
-      if (!existing) {
-        localStorage.setItem('bjjcron_homolog_students', JSON.stringify(INITIAL_STUDENTS));
-        localStorage.setItem('bjjcron_homolog_teachers', JSON.stringify(INITIAL_TEACHERS));
-        localStorage.setItem('bjjcron_homolog_classes', JSON.stringify(INITIAL_CLASSES));
-        localStorage.setItem('bjjcron_homolog_attendances', JSON.stringify(INITIAL_ATTENDANCE));
-        localStorage.setItem('bjjcron_homolog_payments', JSON.stringify(INITIAL_PAYMENTS));
-        localStorage.setItem('bjjcron_homolog_graduations', JSON.stringify(INITIAL_GRADUATIONS));
-        localStorage.setItem('bjjcron_homolog_belt_requests', JSON.stringify(INITIAL_BELT_REQUESTS));
-        localStorage.setItem('bjjcron_homolog_training_logs', JSON.stringify(INITIAL_TRAINING_LOGS));
-        localStorage.setItem('bjjcron_homolog_teacher_observations', JSON.stringify(INITIAL_TEACHER_OBSERVATIONS));
-      }
-    }
-
-    const savedStudents = localStorage.getItem(`${prefix}students`);
-    const savedTeachers = localStorage.getItem(`${prefix}teachers`);
-    const savedClasses = localStorage.getItem(`${prefix}classes`);
-    const savedAttendances = localStorage.getItem(`${prefix}attendances`);
-    const savedPayments = localStorage.getItem(`${prefix}payments`);
-    const savedGraduations = localStorage.getItem(`${prefix}graduations`);
-    const savedBeltRequests = localStorage.getItem(`${prefix}belt_requests`);
-    const savedLogs = localStorage.getItem(`${prefix}training_logs`);
-    const savedObs = localStorage.getItem(`${prefix}teacher_observations`);
-
-    setStudents(savedStudents ? JSON.parse(savedStudents) : []);
-    setTeachers(savedTeachers ? JSON.parse(savedTeachers) : []);
-    setClasses(savedClasses ? JSON.parse(savedClasses) : []);
-    setAttendances(savedAttendances ? JSON.parse(savedAttendances) : []);
-    setPayments(savedPayments ? JSON.parse(savedPayments) : []);
-    setGraduations(savedGraduations ? JSON.parse(savedGraduations) : []);
-    setBeltRequests(savedBeltRequests ? JSON.parse(savedBeltRequests) : []);
-    setTrainingLogs(savedLogs ? JSON.parse(savedLogs) : []);
-    setTeacherObservations(savedObs ? JSON.parse(savedObs) : []);
-
-    window.dispatchEvent(new Event('bjjcron_env_changed'));
-  };
-
-  const resetHomologationData = () => {
-    localStorage.setItem('bjjcron_homolog_students', JSON.stringify(INITIAL_STUDENTS));
-    localStorage.setItem('bjjcron_homolog_teachers', JSON.stringify(INITIAL_TEACHERS));
-    localStorage.setItem('bjjcron_homolog_classes', JSON.stringify(INITIAL_CLASSES));
-    localStorage.setItem('bjjcron_homolog_attendances', JSON.stringify(INITIAL_ATTENDANCE));
-    localStorage.setItem('bjjcron_homolog_payments', JSON.stringify(INITIAL_PAYMENTS));
-    localStorage.setItem('bjjcron_homolog_graduations', JSON.stringify(INITIAL_GRADUATIONS));
-    localStorage.setItem('bjjcron_homolog_belt_requests', JSON.stringify(INITIAL_BELT_REQUESTS));
-    localStorage.setItem('bjjcron_homolog_training_logs', JSON.stringify(INITIAL_TRAINING_LOGS));
-    localStorage.setItem('bjjcron_homolog_teacher_observations', JSON.stringify(INITIAL_TEACHER_OBSERVATIONS));
-
-    if (environmentMode === 'HOMOLOG') {
-      setStudents(INITIAL_STUDENTS);
-      setTeachers(INITIAL_TEACHERS);
-      setClasses(INITIAL_CLASSES);
-      setAttendances(INITIAL_ATTENDANCE);
-      setPayments(INITIAL_PAYMENTS);
-      setGraduations(INITIAL_GRADUATIONS);
-      setBeltRequests(INITIAL_BELT_REQUESTS);
-      setTrainingLogs(INITIAL_TRAINING_LOGS);
-      setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
-    }
-  };
-
-  useEffect(() => { safeSave('bjjcron_students', students); }, [students]);
-  useEffect(() => { safeSave('bjjcron_teachers', teachers); }, [teachers]);
-  useEffect(() => { safeSave('bjjcron_classes', classes); }, [classes]);
-  useEffect(() => { safeSave('bjjcron_attendances', attendances); }, [attendances]);
-  useEffect(() => { safeSave('bjjcron_payments', payments); }, [payments]);
-  useEffect(() => { safeSave('bjjcron_graduations', graduations); }, [graduations]);
-  useEffect(() => { safeSave('bjjcron_belt_requests', beltRequests); }, [beltRequests]);
-  useEffect(() => { safeSave('bjjcron_training_logs', trainingLogs); }, [trainingLogs]);
-  useEffect(() => { safeSave('bjjcron_teacher_observations', teacherObservations); }, [teacherObservations]);
-  useEffect(() => { safeSave('bjjcron_academy_config', academyConfig); }, [academyConfig]);
-  useEffect(() => { safeSave('bjjcron_notifications', notifications); }, [notifications]);
-  useEffect(() => { safeSave('bjjcron_weekly_positions', weeklyPositions); }, [weeklyPositions]);
-
-  // Sync positions from classes that have weeklyFocus set (retroactive sync)
+  // 1. Purge legacy localStorage data completely on startup
   useEffect(() => {
-    if (classes && classes.length > 0) {
-      classes.forEach(c => {
-        if (c.weeklyFocus && c.weeklyFocus.trim() !== '') {
-          setWeeklyPositions(prev => {
-            const exists = prev.some(
-              p => p.classId === c.id && p.title.toLowerCase() === c.weeklyFocus?.toLowerCase()
-            );
-            if (!exists) {
-              const newPos: WeeklyPosition = {
-                id: `pos-${c.id}`,
-                title: c.weeklyFocus!,
-                category: 'GERAL',
-                classId: c.id,
-                className: c.title,
-                professorName: c.professorName || 'Professor',
-                date: getLocalDateStr(),
-                weekLabel: 'Foco da Semana',
-                description: `Foco técnico da turma ${c.title}`,
-                keyDetails: [],
-                videoUrl: c.weeklyFocusVideoUrl || '',
-                isCurrentFocus: true,
-                createdAt: new Date().toISOString(),
-                learnedByStudentIds: [],
-              };
-              return [newPos, ...prev];
-            }
-            return prev;
-          });
-        }
-      });
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      purgeAllLegacyLocalStorage();
     }
-  }, [classes]);
+  }, []);
 
-  // Push Notification Handlers
-  const requestPushPermission = async (): Promise<NotificationPermission> => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const res = await Notification.requestPermission();
-        setPushPermissionStatus(res);
-        if (res === 'granted') {
-          try {
-            new Notification('🔔 Notificações BJJCRON Ativadas!', {
-              body: 'Você receberá alertas em tempo real sobre o foco da semana e avisos da academia.',
-              icon: '/logo.svg',
-            });
-          } catch (e) {
-            console.warn('Erro ao abrir notificação de confirmação:', e);
-          }
-        }
-        return res;
-      } catch (err) {
-        console.warn('Erro ao solicitar permissão de Notificação:', err);
-      }
-    }
-    return 'denied';
-  };
-
-  const addNotification = (notifData: Omit<AppNotification, 'id' | 'createdAt' | 'readBy'>): AppNotification => {
-    const newNotif: AppNotification = {
-      ...notifData,
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      createdAt: new Date().toISOString(),
-      readBy: [],
-    };
-
-    setNotifications(prev => [newNotif, ...prev]);
-    saveToFirestore('notifications', newNotif);
-
-    // Show in-app banner toast
-    setActiveToastNotif(newNotif);
-
-    // Trigger Web Push Notification if browser permission granted
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification(newNotif.title, {
-          body: newNotif.message,
-          icon: '/logo.svg',
-        });
-      } catch (e) {
-        console.warn('Web Notification trigger error:', e);
-      }
-    }
-
-    return newNotif;
-  };
-
-  const markNotificationAsRead = (notificationId: string, userId: string) => {
-    if (!userId) return;
-    setNotifications(prev =>
-      prev.map(n => {
-        if (n.id === notificationId && !n.readBy.includes(userId)) {
-          const updated = { ...n, readBy: [...n.readBy, userId] };
-          saveToFirestore('notifications', updated);
-          return updated;
-        }
-        return n;
-      })
-    );
-  };
-
-  const markAllNotificationsAsRead = (userId: string) => {
-    if (!userId) return;
-    setNotifications(prev =>
-      prev.map(n => {
-        if (!n.readBy.includes(userId)) {
-          const updated = { ...n, readBy: [...n.readBy, userId] };
-          saveToFirestore('notifications', updated);
-          return updated;
-        }
-        return n;
-      })
-    );
-  };
-
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    removeFromFirestore('notifications', notificationId);
-  };
-
-  const dismissToastNotif = () => {
-    setActiveToastNotif(null);
-  };
-
-  // Real-time Firestore Cloud Synchronization
+  // 2. Real-time Firestore Subscriptions for all collections (100% Cloud-native synchronized)
   useEffect(() => {
-    const unsubStudents = subscribeFirestoreCollection<Student>('students', (data) => {
-      if (!data) return;
-      const validCloudStudents = (data || []).filter(cloudSt =>
-        !isTestMockRecord(cloudSt.id) && 
-        !isTestMockRecord(cloudSt.email) && 
-        !isTestMockRecord(cloudSt.name) && 
-        !isTestMockRecord(cloudSt.registrationNumber) && 
-        !isDeletedRecord(cloudSt.id, cloudSt.email, cloudSt.registrationNumber)
-      ).map(s => ({
-        ...s,
-        photoUrl: (s.photoUrl && !s.photoUrl.includes('unsplash.com')) ? s.photoUrl : DEFAULT_BLACK_GI_AVATAR
-      }));
+    console.log('[Firestore Sync] Conectando ouvintes em tempo real para todas as coleções...');
 
-      setStudents(prev => {
-        if (validCloudStudents.length > 0) {
-          const merged: Student[] = [...validCloudStudents];
-          prev.forEach(localSt => {
-            if (!merged.some(m => m.id === localSt.id || (m.email && localSt.email && m.email.trim().toLowerCase() === localSt.email.trim().toLowerCase()))) {
-              merged.push(localSt);
-            }
-          });
-          safeSave('bjjcron_students', merged);
-          return merged;
-        }
-        return prev;
-      });
-      window.dispatchEvent(new Event('bjjcron_students_updated'));
-    });
-
-    const unsubTeachers = subscribeFirestoreCollection<Teacher>('teachers', (data) => {
-      setTeachers(data);
-    });
-
-    const unsubClasses = subscribeFirestoreCollection<BJJClass>('classes', (data) => {
-      setClasses(data);
-    });
-
-    const unsubAttendances = subscribeFirestoreCollection<AttendanceRecord>('attendances', (data) => {
-      if (data && data.length > 0) {
-        setAttendances(prev => {
-          const merged = [...data];
-          // Preserve any newly recorded local attendance that hasn't synced yet
-          prev.forEach(localAtt => {
-            if (!merged.some(m => m.id === localAtt.id)) {
-              merged.unshift(localAtt);
-            }
-          });
-          safeSave('bjjcron_attendances', merged);
-          return merged;
-        });
-
-        setStudents(prev => {
-          let updated = false;
-          const newList = prev.map(s => {
-            const count = getStudentAttendances(s, data, 'ALL').length;
-            const actualTotal = Math.max(s.totalClassesAttended || 0, count);
-            if (s.totalClassesAttended !== actualTotal) {
-              updated = true;
-              return { ...s, totalClassesAttended: actualTotal };
-            }
-            return s;
-          });
-          if (updated) {
-            safeSave('bjjcron_students', newList);
-            return newList;
-          }
-          return prev;
-        });
-      }
-    });
-
-    const unsubPayments = subscribeFirestoreCollection<PaymentRecord>('payments', (data) => {
-      setPayments(data);
-    });
-
-    const unsubGraduations = subscribeFirestoreCollection<Graduation>('graduations', (data) => {
-      setGraduations(data);
-      if (data && data.length > 0) {
-        setStudents(prev => {
-          let updated = false;
-          const newList = prev.map(s => {
-            const cleanSEmail = s.email ? s.email.trim().toLowerCase() : '';
-            const studentGrads = data.filter(g => 
-              g.studentId === s.id || 
-              (cleanSEmail && g.studentId && g.studentId.trim().toLowerCase() === cleanSEmail)
-            );
-            if (studentGrads.length > 0) {
-              studentGrads.sort((a,b) => new Date(b.promotedAt).getTime() - new Date(a.promotedAt).getTime());
-              const latestGrad = studentGrads[0];
-              const gradWeight = getBeltWeight(latestGrad.belt, latestGrad.stripes);
-              const currentWeight = getBeltWeight(s.belt, s.stripes);
-
-              if (latestGrad.belt && gradWeight > currentWeight) {
-                updated = true;
-                return { ...s, belt: latestGrad.belt, stripes: latestGrad.stripes ?? s.stripes };
-              }
-            }
-            return s;
-          });
-          if (updated) {
-            safeSave('bjjcron_students', newList);
-            return newList;
-          }
-          return prev;
-        });
-      }
-    });
-
-    const unsubBeltRequests = subscribeFirestoreCollection<BeltChangeRequest>('beltRequests', (data) => {
-      setBeltRequests(data);
-    });
-
-    const unsubTrainingLogs = subscribeFirestoreCollection<TrainingLog>('trainingLogs', (data) => {
-      const realLogs = (data || []).filter(l => 
-        l.id !== 'log-1' && 
-        l.id !== 'log-2' && 
-        l.studentId !== 'std-1' &&
-        !isTestMockRecord(l.id) && 
-        !isTestMockRecord(l.studentId)
-      );
-      setTrainingLogs(realLogs);
-      safeSave('bjjcron_training_logs', realLogs);
-    });
-
-    const unsubTeacherObs = subscribeFirestoreCollection<TeacherObservation>('teacherObservations', (data) => {
-      setTeacherObservations(data);
-    });
-
-    const unsubWeeklyPositions = subscribeFirestoreCollection<WeeklyPosition>('weeklyPositions', (data) => {
-      const realPositions = (data || []).filter(p => !isTestMockRecord(p.id) && !isTestMockRecord(p.title));
-      if (realPositions.length > 0) {
-        setWeeklyPositions(realPositions);
-        safeSave('bjjcron_weekly_positions', realPositions);
-      }
-    });
-
-    const unsubNotifications = subscribeFirestoreCollection<AppNotification>('notifications', (data) => {
-      const realNotifs = data.filter(n => n.id !== 'notif-1' && n.id !== 'notif-2' && !n.authorName?.includes('Carlos Gracie'));
-      setNotifications(realNotifs);
-      safeSave('bjjcron_notifications', realNotifs);
-    });
-
-    const unsubConfig = subscribeFirestoreConfig((data) => {
-      if (data) {
-        setAcademyConfig(prev => ({
-          ...INITIAL_ACADEMY_CONFIG,
-          ...prev,
-          ...data,
-          graduationCriteria: data.graduationCriteria || prev.graduationCriteria || INITIAL_ACADEMY_CONFIG.graduationCriteria,
+    const unsubStudents = subscribeFirestoreCollection<Student>('students', (docs) => {
+      const valid = docs
+        .filter(s => !isDeletedRecord(s.id, s.email, s.registrationNumber))
+        .map(s => ({
+          ...s,
+          approvalStatus: s.approvalStatus || 'APPROVED',
+          active: s.approvalStatus === 'APPROVED' || s.active !== false,
+          photoUrl: (!s.photoUrl || s.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : s.photoUrl,
         }));
+      setStudents(valid);
+    });
+
+    const unsubTeachers = subscribeFirestoreCollection<Teacher>('teachers', (docs) => {
+      const valid = docs
+        .filter(t => !isDeletedRecord(t.id, t.email))
+        .map(t => ({
+          ...t,
+          photoUrl: (!t.photoUrl || t.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : t.photoUrl,
+        }));
+      setTeachers(valid);
+    });
+
+    const unsubClasses = subscribeFirestoreCollection<BJJClass>('classes', (docs) => {
+      const valid = docs.filter(c => !isDeletedRecord(c.id));
+      setClasses(valid);
+    });
+
+    const unsubAttendances = subscribeFirestoreCollection<AttendanceRecord>('attendances', (docs) => {
+      const valid = docs.filter(a => !isDeletedRecord(a.id));
+      setAttendances(valid);
+    });
+
+    const unsubPayments = subscribeFirestoreCollection<PaymentRecord>('payments', (docs) => {
+      const valid = docs.filter(p => !isDeletedRecord(p.id));
+      setPayments(valid);
+    });
+
+    const unsubGraduations = subscribeFirestoreCollection<Graduation>('graduations', (docs) => {
+      const valid = docs.filter(g => !isDeletedRecord(g.id));
+      setGraduations(valid);
+    });
+
+    const unsubBeltRequests = subscribeFirestoreCollection<BeltChangeRequest>('beltRequests', (docs) => {
+      const valid = docs.filter(b => !isDeletedRecord(b.id));
+      setBeltRequests(valid);
+    });
+
+    const unsubTrainingLogs = subscribeFirestoreCollection<TrainingLog>('trainingLogs', (docs) => {
+      const valid = docs.filter(l => !isDeletedRecord(l.id));
+      setTrainingLogs(valid);
+    });
+
+    const unsubTeacherObservations = subscribeFirestoreCollection<TeacherObservation>('teacherObservations', (docs) => {
+      const valid = docs.filter(o => !isDeletedRecord(o.id));
+      setTeacherObservations(valid);
+    });
+
+    const unsubWeeklyPositions = subscribeFirestoreCollection<WeeklyPosition>('weeklyPositions', (docs) => {
+      const valid = docs.filter(p => !isDeletedRecord(p.id));
+      setWeeklyPositions(valid);
+    });
+
+    const unsubNotifications = subscribeFirestoreCollection<AppNotification>('notifications', (docs) => {
+      const valid = docs.filter(n => !isDeletedRecord(n.id));
+      setNotifications(valid);
+    });
+
+    const unsubConfig = subscribeFirestoreConfig((cfg) => {
+      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length > 0) {
+        setAcademyConfig({
+          ...INITIAL_ACADEMY_CONFIG,
+          ...cfg,
+        });
       }
     });
 
@@ -700,66 +323,138 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubGraduations();
       unsubBeltRequests();
       unsubTrainingLogs();
-      unsubTeacherObs();
+      unsubTeacherObservations();
+      unsubWeeklyPositions();
       unsubNotifications();
       unsubConfig();
     };
   }, []);
 
+  // Notifications API handlers
+  const requestPushPermission = async (): Promise<NotificationPermission> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'denied';
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermissionStatus(permission);
+      return permission;
+    } catch {
+      return 'denied';
+    }
+  };
 
-  // Student CRUD
+  const addNotification = (notifData: Omit<AppNotification, 'id' | 'createdAt' | 'readBy'>): AppNotification => {
+    const newNotif: AppNotification = {
+      ...notifData,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      createdAt: new Date().toISOString(),
+      readBy: [],
+    };
+
+    setNotifications(prev => [newNotif, ...prev]);
+    setActiveToastNotif(newNotif);
+    saveToFirestore('notifications', newNotif);
+
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(newNotif.title, {
+          body: newNotif.message,
+          icon: '/favicon.ico',
+        });
+      } catch (e) {
+        console.warn('Could not display system push notification:', e);
+      }
+    }
+
+    return newNotif;
+  };
+
+  const markNotificationAsRead = (notificationId: string, userId: string) => {
+    let updatedNotif: AppNotification | null = null;
+    setNotifications(prev => {
+      const updated = prev.map(n => {
+        if (n.id === notificationId) {
+          const readBy = Array.isArray(n.readBy) ? n.readBy : [];
+          if (!readBy.includes(userId)) {
+            updatedNotif = { ...n, readBy: [...readBy, userId] };
+            return updatedNotif;
+          }
+        }
+        return n;
+      });
+      return updated;
+    });
+
+    if (updatedNotif) {
+      saveToFirestore('notifications', updatedNotif);
+    }
+  };
+
+  const markAllNotificationsAsRead = (userId: string) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => {
+        const readBy = Array.isArray(n.readBy) ? n.readBy : [];
+        if (!readBy.includes(userId)) {
+          const item = { ...n, readBy: [...readBy, userId] };
+          saveToFirestore('notifications', item);
+          return item;
+        }
+        return n;
+      });
+      return updated;
+    });
+  };
+
+  const deleteNotification = (notificationId: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    removeFromFirestore('notifications', notificationId);
+  };
+
+  const dismissToastNotif = () => {
+    setActiveToastNotif(null);
+  };
+
+  // Student CRUD (Pure Firestore Direct Sync)
   const addStudent = (studentData: Omit<Student, 'id' | 'registrationNumber' | 'qrCodeToken' | 'totalClassesAttended' | 'classesSinceLastGraduation'>): Student => {
     const newId = `std-${Date.now()}`;
-    const regNum = `BJJ-2026-${String(students.length + 1).padStart(3, '0')}`;
-    const qrToken = `BJJCRON-${newId}-${studentData.name.toUpperCase().replace(/\s+/g, '-')}`;
+    const regYear = new Date().getFullYear();
+    const regNum = `BJJ-${regYear}-${String(students.length + 1).padStart(3, '0')}`;
 
     const newStudent: Student = {
       ...studentData,
       id: newId,
       registrationNumber: regNum,
-      qrCodeToken: qrToken,
+      qrCodeToken: `BJJCRON-${newId}`,
       totalClassesAttended: 0,
       classesSinceLastGraduation: 0,
+      photoUrl: (!studentData.photoUrl || studentData.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : studentData.photoUrl,
+      active: true,
       approvalStatus: studentData.approvalStatus || 'APPROVED',
-      hasActivatedAccount: false,
+      hasActivatedAccount: true,
+      updatedAt: new Date().toISOString(),
     };
 
-    setStudents(prev => {
-      const updated = [newStudent, ...prev];
-      localStorage.setItem('bjjcron_students', JSON.stringify(updated));
-      return updated;
-    });
+    setStudents(prev => [newStudent, ...prev]);
     saveToFirestore('students', newStudent);
 
-    // Automatically create User in bjjcron_users so student can log in / activate immediately with their email
-    if (studentData.email) {
-      const cleanEmail = studentData.email.trim().toLowerCase();
-      try {
-        const savedUsers = localStorage.getItem('bjjcron_users');
-        const usersList = savedUsers ? JSON.parse(savedUsers) : [];
-        if (!usersList.some((u: any) => (u.email && u.email.trim().toLowerCase() === cleanEmail) || u.studentId === newId)) {
-          const newUserObj = {
-            id: `user-${newId}`,
-            name: studentData.name,
-            email: cleanEmail,
-            role: 'ALUNO',
-            studentId: newId,
-            phone: studentData.phone || '',
-            password: '123',
-            approvalStatus: studentData.approvalStatus || 'APPROVED',
-            isActivated: false,
-            avatarUrl: (studentData.photoUrl && !studentData.photoUrl.includes('unsplash.com')) ? studentData.photoUrl : DEFAULT_BLACK_GI_AVATAR
-          };
-          usersList.push(newUserObj);
-          localStorage.setItem('bjjcron_users', JSON.stringify(usersList));
-          window.dispatchEvent(new Event('bjjcron_users_updated'));
-        }
-      } catch (e) {
-        console.error('Error syncing student to bjjcron_users:', e);
-      }
+    // Initial graduation record
+    if (newStudent.belt) {
+      const initialGrad: Graduation = {
+        id: `grad-${Date.now()}`,
+        studentId: newId,
+        belt: newStudent.belt,
+        stripes: newStudent.stripes || 0,
+        promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
+        promotedAt: studentData.startDate || new Date().toISOString().split('T')[0],
+        notes: 'Graduação inicial no ato da matrícula.',
+        classesCountAtPromotion: 0,
+      };
+      setGraduations(prev => [initialGrad, ...prev]);
+      saveToFirestore('graduations', initialGrad);
     }
 
-    // Automatically create first payment record
+    // Initial payment record
     const today = new Date();
     const dueDate = new Date(today.getFullYear(), today.getMonth(), studentData.paymentDueDateDay || 10);
     const refMonth = `${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
@@ -777,18 +472,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPayments(prev => [newPayment, ...prev]);
     saveToFirestore('payments', newPayment);
 
-    fetch('/api/students', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newStudent),
-    }).catch(() => {});
-    fetch('/api/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPayment),
-    }).catch(() => {});
-
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
     return newStudent;
   };
 
@@ -797,53 +480,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nowIso = new Date().toISOString();
     const enrichedUpdates = { ...updates, updatedAt: nowIso };
 
-    // Get current student
     const existing = students.find(s => 
       s.id === id || 
       (s.email && s.email.trim().toLowerCase() === cleanId) ||
       (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
     );
-
-    // If student not in state, look in users to populate initial profile data
-    let fallbackUserData: Partial<Student> = {};
-    if (!existing) {
-      try {
-        const savedUsers = localStorage.getItem('bjjcron_users');
-        if (savedUsers) {
-          const usersList = JSON.parse(savedUsers);
-          const matchedUser = usersList.find((u: any) => 
-            u.id === id || 
-            u.studentId === id || 
-            (u.email && u.email.trim().toLowerCase() === cleanId)
-          );
-          if (matchedUser) {
-            fallbackUserData = {
-              name: matchedUser.name,
-              email: matchedUser.email,
-              phone: matchedUser.phone || '',
-              photoUrl: matchedUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
-              registrationNumber: `BJJ-${new Date().getFullYear()}-${id.slice(-4)}`,
-              qrCodeToken: `BJJCRON-${id}`,
-              birthDate: '2000-01-01',
-              belt: 'BRANCA',
-              stripes: 0,
-              startDate: new Date().toISOString().split('T')[0],
-              totalClassesAttended: 0,
-              classesSinceLastGraduation: 0,
-              weightCategory: 'MÉDIO',
-              ageCategory: 'ADULTO',
-              active: true,
-              planName: 'Plano Mensal Padrão',
-              planPrice: 240,
-              paymentDueDateDay: 10,
-              paymentStatus: 'PAGO',
-              approvalStatus: 'APPROVED',
-              hasActivatedAccount: true
-            };
-          }
-        }
-      } catch (e) {}
-    }
 
     const mergedStudent: Student = existing 
       ? { ...existing, ...enrichedUpdates }
@@ -870,24 +511,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           paymentStatus: 'PAGO',
           approvalStatus: 'APPROVED',
           hasActivatedAccount: true,
-          ...fallbackUserData,
-          ...enrichedUpdates
+          ...enrichedUpdates,
         } as Student);
 
-    // 1. Direct write to Firestore students
+    // Save directly to Firestore students
     await saveToFirestore('students', mergedStudent);
 
-    // 2. Update local state
+    // Update local state optimistically
     setStudents(prev => {
       const exists = prev.some(s => s.id === mergedStudent.id);
-      const updated = exists 
+      return exists 
         ? prev.map(s => (s.id === mergedStudent.id ? mergedStudent : s))
         : [mergedStudent, ...prev];
-      safeSave('bjjcron_students', updated);
-      return updated;
     });
 
-    // 3. If belt, stripes or lastGraduationDate were modified, automatically generate/update Graduation record
+    // Auto generate graduation record if belt or stripes changed
     if (updates.belt !== undefined || updates.stripes !== undefined || updates.lastGraduationDate !== undefined) {
       const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || new Date().toISOString().split('T')[0];
       const gradRec: Graduation = {
@@ -900,97 +538,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         notes: updates.notes || 'Atualização de faixa/graduação do cadastro.',
         classesCountAtPromotion: mergedStudent.totalClassesAttended,
       };
-      setGraduations(gPrev => {
-        const nextGrads = [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)];
-        safeSave('bjjcron_graduations', nextGrads);
-        return nextGrads;
-      });
+      setGraduations(gPrev => [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)]);
       saveToFirestore('graduations', gradRec);
     }
-
-    // 4. Sync corresponding user in Firestore users
-    const targetEmail = mergedStudent.email ? mergedStudent.email.trim().toLowerCase() : '';
-    try {
-      const savedUsers = localStorage.getItem('bjjcron_users');
-      if (savedUsers) {
-        const usersList = JSON.parse(savedUsers);
-        const userIdx = usersList.findIndex((u: any) => 
-          (u.studentId === mergedStudent.id) || 
-          (u.role === 'ALUNO' && targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail)
-        );
-        if (userIdx !== -1) {
-          if (updates.name) usersList[userIdx].name = updates.name.trim();
-          if (updates.email) usersList[userIdx].email = updates.email.trim().toLowerCase();
-          if (updates.phone) usersList[userIdx].phone = updates.phone;
-          if (updates.photoUrl !== undefined) usersList[userIdx].avatarUrl = updates.photoUrl;
-          if (updates.approvalStatus) usersList[userIdx].approvalStatus = updates.approvalStatus;
-          localStorage.setItem('bjjcron_users', JSON.stringify(usersList));
-          saveToFirestore('users', usersList[userIdx]);
-        }
-      }
-
-      // Update current user if matching
-      const savedCurr = localStorage.getItem('bjjcron_current_user');
-      if (savedCurr) {
-        const curr = JSON.parse(savedCurr);
-        if (
-          curr.studentId === mergedStudent.id ||
-          (curr.role === 'ALUNO' && targetEmail && curr.email && curr.email.trim().toLowerCase() === targetEmail)
-        ) {
-          if (updates.name) curr.name = updates.name.trim();
-          if (updates.email) curr.email = updates.email.trim().toLowerCase();
-          if (updates.phone) curr.phone = updates.phone;
-          if (updates.photoUrl !== undefined) curr.avatarUrl = updates.photoUrl;
-          localStorage.setItem('bjjcron_current_user', JSON.stringify(curr));
-        }
-      }
-      window.dispatchEvent(new Event('bjjcron_users_updated'));
-    } catch (e) {
-      console.error('Error updating user in bjjcron_users:', e);
-    }
-
-    fetch(`/api/students/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(enrichedUpdates),
-    }).catch(() => {});
-
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
   };
 
   const deleteStudent = (id: string) => {
     const targetStudent = students.find(s => s.id === id);
     markAsDeleted(id, targetStudent?.email, targetStudent?.registrationNumber);
 
-    setStudents(prev => {
-      const updated = prev.filter(s => s.id !== id && (s.email && targetStudent?.email ? s.email.trim().toLowerCase() !== targetStudent.email.trim().toLowerCase() : true));
-      safeSave('bjjcron_students', updated);
-      return updated;
-    });
-
+    setStudents(prev => prev.filter(s => s.id !== id && (s.email && targetStudent?.email ? s.email.trim().toLowerCase() !== targetStudent.email.trim().toLowerCase() : true)));
     removeFromFirestore('students', id);
     if (targetStudent && targetStudent.email) {
       removeFromFirestore('students', targetStudent.email.trim().toLowerCase());
     }
-
-    try {
-      const savedUsersStr = localStorage.getItem('bjjcron_users');
-      if (savedUsersStr) {
-        const usersList: any[] = JSON.parse(savedUsersStr);
-        const targetEmail = targetStudent?.email?.trim().toLowerCase();
-        const matchedUsers = usersList.filter(u => u.studentId === id || (targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail));
-        matchedUsers.forEach(u => {
-          markAsDeleted(u.id, u.email, u.studentId);
-          removeFromFirestore('users', u.id);
-        });
-        const updatedUsers = usersList.filter(u => u.studentId !== id && (!targetEmail || !u.email || u.email.trim().toLowerCase() !== targetEmail));
-        localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
-        window.dispatchEvent(new Event('bjjcron_users_updated'));
-      }
-    } catch (e) {}
-
-    fetch(`/api/students/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
   };
 
   const promoteStudent = (
@@ -1023,11 +584,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       classesCountAtPromotion: student.totalClassesAttended,
     };
 
-    setGraduations(prev => {
-      const nextGrads = [newGraduation, ...prev];
-      safeSave('bjjcron_graduations', nextGrads);
-      return nextGrads;
-    });
+    setGraduations(prev => [newGraduation, ...prev]);
     saveToFirestore('graduations', newGraduation);
 
     const nowIso = new Date().toISOString();
@@ -1040,35 +597,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: nowIso,
     };
 
-    setStudents(prev => {
-      const nextStudents = prev.map(s => {
-        if (
-          s.id === realId || 
-          (s.email && student.email && s.email.trim().toLowerCase() === student.email.trim().toLowerCase())
-        ) {
-          return updatedStudentObj;
-        }
-        return s;
-      });
-      safeSave('bjjcron_students', nextStudents);
-      return nextStudents;
-    });
-
+    setStudents(prev => prev.map(s => (s.id === realId ? updatedStudentObj : s)));
     saveToFirestore('students', updatedStudentObj);
-
-    fetch(`/api/students/${encodeURIComponent(realId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        belt: newBelt,
-        stripes: newStripes,
-        classesSinceLastGraduation: 0,
-        lastGraduationDate: graduationDate,
-        updatedAt: nowIso,
-      }),
-    }).catch(() => {});
-
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
   };
 
   const requestBeltChange = (
@@ -1087,7 +617,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (existingPending) {
       return {
         success: false,
-        message: 'Você já possui uma solicitação de alteração de faixa pendente de análise pelo professor.'
+        message: 'Você já possui uma solicitação de alteração de faixa pendente de análise pelo professor.',
       };
     }
 
@@ -1104,22 +634,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'PENDING',
     };
 
-    setBeltRequests(prev => {
-      const updated = [newRequest, ...prev];
-      localStorage.setItem('bjjcron_belt_requests', JSON.stringify(updated));
-      return updated;
-    });
+    setBeltRequests(prev => [newRequest, ...prev]);
     saveToFirestore('beltRequests', newRequest);
-
-    fetch('/api/belt-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRequest),
-    }).catch(() => {});
 
     return {
       success: true,
-      message: 'Solicitação de troca de faixa enviada com sucesso! Aguarde a aprovação do seu Professor.'
+      message: 'Solicitação de troca de faixa enviada com sucesso! Aguarde a aprovação do seu Professor.',
     };
   };
 
@@ -1136,28 +656,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const reviewedAt = new Date().toISOString().split('T')[0];
-    const updatedReq = {
+    const updatedReq: BeltChangeRequest = {
       ...req,
-      status: 'APPROVED' as const,
+      status: 'APPROVED',
       reviewedBy: reviewerName,
       reviewedAt,
     };
-    setBeltRequests(prev => {
-      const updated = prev.map(r => r.id === requestId ? updatedReq : r);
-      localStorage.setItem('bjjcron_belt_requests', JSON.stringify(updated));
-      return updated;
-    });
+    setBeltRequests(prev => prev.map(r => (r.id === requestId ? updatedReq : r)));
     saveToFirestore('beltRequests', updatedReq);
-
-    fetch(`/api/belt-requests/${encodeURIComponent(requestId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'APPROVED',
-        reviewedBy: reviewerName,
-        reviewedAt,
-      }),
-    }).catch(() => {});
   };
 
   const rejectBeltChange = (requestId: string, reviewerName: string) => {
@@ -1165,29 +671,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!req) return;
 
     const reviewedAt = new Date().toISOString().split('T')[0];
-    const updatedReq = {
+    const updatedReq: BeltChangeRequest = {
       ...req,
-      status: 'REJECTED' as const,
+      status: 'REJECTED',
       reviewedBy: reviewerName,
       reviewedAt,
     };
 
-    setBeltRequests(prev => {
-      const updated = prev.map(r => r.id === requestId ? updatedReq : r);
-      localStorage.setItem('bjjcron_belt_requests', JSON.stringify(updated));
-      return updated;
-    });
+    setBeltRequests(prev => prev.map(r => (r.id === requestId ? updatedReq : r)));
     saveToFirestore('beltRequests', updatedReq);
-
-    fetch(`/api/belt-requests/${encodeURIComponent(requestId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'REJECTED',
-        reviewedBy: reviewerName,
-        reviewedAt,
-      }),
-    }).catch(() => {});
   };
 
   // Teacher CRUD
@@ -1196,53 +688,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...teacherData,
       id: `prof-${Date.now()}`,
     };
-    setTeachers(prev => {
-      const updated = [newTeacher, ...prev];
-      safeSave('bjjcron_teachers', updated);
-      return updated;
-    });
+    setTeachers(prev => [newTeacher, ...prev]);
     saveToFirestore('teachers', newTeacher);
-
-    fetch('/api/teachers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTeacher),
-    }).catch(() => {});
-
     return newTeacher;
   };
 
   const updateTeacher = (id: string, updates: Partial<Teacher>) => {
     let updatedTeacher: Teacher | null = null;
-    setTeachers(prev => {
-      const updated = prev.map(t => {
+    setTeachers(prev =>
+      prev.map(t => {
         if (t.id === id) {
           updatedTeacher = { ...t, ...updates };
           return updatedTeacher;
         }
         return t;
-      });
-      safeSave('bjjcron_teachers', updated);
-      return updated;
-    });
+      })
+    );
     if (updatedTeacher) saveToFirestore('teachers', updatedTeacher);
-
-    fetch(`/api/teachers/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    }).catch(() => {});
   };
 
   const deleteTeacher = (id: string) => {
-    setTeachers(prev => {
-      const updated = prev.filter(t => t.id !== id);
-      safeSave('bjjcron_teachers', updated);
-      return updated;
-    });
+    setTeachers(prev => prev.filter(t => t.id !== id));
     removeFromFirestore('teachers', id);
-
-    fetch(`/api/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Class CRUD
@@ -1251,18 +718,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...classData,
       id: `cls-${Date.now()}`,
     };
-    setClasses(prev => {
-      const updated = [...prev, newClass];
-      safeSave('bjjcron_classes', updated);
-      return updated;
-    });
+    setClasses(prev => [...prev, newClass]);
     saveToFirestore('classes', newClass);
-
-    fetch('/api/classes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newClass),
-    }).catch(() => {});
   };
 
   const updateClass = (id: string, updates: Partial<BJJClass>) => {
@@ -1272,22 +729,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const targetClass = classes.find(c => c.id === id);
     if (targetClass) oldFocus = targetClass.weeklyFocus;
 
-    setClasses(prev => {
-      const updated = prev.map(c => {
+    setClasses(prev =>
+      prev.map(c => {
         if (c.id === id) {
           updatedClass = { ...c, ...updates };
           return updatedClass;
         }
         return c;
-      });
-      safeSave('bjjcron_classes', updated);
-      return updated;
-    });
+      })
+    );
 
     if (updatedClass) {
       saveToFirestore('classes', updatedClass);
 
-      // Auto trigger push notification if weeklyFocus was set or changed
       if (updates.weeklyFocus !== undefined && updates.weeklyFocus !== oldFocus && updates.weeklyFocus.trim() !== '') {
         const className = updates.title || targetClass?.title || 'Turma';
         addNotification({
@@ -1299,7 +753,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           authorName: updates.professorName || targetClass?.professorName || 'Professor / Mestre',
         });
 
-        // Automatically record position into weeklyPositions
         setWeeklyPositions(prev => {
           const existsIndex = prev.findIndex(p => p.classId === id && p.title.toLowerCase() === updates.weeklyFocus?.toLowerCase());
           let updatedPositions = [...prev];
@@ -1329,28 +782,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedPositions = [newPos, ...updatedPositions];
             saveToFirestore('weeklyPositions', newPos);
           }
-          safeSave('bjjcron_weekly_positions', updatedPositions);
           return updatedPositions;
         });
       }
     }
-
-    fetch(`/api/classes/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    }).catch(() => {});
   };
 
   const deleteClass = (id: string) => {
-    setClasses(prev => {
-      const updated = prev.filter(c => c.id !== id);
-      safeSave('bjjcron_classes', updated);
-      return updated;
-    });
+    setClasses(prev => prev.filter(c => c.id !== id));
     removeFromFirestore('classes', id);
-
-    fetch(`/api/classes/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Attendance
@@ -1372,7 +812,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const bjjClass = classes.find(c => c.id === classId) || classes[0];
 
-    // Enforce day and 15-minute time window check unless explicitly bypassed
     if (!bypassTimeCheck) {
       const availability = checkClassCheckinAvailability(bjjClass);
       if (!availability.isAvailable) {
@@ -1385,7 +824,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const todayStr = getLocalDateStr();
 
-    // Check if student already checked in today (limit to 1 attendance per day)
     const alreadyPresent = attendances.some(a => 
       a.studentId === student.id && 
       a.date === todayStr
@@ -1407,45 +845,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       verifiedBy,
     };
 
-    setAttendances(prev => {
-      const updated = [newRecord, ...prev];
-      localStorage.setItem('bjjcron_attendances', JSON.stringify(updated));
-      return updated;
-    });
+    setAttendances(prev => [newRecord, ...prev]);
     saveToFirestore('attendances', newRecord);
 
-    fetch('/api/attendances', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRecord),
-    }).catch(() => {});
-
-    // Update student's class counter
-    setStudents(prev => {
-      let updatedStudent: Student | null = null;
-      const updated = prev.map(s => {
-        if (s.id === student.id) {
-          updatedStudent = {
-            ...s,
-            totalClassesAttended: s.totalClassesAttended + 1,
-            classesSinceLastGraduation: s.classesSinceLastGraduation + 1,
-          };
-          fetch(`/api/students/${encodeURIComponent(s.id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              totalClassesAttended: updatedStudent.totalClassesAttended,
-              classesSinceLastGraduation: updatedStudent.classesSinceLastGraduation,
-            }),
-          }).catch(() => {});
-          return updatedStudent;
-        }
-        return s;
-      });
-      localStorage.setItem('bjjcron_students', JSON.stringify(updated));
-      if (updatedStudent) saveToFirestore('students', updatedStudent);
-      return updated;
-    });
+    // Update student's class counter directly in Firestore
+    const updatedStudent: Student = {
+      ...student,
+      totalClassesAttended: student.totalClassesAttended + 1,
+      classesSinceLastGraduation: student.classesSinceLastGraduation + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    setStudents(prev => prev.map(s => (s.id === student.id ? updatedStudent : s)));
+    saveToFirestore('students', updatedStudent);
 
     return {
       success: true,
@@ -1456,39 +867,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const removeAttendance = (id: string) => {
     const record = attendances.find(a => a.id === id);
     if (record) {
-      setAttendances(prev => {
-        const updated = prev.filter(a => a.id !== id);
-        localStorage.setItem('bjjcron_attendances', JSON.stringify(updated));
-        return updated;
-      });
+      setAttendances(prev => prev.filter(a => a.id !== id));
       removeFromFirestore('attendances', id);
-      fetch(`/api/attendances/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
 
-      setStudents(prev => {
-        let updatedStudent: Student | null = null;
-        const updated = prev.map(s => {
-          if (s.id === record.studentId) {
-            updatedStudent = {
-              ...s,
-              totalClassesAttended: Math.max(0, s.totalClassesAttended - 1),
-              classesSinceLastGraduation: Math.max(0, s.classesSinceLastGraduation - 1),
-            };
-            fetch(`/api/students/${encodeURIComponent(s.id)}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                totalClassesAttended: updatedStudent.totalClassesAttended,
-                classesSinceLastGraduation: updatedStudent.classesSinceLastGraduation,
-              }),
-            }).catch(() => {});
-            return updatedStudent;
-          }
-          return s;
-        });
-        localStorage.setItem('bjjcron_students', JSON.stringify(updated));
-        if (updatedStudent) saveToFirestore('students', updatedStudent);
-        return updated;
-      });
+      const targetStudent = students.find(s => s.id === record.studentId);
+      if (targetStudent) {
+        const updatedStudent: Student = {
+          ...targetStudent,
+          totalClassesAttended: Math.max(0, targetStudent.totalClassesAttended - 1),
+          classesSinceLastGraduation: Math.max(0, targetStudent.classesSinceLastGraduation - 1),
+          updatedAt: new Date().toISOString(),
+        };
+        setStudents(prev => prev.map(s => (s.id === targetStudent.id ? updatedStudent : s)));
+        saveToFirestore('students', updatedStudent);
+      }
     }
   };
 
@@ -1498,73 +890,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...paymentData,
       id: `pay-${Date.now()}`,
     };
-    setPayments(prev => {
-      const updated = [newPayment, ...prev];
-      localStorage.setItem('bjjcron_payments', JSON.stringify(updated));
-      return updated;
-    });
+    setPayments(prev => [newPayment, ...prev]);
     saveToFirestore('payments', newPayment);
-
-    fetch('/api/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPayment),
-    }).catch(() => {});
   };
 
   const markPaymentAsPaid = (paymentId: string, method: 'PIX' | 'CARTAO' | 'DINHEIRO' | 'BOLETO') => {
-    const todayStr = new Date().toISOString().split('T')[0];
     let updatedPayment: PaymentRecord | null = null;
-    setPayments(prev => {
-      const updated = prev.map(p => {
-        if (p.id === paymentId) {
-          fetch(`/api/payments/${encodeURIComponent(paymentId)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: 'PAGO',
-              paymentDate: todayStr,
-              paymentMethod: method,
-            }),
-          }).catch(() => {});
+    const paidAt = new Date().toISOString();
 
+    setPayments(prev =>
+      prev.map(p => {
+        if (p.id === paymentId) {
           updatedPayment = {
             ...p,
-            status: 'PAGO' as PaymentStatus,
-            paymentDate: todayStr,
+            status: 'PAGO',
+            paymentDate: paidAt,
             paymentMethod: method,
           };
           return updatedPayment;
         }
         return p;
-      });
-      localStorage.setItem('bjjcron_payments', JSON.stringify(updated));
-      return updated;
-    });
-    if (updatedPayment) saveToFirestore('payments', updatedPayment);
+      })
+    );
 
-    setStudents(sPrev => {
-      const targetPayment = payments.find(p => p.id === paymentId);
-      let updatedStudent: Student | null = null;
-      const updated = sPrev.map(st => {
-        if (targetPayment && st.id === targetPayment.studentId) {
-          fetch(`/api/students/${encodeURIComponent(st.id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              paymentStatus: 'PAGO',
-              lastPaymentDate: todayStr,
-            }),
-          }).catch(() => {});
-          updatedStudent = { ...st, paymentStatus: 'PAGO' as PaymentStatus, lastPaymentDate: todayStr };
-          return updatedStudent;
-        }
-        return st;
-      });
-      localStorage.setItem('bjjcron_students', JSON.stringify(updated));
-      if (updatedStudent) saveToFirestore('students', updatedStudent);
-      return updated;
-    });
+    if (updatedPayment) {
+      saveToFirestore('payments', updatedPayment);
+
+      const targetStudent = students.find(s => s.id === (updatedPayment as PaymentRecord).studentId);
+      if (targetStudent) {
+        const updatedStudent: Student = {
+          ...targetStudent,
+          paymentStatus: 'PAGO',
+          updatedAt: new Date().toISOString(),
+        };
+        setStudents(prev => prev.map(s => (s.id === targetStudent.id ? updatedStudent : s)));
+        saveToFirestore('students', updatedStudent);
+      }
+    }
   };
 
   // Training Logs
@@ -1573,139 +935,77 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...logData,
       id: `log-${Date.now()}`,
     };
-    setTrainingLogs(prev => {
-      const updated = [newLog, ...prev];
-      localStorage.setItem('bjjcron_training_logs', JSON.stringify(updated));
-      return updated;
-    });
+    setTrainingLogs(prev => [newLog, ...prev]);
     saveToFirestore('trainingLogs', newLog);
-
-    fetch('/api/training-logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newLog),
-    }).catch(() => {});
   };
 
   const updateTrainingLog = (id: string, updates: Partial<TrainingLog>) => {
-    setTrainingLogs(prev => {
-      const updated = prev.map(l => l.id === id ? { ...l, ...updates } : l);
-      localStorage.setItem('bjjcron_training_logs', JSON.stringify(updated));
-      return updated;
-    });
-    const log = trainingLogs.find(l => l.id === id);
-    if (log) {
-      const merged = { ...log, ...updates };
-      saveToFirestore('trainingLogs', merged);
-      fetch(`/api/training-logs/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(merged),
-      }).catch(() => {});
-    }
+    let updatedLog: TrainingLog | null = null;
+    setTrainingLogs(prev =>
+      prev.map(l => {
+        if (l.id === id) {
+          updatedLog = { ...l, ...updates };
+          return updatedLog;
+        }
+        return l;
+      })
+    );
+    if (updatedLog) saveToFirestore('trainingLogs', updatedLog);
   };
 
   const deleteTrainingLog = (id: string) => {
-    setTrainingLogs(prev => {
-      const updated = prev.filter(l => l.id !== id);
-      localStorage.setItem('bjjcron_training_logs', JSON.stringify(updated));
-      return updated;
-    });
+    setTrainingLogs(prev => prev.filter(l => l.id !== id));
     removeFromFirestore('trainingLogs', id);
-    fetch(`/api/training-logs/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Teacher Observations
   const addTeacherObservation = (obsData: Omit<TeacherObservation, 'id' | 'date'>) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const targetStudent = students.find(s => s.id === obsData.studentId);
     const newObs: TeacherObservation = {
       ...obsData,
-      studentName: targetStudent ? targetStudent.name : obsData.studentName || 'Aluno',
       id: `obs-${Date.now()}`,
-      date: todayStr
+      date: getLocalDateStr(),
     };
-    setTeacherObservations(prev => {
-      const updated = [newObs, ...prev];
-      localStorage.setItem('bjjcron_teacher_observations', JSON.stringify(updated));
-      return updated;
-    });
+    setTeacherObservations(prev => [newObs, ...prev]);
     saveToFirestore('teacherObservations', newObs);
-
-    fetch('/api/teacher-observations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newObs),
-    }).catch(() => {});
   };
 
   const updateTeacherObservation = (id: string, updates: Partial<TeacherObservation>) => {
-    setTeacherObservations(prev => {
-      const updated = prev.map(o => {
+    let updatedObs: TeacherObservation | null = null;
+    setTeacherObservations(prev =>
+      prev.map(o => {
         if (o.id === id) {
-          const targetStudent = updates.studentId ? students.find(s => s.id === updates.studentId) : null;
-          return {
-            ...o,
-            ...updates,
-            ...(targetStudent ? { studentName: targetStudent.name } : {})
-          };
+          updatedObs = { ...o, ...updates };
+          return updatedObs;
         }
         return o;
-      });
-      localStorage.setItem('bjjcron_teacher_observations', JSON.stringify(updated));
-      return updated;
-    });
-
-    const existing = teacherObservations.find(o => o.id === id);
-    if (existing) {
-      const targetStudent = updates.studentId ? students.find(s => s.id === updates.studentId) : null;
-      const updatedObj = {
-        ...existing,
-        ...updates,
-        ...(targetStudent ? { studentName: targetStudent.name } : {})
-      };
-      saveToFirestore('teacherObservations', updatedObj);
-      fetch(`/api/teacher-observations/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedObj)
-      }).catch(() => {});
-    }
+      })
+    );
+    if (updatedObs) saveToFirestore('teacherObservations', updatedObs);
   };
 
   const deleteTeacherObservation = (id: string) => {
-    setTeacherObservations(prev => {
-      const updated = prev.filter(o => o.id !== id);
-      localStorage.setItem('bjjcron_teacher_observations', JSON.stringify(updated));
-      return updated;
-    });
+    setTeacherObservations(prev => prev.filter(o => o.id !== id));
     removeFromFirestore('teacherObservations', id);
-
-    fetch(`/api/teacher-observations/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Weekly Focus Positions
   const addWeeklyPosition = (positionData: Omit<WeeklyPosition, 'id' | 'createdAt'>): WeeklyPosition => {
     const newPos: WeeklyPosition = {
       ...positionData,
-      id: `pos-${Date.now()}`,
-      createdAt: new Date().toISOString()
+      id: `pos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      createdAt: new Date().toISOString(),
+      learnedByStudentIds: positionData.learnedByStudentIds || [],
     };
-    setWeeklyPositions(prev => {
-      const updated = [newPos, ...prev];
-      localStorage.setItem('bjjcron_weekly_positions', JSON.stringify(updated));
-      return updated;
-    });
+    setWeeklyPositions(prev => [newPos, ...prev]);
     saveToFirestore('weeklyPositions', newPos);
 
-    // Also trigger notification if it's set as current focus
     if (newPos.isCurrentFocus) {
       addNotification({
         title: `🎯 Nova Posição/Foco: ${newPos.title}`,
         message: `O professor cadastrou o foco técnico: "${newPos.title}" (${newPos.className || 'Todas as Turmas'})`,
         type: 'WEEKLY_FOCUS',
         targetClassName: newPos.className || 'Academia',
-        authorName: newPos.professorName || 'Professor'
+        authorName: newPos.professorName || 'Professor',
       });
     }
 
@@ -1714,35 +1014,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateWeeklyPosition = (id: string, updates: Partial<WeeklyPosition>) => {
     let updatedItem: WeeklyPosition | null = null;
-    setWeeklyPositions(prev => {
-      const updated = prev.map(p => {
+    setWeeklyPositions(prev =>
+      prev.map(p => {
         if (p.id === id) {
           updatedItem = { ...p, ...updates };
           return updatedItem;
         }
         return p;
-      });
-      localStorage.setItem('bjjcron_weekly_positions', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
     if (updatedItem) {
       saveToFirestore('weeklyPositions', updatedItem);
     }
   };
 
   const deleteWeeklyPosition = (id: string) => {
-    setWeeklyPositions(prev => {
-      const updated = prev.filter(p => p.id !== id);
-      localStorage.setItem('bjjcron_weekly_positions', JSON.stringify(updated));
-      return updated;
-    });
+    setWeeklyPositions(prev => prev.filter(p => p.id !== id));
     removeFromFirestore('weeklyPositions', id);
   };
 
   const toggleStudentLearnedPosition = (positionId: string, studentId: string) => {
     let updatedPos: WeeklyPosition | null = null;
-    setWeeklyPositions(prev => {
-      const updated = prev.map(p => {
+    setWeeklyPositions(prev =>
+      prev.map(p => {
         if (p.id === positionId) {
           const currentList = p.learnedByStudentIds || [];
           const isLearned = currentList.includes(studentId);
@@ -1754,10 +1048,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return updatedPos;
         }
         return p;
-      });
-      localStorage.setItem('bjjcron_weekly_positions', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
     if (updatedPos) {
       saveToFirestore('weeklyPositions', updatedPos);
     }
@@ -1768,27 +1060,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAcademyConfig(prev => {
       const updated = { ...prev, ...updates };
       saveConfigToFirestore(updated);
-      fetch('/api/academy-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
-      }).catch(() => {});
       return updated;
     });
   };
 
-  const resetToDefaultData = () => {
-    localStorage.removeItem('bjjcron_students');
-    localStorage.removeItem('bjjcron_teachers');
-    localStorage.removeItem('bjjcron_classes');
-    localStorage.removeItem('bjjcron_attendances');
-    localStorage.removeItem('bjjcron_payments');
-    localStorage.removeItem('bjjcron_graduations');
-    localStorage.removeItem('bjjcron_belt_requests');
-    localStorage.removeItem('bjjcron_training_logs');
-    localStorage.removeItem('bjjcron_teacher_observations');
-    localStorage.removeItem('bjjcron_academy_config');
+  const resetHomologationData = () => {
+    setStudents(INITIAL_STUDENTS);
+    setTeachers(INITIAL_TEACHERS);
+    setClasses(INITIAL_CLASSES);
+    setAttendances(INITIAL_ATTENDANCE);
+    setPayments(INITIAL_PAYMENTS);
+    setGraduations(INITIAL_GRADUATIONS);
+    setBeltRequests(INITIAL_BELT_REQUESTS);
+    setTrainingLogs(INITIAL_TRAINING_LOGS);
+    setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
+  };
 
+  const resetToDefaultData = () => {
     setStudents(INITIAL_STUDENTS);
     setTeachers(INITIAL_TEACHERS);
     setClasses(INITIAL_CLASSES);
@@ -1799,21 +1087,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTrainingLogs(INITIAL_TRAINING_LOGS);
     setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
     setAcademyConfig(INITIAL_ACADEMY_CONFIG);
-    fetch('/api/reset-data', { method: 'POST' }).catch(() => {});
   };
 
   const clearAllDataToEmpty = () => {
-    localStorage.setItem('bjjcron_students', JSON.stringify([]));
-    localStorage.setItem('bjjcron_teachers', JSON.stringify([]));
-    localStorage.setItem('bjjcron_classes', JSON.stringify([]));
-    localStorage.setItem('bjjcron_attendances', JSON.stringify([]));
-    localStorage.setItem('bjjcron_payments', JSON.stringify([]));
-    localStorage.setItem('bjjcron_graduations', JSON.stringify([]));
-    localStorage.setItem('bjjcron_belt_requests', JSON.stringify([]));
-    localStorage.setItem('bjjcron_training_logs', JSON.stringify([]));
-    localStorage.setItem('bjjcron_teacher_observations', JSON.stringify([]));
-    localStorage.setItem('bjjcron_notifications', JSON.stringify([]));
-
     setStudents([]);
     setTeachers([]);
     setClasses([]);
@@ -1826,12 +1102,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNotifications([]);
 
     clearAllFirestoreCollections();
-    fetch('/api/clear-all-data', { method: 'POST' }).catch(() => {});
   };
 
   const exportDatabaseJSON = () => {
     const dbPayload = {
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       academyConfig,
       students,
@@ -1854,82 +1129,114 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: 'Arquivo de backup inválido ou corrompido.' };
       }
 
-      if (data.students && Array.isArray(data.students)) setStudents(data.students);
-      if (data.teachers && Array.isArray(data.teachers)) setTeachers(data.teachers);
-      if (data.classes && Array.isArray(data.classes)) setClasses(data.classes);
-      if (data.attendances && Array.isArray(data.attendances)) setAttendances(data.attendances);
-      if (data.payments && Array.isArray(data.payments)) setPayments(data.payments);
-      if (data.graduations && Array.isArray(data.graduations)) setGraduations(data.graduations);
-      if (data.beltRequests && Array.isArray(data.beltRequests)) setBeltRequests(data.beltRequests);
-      if (data.trainingLogs && Array.isArray(data.trainingLogs)) setTrainingLogs(data.trainingLogs);
-      if (data.teacherObservations && Array.isArray(data.teacherObservations)) setTeacherObservations(data.teacherObservations);
-      if (data.academyConfig && typeof data.academyConfig === 'object') setAcademyConfig(data.academyConfig);
+      if (data.students && Array.isArray(data.students)) {
+        setStudents(data.students);
+        data.students.forEach((s: any) => saveToFirestore('students', s));
+      }
+      if (data.teachers && Array.isArray(data.teachers)) {
+        setTeachers(data.teachers);
+        data.teachers.forEach((t: any) => saveToFirestore('teachers', t));
+      }
+      if (data.classes && Array.isArray(data.classes)) {
+        setClasses(data.classes);
+        data.classes.forEach((c: any) => saveToFirestore('classes', c));
+      }
+      if (data.attendances && Array.isArray(data.attendances)) {
+        setAttendances(data.attendances);
+        data.attendances.forEach((a: any) => saveToFirestore('attendances', a));
+      }
+      if (data.payments && Array.isArray(data.payments)) {
+        setPayments(data.payments);
+        data.payments.forEach((p: any) => saveToFirestore('payments', p));
+      }
+      if (data.graduations && Array.isArray(data.graduations)) {
+        setGraduations(data.graduations);
+        data.graduations.forEach((g: any) => saveToFirestore('graduations', g));
+      }
+      if (data.beltRequests && Array.isArray(data.beltRequests)) {
+        setBeltRequests(data.beltRequests);
+        data.beltRequests.forEach((b: any) => saveToFirestore('beltRequests', b));
+      }
+      if (data.trainingLogs && Array.isArray(data.trainingLogs)) {
+        setTrainingLogs(data.trainingLogs);
+        data.trainingLogs.forEach((l: any) => saveToFirestore('trainingLogs', l));
+      }
+      if (data.teacherObservations && Array.isArray(data.teacherObservations)) {
+        setTeacherObservations(data.teacherObservations);
+        data.teacherObservations.forEach((o: any) => saveToFirestore('teacherObservations', o));
+      }
+      if (data.academyConfig && typeof data.academyConfig === 'object') {
+        setAcademyConfig(data.academyConfig);
+        saveConfigToFirestore(data.academyConfig);
+      }
 
-      return { success: true, message: 'Banco de dados restaurado com sucesso do backup!' };
+      return { success: true, message: 'Banco de dados restaurado com sucesso no Firestore!' };
     } catch (err: any) {
       return { success: false, message: `Erro ao importar arquivo: ${err.message || 'Formato JSON inválido'}` };
     }
   };
 
   return (
-    <DataContext.Provider value={{
-      students,
-      teachers,
-      classes,
-      attendances,
-      payments,
-      graduations,
-      beltRequests,
-      trainingLogs,
-      teacherObservations,
-      academyConfig,
-      notifications,
-      activeToastNotif,
-      pushPermissionStatus,
-      addNotification,
-      markNotificationAsRead,
-      markAllNotificationsAsRead,
-      deleteNotification,
-      requestPushPermission,
-      dismissToastNotif,
-      addStudent,
-      updateStudent,
-      deleteStudent,
-      promoteStudent,
-      requestBeltChange,
-      approveBeltChange,
-      rejectBeltChange,
-      addTeacher,
-      updateTeacher,
-      deleteTeacher,
-      addClass,
-      updateClass,
-      deleteClass,
-      recordAttendance,
-      removeAttendance,
-      addPayment,
-      markPaymentAsPaid,
-      addTrainingLog,
-      updateTrainingLog,
-      deleteTrainingLog,
-      addTeacherObservation,
-      updateTeacherObservation,
-      deleteTeacherObservation,
-      weeklyPositions,
-      addWeeklyPosition,
-      updateWeeklyPosition,
-      deleteWeeklyPosition,
-      toggleStudentLearnedPosition,
-      updateAcademyConfig,
-      environmentMode,
-      isHomologationMode: environmentMode === 'HOMOLOG',
-      setEnvironmentMode,
-      resetHomologationData,
-      resetToDefaultData,
-      clearAllDataToEmpty,
-      exportDatabaseJSON,
-      importDatabaseJSON,
-    }}>
+    <DataContext.Provider
+      value={{
+        students,
+        teachers,
+        classes,
+        attendances,
+        payments,
+        graduations,
+        beltRequests,
+        trainingLogs,
+        teacherObservations,
+        academyConfig,
+        notifications,
+        activeToastNotif,
+        pushPermissionStatus,
+        addNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        deleteNotification,
+        requestPushPermission,
+        dismissToastNotif,
+        addStudent,
+        updateStudent,
+        deleteStudent,
+        promoteStudent,
+        requestBeltChange,
+        approveBeltChange,
+        rejectBeltChange,
+        addTeacher,
+        updateTeacher,
+        deleteTeacher,
+        addClass,
+        updateClass,
+        deleteClass,
+        recordAttendance,
+        removeAttendance,
+        addPayment,
+        markPaymentAsPaid,
+        addTrainingLog,
+        updateTrainingLog,
+        deleteTrainingLog,
+        addTeacherObservation,
+        updateTeacherObservation,
+        deleteTeacherObservation,
+        weeklyPositions,
+        addWeeklyPosition,
+        updateWeeklyPosition,
+        deleteWeeklyPosition,
+        toggleStudentLearnedPosition,
+        updateAcademyConfig,
+        environmentMode,
+        isHomologationMode: environmentMode === 'HOMOLOG',
+        setEnvironmentMode,
+        resetHomologationData,
+        resetToDefaultData,
+        clearAllDataToEmpty,
+        exportDatabaseJSON,
+        importDatabaseJSON,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );

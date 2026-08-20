@@ -64,11 +64,8 @@ export const WeeklyFocusPositionsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
   const [selectedClassId, setSelectedClassId] = useState<string>('TODAS');
 
-  // Favorites Local State
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('bjjcron_fav_positions');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Favorites State
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
 
   // Video Modal State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -99,11 +96,7 @@ export const WeeklyFocusPositionsView: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const toggleFavorite = (id: string) => {
-    setFavoriteIds(prev => {
-      const updated = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      localStorage.setItem('bjjcron_fav_positions', JSON.stringify(updated));
-      return updated;
-    });
+    setFavoriteIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const handleOpenVideoModal = (title: string, focusText?: string, videoUrl?: string) => {

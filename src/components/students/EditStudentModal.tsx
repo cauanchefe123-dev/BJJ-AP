@@ -378,9 +378,6 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
               onChange={e => {
                 const newName = e.target.value;
                 setLinkedAcademyName(newName);
-                if (student) {
-                  localStorage.setItem(`bjjcron_student_academy_name_${student.id}`, newName);
-                }
               }}
               className="w-full bg-slate-950 border border-amber-500/50 rounded-xl p-2.5 text-slate-100 font-semibold focus:ring-2 focus:ring-amber-500 outline-none text-xs"
             >

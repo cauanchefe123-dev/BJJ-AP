@@ -54,19 +54,7 @@ export const StudentTrainingJournal: React.FC = () => {
     : (students.find(s => s.id === selectedStudentId) || resolvedStudent || (students.length > 0 ? students[0] : null));
 
   const student = activeStudent;
-  const isFakeMockLog = (l: any) => {
-    if (!l) return true;
-    if (l.id === '1' || l.id === '2' || l.id === 'log-1' || l.id === 'log-2') return true;
-    if (l.studentId === 'std-1' || l.studentId === 'std-2' || l.studentId === 'mock-std-1') return true;
-    if (l.notes === 'gostei' || l.notes === 'Oss!!!' || (typeof l.notes === 'string' && (l.notes.toLowerCase().includes('raspagem de aranha') || l.notes.toLowerCase().includes('posicionamento de calcanhar')))) return true;
-    if (Array.isArray(l.techniquesLearned) && l.techniquesLearned.some((t: string) => {
-      const lower = t.toLowerCase();
-      return lower.includes('passagem de guarda emborcando') || lower.includes('ogoshi') || lower.includes('triângulo ajustado') || lower.includes('leg lock no-gi');
-    })) return true;
-    return false;
-  };
-
-  const myLogs = activeStudent ? trainingLogs.filter(l => l.studentId === activeStudent.id && !isFakeMockLog(l)) : [];
+  const myLogs = activeStudent ? trainingLogs.filter(l => l.studentId === activeStudent.id) : [];
 
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(true);

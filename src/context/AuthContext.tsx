@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, BeltType, AgeCategory, WeightCategory, Student } from '../types';
-import { INITIAL_USERS } from '../data/mockData';
+import { INITIAL_USERS } from '../data/initialData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore } from '../lib/firebaseStore';
-import { markAsDeleted, isDeletedRecord, isTestMockRecord } from '../lib/deletionTracker';
+import { markAsDeleted, isDeletedRecord } from '../lib/deletionTracker';
 
 export interface LoginResult {
   success: boolean;
@@ -58,277 +58,63 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to ensure every student in bjjcron_students or INITIAL_STUDENTS has a corresponding User
-const getSyncedInitialUsers = (): User[] => {
-  const savedUsers = localStorage.getItem('bjjcron_users');
-  let baseUsers: User[] = savedUsers ? JSON.parse(savedUsers) : INITIAL_USERS;
-
-  // Filter out any leftover robot/test or deleted accounts
-  baseUsers = baseUsers.filter(u => 
-    !isTestMockRecord(u.id) &&
-    !isTestMockRecord(u.email) &&
-    !isTestMockRecord(u.name) &&
-    !isDeletedRecord(u.id, u.email, u.studentId)
-  );
-
-  // Ensure essential admin user (cauanchefe123@gmail.com) is present
-  const cauanAdmin = INITIAL_USERS.find(u => u.email.includes('cauanchefe123'));
-  if (cauanAdmin && !baseUsers.some(u => u.email.trim().toLowerCase() === cauanAdmin.email.trim().toLowerCase())) {
-    baseUsers.push(cauanAdmin);
-  }
-
-  // Replace unsplash avatars with DEFAULT_BLACK_GI_AVATAR
-  baseUsers = baseUsers.map(u => ({
-    ...u,
-    approvalStatus: u.approvalStatus || 'APPROVED',
-    avatarUrl: (!u.avatarUrl || u.avatarUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : u.avatarUrl
-  }));
-
-  const savedStudents = localStorage.getItem('bjjcron_students');
-  if (savedStudents) {
-    try {
-      const studentsList = JSON.parse(savedStudents);
-      let changed = false;
-      studentsList.forEach((std: any) => {
-        if (!std.email && !std.id) return;
-        if (
-          isTestMockRecord(std.id) ||
-          isTestMockRecord(std.email) ||
-          isTestMockRecord(std.name) ||
-          isTestMockRecord(std.registrationNumber) ||
-          isDeletedRecord(std.id, std.email, std.registrationNumber)
-        ) {
-          return;
-        }
-        const cleanEmail = std.email ? std.email.trim().toLowerCase() : '';
-        const cleanName = std.name ? std.name.trim().toLowerCase() : '';
-        const existingIdx = baseUsers.findIndex(u => 
-          (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail) || 
-          (cleanName && u.name && u.name.trim().toLowerCase() === cleanName) ||
-          (u.studentId && u.studentId === std.id)
-        );
-        if (existingIdx === -1) {
-          baseUsers.push({
-            id: `user-${std.id}`,
-            name: std.name,
-            email: cleanEmail,
-            role: 'ALUNO',
-            studentId: std.id,
-            phone: std.phone || '',
-            password: std.password || '123',
-            approvalStatus: std.approvalStatus || 'APPROVED',
-            isActivated: std.hasActivatedAccount !== undefined ? std.hasActivatedAccount : true,
-            avatarUrl: (std.photoUrl && !std.photoUrl.includes('unsplash.com')) ? std.photoUrl : DEFAULT_BLACK_GI_AVATAR
-          });
-          changed = true;
-        } else {
-          const existingUser = baseUsers[existingIdx];
-          if (std.approvalStatus === 'APPROVED' && existingUser.approvalStatus !== 'APPROVED') {
-            existingUser.approvalStatus = 'APPROVED';
-            existingUser.isActivated = true;
-            changed = true;
-          }
-          if (std.name && existingUser.name !== std.name) {
-            existingUser.name = std.name;
-            changed = true;
-          }
-          if (std.phone && existingUser.phone !== std.phone) {
-            existingUser.phone = std.phone;
-            changed = true;
-          }
-          if (std.photoUrl && !std.photoUrl.includes('unsplash.com') && existingUser.avatarUrl !== std.photoUrl) {
-            existingUser.avatarUrl = std.photoUrl;
-            changed = true;
-          }
-        }
-      });
-      if (changed) {
-        localStorage.setItem('bjjcron_users', JSON.stringify(baseUsers));
-      }
-    } catch (e) {
-      console.error('Error syncing students to users on load:', e);
-    }
-  }
-
-  return baseUsers;
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(getSyncedInitialUsers);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('bjjcron_current_user');
-    if (saved) {
-      try {
-        const u = JSON.parse(saved);
-        if (u && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
-          u.avatarUrl = DEFAULT_BLACK_GI_AVATAR;
-        }
-        return u;
-      } catch (e) {}
-    }
-    return null;
-  });
+  // 1. Subscribe to Firestore `users` in real-time
+  useEffect(() => {
+    const unsubUsers = subscribeFirestoreCollection<User>('users', (docs) => {
+      let list = docs
+        .filter(u => !isDeletedRecord(u.id, u.email, u.studentId))
+        .map(u => ({
+          ...u,
+          approvalStatus: u.approvalStatus || 'APPROVED',
+          avatarUrl: (!u.avatarUrl || u.avatarUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : u.avatarUrl,
+        }));
 
-  const fetchUsersFromApi = async () => {
-    try {
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setUsers(prev => {
-            const savedStudents = localStorage.getItem('bjjcron_students');
-            const savedCurr = localStorage.getItem('bjjcron_current_user');
-            let currUser: any = null;
-            if (savedCurr) { try { currUser = JSON.parse(savedCurr); } catch(e){} }
-            let merged = data;
-            try {
-              const studentsList = savedStudents ? JSON.parse(savedStudents) : [];
-              merged = data.map((u: User) => {
-                const match = studentsList.find((s: any) => 
-                  (s.id && u.studentId && s.id === u.studentId) || 
-                  (s.email && u.email && s.email.trim().toLowerCase() === u.email.trim().toLowerCase())
-                );
-                const isCurr = currUser && (
-                  currUser.id === u.id || 
-                  (currUser.email && u.email && currUser.email.trim().toLowerCase() === u.email.trim().toLowerCase())
-                );
-                const localPrev = prev.find((p: User) => p.id === u.id || (p.email && u.email && p.email.trim().toLowerCase() === u.email.trim().toLowerCase()));
-                const isApproved = u.approvalStatus === 'APPROVED' || (match && match.approvalStatus === 'APPROVED') || (localPrev && localPrev.approvalStatus === 'APPROVED') || (!u.approvalStatus && u.approvalStatus !== 'PENDING' && u.approvalStatus !== 'REJECTED');
-                const bestApproval = isApproved ? 'APPROVED' : (u.approvalStatus || (match && match.approvalStatus) || (localPrev && localPrev.approvalStatus) || 'APPROVED');
+      // Ensure Master Admin exists in Firestore if list is empty
+      const cauanAdmin = INITIAL_USERS.find(u => u.email.includes('cauanchefe123'));
+      if (cauanAdmin && !list.some(u => u.email.trim().toLowerCase() === cauanAdmin.email.trim().toLowerCase())) {
+        const cauanAdminNormalized = {
+          ...cauanAdmin,
+          approvalStatus: (cauanAdmin.approvalStatus || 'APPROVED') as 'APPROVED' | 'PENDING' | 'REJECTED',
+          avatarUrl: cauanAdmin.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+        };
+        list = [cauanAdminNormalized, ...list];
+        saveToFirestore('users', cauanAdmin);
+      }
 
-                const bestName = (isCurr && currUser.name) ? currUser.name : (localPrev && localPrev.name) ? localPrev.name : (match && match.name) ? match.name : u.name;
-                const bestPhone = (isCurr && currUser.phone) ? currUser.phone : (localPrev && localPrev.phone) ? localPrev.phone : (match && match.phone) ? match.phone : u.phone;
-                const bestPhoto = (isCurr && currUser.avatarUrl) ? currUser.avatarUrl : (localPrev && localPrev.avatarUrl) ? localPrev.avatarUrl : (match && match.photoUrl && !match.photoUrl.includes('unsplash.com')) ? match.photoUrl : u.avatarUrl;
+      setUsers(list);
 
-                return {
-                  ...u,
-                  approvalStatus: bestApproval,
-                  isActivated: bestApproval === 'APPROVED' ? true : u.isActivated,
-                  name: bestName,
-                  phone: bestPhone,
-                  avatarUrl: bestPhoto
-                };
-              });
-            } catch (e) {}
+      // Reconcile active session user from sessionStorage
+      const sessionUid = sessionStorage.getItem('bjjcron_auth_uid');
+      const sessionEmail = sessionStorage.getItem('bjjcron_auth_email');
 
-            const isDiff = JSON.stringify(prev) !== JSON.stringify(merged);
-            if (isDiff) {
-              localStorage.setItem('bjjcron_users', JSON.stringify(merged));
-            }
-            return isDiff ? merged : prev;
-          });
+      if (sessionUid || sessionEmail) {
+        const found = list.find(u => 
+          (sessionUid && u.id === sessionUid) || 
+          (sessionEmail && u.email && u.email.trim().toLowerCase() === sessionEmail.trim().toLowerCase())
+        );
+        if (found) {
+          setCurrentUser(found);
         }
       }
-    } catch (e) {
-      // Offline fallback
-    }
-  };
-
-  useEffect(() => {
-    localStorage.setItem('bjjcron_users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    fetchUsersFromApi();
-
-    const unsubFirestoreUsers = subscribeFirestoreCollection<User>('users', (cloudUsers) => {
-      if (!cloudUsers || cloudUsers.length === 0) return;
-      
-      const validCloudUsers = cloudUsers.filter((u: User) => 
-        !isTestMockRecord(u.id) &&
-        !isTestMockRecord(u.email) &&
-        !isTestMockRecord(u.name) &&
-        !isDeletedRecord(u.id, u.email, u.studentId)
-      ).map((u: User) => ({
-        ...u,
-        approvalStatus: u.approvalStatus || 'APPROVED',
-        isActivated: u.approvalStatus === 'APPROVED' ? true : (u.isActivated ?? true),
-        avatarUrl: (u.avatarUrl && !u.avatarUrl.includes('unsplash.com')) ? u.avatarUrl : DEFAULT_BLACK_GI_AVATAR
-      }));
-
-      setUsers(prev => {
-        const merged: User[] = [...validCloudUsers];
-        // Keep any transient user that hasn't synced yet
-        prev.forEach(localU => {
-          if (!merged.some(m => m.id === localU.id || (m.email && localU.email && m.email.trim().toLowerCase() === localU.email.trim().toLowerCase()))) {
-            merged.push(localU);
-          }
-        });
-        localStorage.setItem('bjjcron_users', JSON.stringify(merged));
-        return merged;
-      });
-
-      // Synchronize active currentUser if their profile was updated in cloud
-      setCurrentUser(prevCurr => {
-        if (!prevCurr) return prevCurr;
-        const cleanCurrEmail = prevCurr.email ? prevCurr.email.trim().toLowerCase() : '';
-        const matchingCloud = validCloudUsers.find(cu => 
-          cu.id === prevCurr.id || 
-          (cleanCurrEmail && cu.email && cu.email.trim().toLowerCase() === cleanCurrEmail) ||
-          (prevCurr.studentId && cu.studentId && cu.studentId === prevCurr.studentId)
-        );
-        if (matchingCloud) {
-          const updatedCurr: User = {
-            ...prevCurr,
-            ...matchingCloud,
-            name: matchingCloud.name || prevCurr.name,
-            phone: matchingCloud.phone !== undefined ? matchingCloud.phone : prevCurr.phone,
-            avatarUrl: matchingCloud.avatarUrl || prevCurr.avatarUrl
-          };
-          localStorage.setItem('bjjcron_current_user', JSON.stringify(updatedCurr));
-          return updatedCurr;
-        }
-        return prevCurr;
-      });
     });
 
-    const syncFromStorage = () => {
-      fetchUsersFromApi();
-    };
-    window.addEventListener('storage', syncFromStorage);
-    window.addEventListener('bjjcron_env_changed', syncFromStorage);
+    const unsubStudents = subscribeFirestoreCollection<Student>('students', (docs) => {
+      setStudents(docs);
+    });
+
     return () => {
-      unsubFirestoreUsers();
-      window.removeEventListener('storage', syncFromStorage);
-      window.removeEventListener('bjjcron_env_changed', syncFromStorage);
+      unsubUsers();
+      unsubStudents();
     };
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('bjjcron_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('bjjcron_current_user');
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser) {
-      const updatedUser = users.find(u => 
-        u.id === currentUser.id || 
-        (u.studentId && currentUser.studentId && u.studentId === currentUser.studentId) || 
-        (u.email && currentUser.email && u.email.trim().toLowerCase() === currentUser.email.trim().toLowerCase())
-      );
-      if (updatedUser) {
-        if (
-          updatedUser.name !== currentUser.name ||
-          updatedUser.email !== currentUser.email ||
-          updatedUser.phone !== currentUser.phone ||
-          updatedUser.avatarUrl !== currentUser.avatarUrl ||
-          updatedUser.approvalStatus !== currentUser.approvalStatus
-        ) {
-          setCurrentUser(updatedUser);
-        }
-      }
-    }
-  }, [users]);
-
   const refreshUsersFromStorage = () => {
-    const saved = localStorage.getItem('bjjcron_users');
-    if (saved) {
-      setUsers(JSON.parse(saved));
-    }
+    // Pure cloud mode: real-time listeners are active automatically
   };
 
   const loginWithPassword = async (email: string, password?: string): Promise<LoginResult> => {
@@ -336,131 +122,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!cleanEmail) {
       return {
         success: false,
-        reason: 'NOT_FOUND',
-        message: 'Por favor, informe seu e-mail cadastrado.'
+        reason: 'INVALID_CREDENTIALS',
+        message: 'Por favor, informe seu e-mail de acesso.'
       };
     }
 
-    // Try backend /api/auth/login first for Postgres accuracy
-    try {
-      const resp = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: password || '' })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success && data.user) {
-          const u: User = data.user;
-          u.isActivated = true;
-          setCurrentUser(u);
+    let found = users.find(u => u.email.trim().toLowerCase() === cleanEmail);
 
-          // Update users state list
-          setUsers(prev => {
-            const next = prev.map(existing => existing.email.trim().toLowerCase() === cleanEmail ? u : existing);
-            if (!next.some(existing => existing.email.trim().toLowerCase() === cleanEmail)) {
-              next.push(u);
-            }
-            localStorage.setItem('bjjcron_users', JSON.stringify(next));
-            return next;
-          });
-          window.dispatchEvent(new Event('bjjcron_users_updated'));
-          return {
-            success: true,
-            user: u,
-            message: data.message || `Bem-vindo(a) de volta, ${u.name}!`
-          };
-        } else if (data.reason === 'WRONG_PASSWORD') {
-          return {
-            success: false,
-            reason: 'WRONG_PASSWORD',
-            message: data.message || 'Senha incorreta. Verifique sua senha e tente novamente.'
-          };
-        } else if (data.reason === 'NOT_FOUND') {
-          return {
-            success: false,
-            reason: 'NOT_FOUND',
-            message: data.message || 'E-mail não cadastrado! Por favor, solicite seu cadastro ao Mestre ou crie uma conta.'
-          };
-        }
-      }
-    } catch (e) {
-      console.warn('Backend login fallback to local memory check:', e);
-    }
-
-    let currentUsers = [...users];
-    const savedUsers = localStorage.getItem('bjjcron_users');
-    if (savedUsers) {
-      try {
-        const parsed: User[] = JSON.parse(savedUsers);
-        parsed.forEach(u => {
-          if (!currentUsers.some(c => c.id === u.id || c.email.trim().toLowerCase() === u.email.trim().toLowerCase())) {
-            currentUsers.push(u);
-          }
-        });
-      } catch (e) {}
-    }
-
-    let found = currentUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
-
-    // If not found in current users array, check bjjcron_students dynamically
+    // If not found in users state, check Firestore students collection
     if (!found) {
-      const savedStudents = localStorage.getItem('bjjcron_students');
-      if (savedStudents) {
-        try {
-          const studentsList = JSON.parse(savedStudents);
-          const studentObj = studentsList.find((s: any) => s.email && s.email.trim().toLowerCase() === cleanEmail);
-          if (studentObj) {
-            const newUser: User = {
-              id: `user-${studentObj.id}`,
-              name: studentObj.name,
-              email: cleanEmail,
-              role: 'ALUNO',
-              studentId: studentObj.id,
-              phone: studentObj.phone || '',
-              password: password || studentObj.password || '123',
-              approvalStatus: 'APPROVED',
-              isActivated: true,
-              avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com')) ? studentObj.photoUrl : DEFAULT_BLACK_GI_AVATAR
-            };
-            found = newUser;
-            currentUsers.push(newUser);
-            setUsers(currentUsers);
-            localStorage.setItem('bjjcron_users', JSON.stringify(currentUsers));
-          }
-        } catch (e) {
-          console.error('Error finding student in localStorage:', e);
-        }
-      }
-    }
-
-    // If not found in students, check bjjcron_teachers dynamically
-    if (!found) {
-      const savedTeachers = localStorage.getItem('bjjcron_teachers');
-      if (savedTeachers) {
-        try {
-          const teachersList = JSON.parse(savedTeachers);
-          const teacherObj = teachersList.find((t: any) => t.email && t.email.trim().toLowerCase() === cleanEmail);
-          if (teacherObj) {
-            const newUser: User = {
-              id: `user-${teacherObj.id}`,
-              name: teacherObj.name,
-              email: cleanEmail,
-              role: 'PROFESSOR',
-              phone: teacherObj.phone || '',
-              password: password || teacherObj.password || '123',
-              approvalStatus: 'APPROVED',
-              isActivated: true,
-              avatarUrl: (teacherObj.avatarUrl && !teacherObj.avatarUrl.includes('unsplash.com')) ? teacherObj.avatarUrl : DEFAULT_BLACK_GI_AVATAR
-            };
-            found = newUser;
-            currentUsers.push(newUser);
-            setUsers(currentUsers);
-            localStorage.setItem('bjjcron_users', JSON.stringify(currentUsers));
-          }
-        } catch (e) {
-          console.error('Error finding teacher in localStorage:', e);
-        }
+      const studentObj = students.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
+      if (studentObj) {
+        const newUser: User = {
+          id: `user-${studentObj.id}`,
+          name: studentObj.name,
+          email: cleanEmail,
+          role: 'ALUNO',
+          studentId: studentObj.id,
+          phone: studentObj.phone || '',
+          password: password || studentObj.password || '123',
+          approvalStatus: studentObj.approvalStatus || 'APPROVED',
+          isActivated: true,
+          avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com')) ? studentObj.photoUrl : DEFAULT_BLACK_GI_AVATAR
+        };
+        found = newUser;
+        setUsers(prev => [newUser, ...prev]);
+        saveToFirestore('users', newUser);
       }
     }
 
@@ -483,9 +170,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     found.isActivated = true;
     if (password) {
       found.password = password;
+      saveToFirestore('users', found);
     }
 
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
+    try {
+      sessionStorage.setItem('bjjcron_auth_uid', found.id);
+      sessionStorage.setItem('bjjcron_auth_email', found.email);
+    } catch (e) {}
+
     setCurrentUser(found);
     return {
       success: true,
@@ -503,108 +195,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Tenta ativar também no backend Postgres de forma assíncrona/imediata
-    fetch('/api/auth/first-access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, newPassword: newPassword || '123' })
-    }).then(res => res.json()).then(data => {
-      if (data && data.success && data.user) {
-        // Recarrega lista de usuários do backend para manter sincronizado
-        fetch('/api/users')
-          .then(r => r.json())
-          .then(list => {
-            if (Array.isArray(list)) {
-              setUsers(list);
-              localStorage.setItem('bjjcron_users', JSON.stringify(list));
-              window.dispatchEvent(new Event('bjjcron_users_updated'));
-            }
-          })
-          .catch(() => {});
-      }
-    }).catch(() => {});
+    let targetUser = users.find(u => u.email.trim().toLowerCase() === cleanEmail);
 
-    let currentUsers = [...users];
-    const savedUsers = localStorage.getItem('bjjcron_users');
-    if (savedUsers) {
-      try {
-        const parsed: User[] = JSON.parse(savedUsers);
-        parsed.forEach(u => {
-          if (!currentUsers.some(c => c.id === u.id || c.email.trim().toLowerCase() === u.email.trim().toLowerCase())) {
-            currentUsers.push(u);
-          }
-        });
-      } catch (e) {}
-    }
-
-    let userIndex = currentUsers.findIndex(u => u.email.trim().toLowerCase() === cleanEmail);
-
-    // If not found in users state, check bjjcron_students dynamically
-    if (userIndex === -1) {
-      const savedStudents = localStorage.getItem('bjjcron_students');
-      if (savedStudents) {
-        try {
-          const studentsList = JSON.parse(savedStudents);
-          const studentObj = studentsList.find((s: any) => s.email && s.email.trim().toLowerCase() === cleanEmail);
-          if (studentObj) {
-            const newUser: User = {
-              id: `user-${studentObj.id}`,
-              name: studentObj.name,
-              email: cleanEmail,
-              role: 'ALUNO',
-              studentId: studentObj.id,
-              phone: studentObj.phone || '',
-              password: newPassword || '123',
-              approvalStatus: 'APPROVED',
-              isActivated: true,
-              avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com')) ? studentObj.photoUrl : DEFAULT_BLACK_GI_AVATAR
-            };
-            currentUsers.push(newUser);
-            userIndex = currentUsers.length - 1;
-          }
-        } catch (e) {
-          console.error('Error finding student for first access:', e);
-        }
+    if (!targetUser) {
+      const studentObj = students.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
+      if (studentObj) {
+        targetUser = {
+          id: `user-${studentObj.id}`,
+          name: studentObj.name,
+          email: cleanEmail,
+          role: 'ALUNO',
+          studentId: studentObj.id,
+          phone: studentObj.phone || '',
+          password: newPassword || studentObj.password || '123',
+          approvalStatus: 'APPROVED',
+          isActivated: true,
+          avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com')) ? studentObj.photoUrl : DEFAULT_BLACK_GI_AVATAR
+        };
       }
     }
 
-    // If not found in students, check bjjcron_teachers dynamically
-    if (userIndex === -1) {
-      const savedTeachers = localStorage.getItem('bjjcron_teachers');
-      if (savedTeachers) {
-        try {
-          const teachersList = JSON.parse(savedTeachers);
-          const teacherObj = teachersList.find((t: any) => t.email && t.email.trim().toLowerCase() === cleanEmail);
-          if (teacherObj) {
-            const newUser: User = {
-              id: `user-${teacherObj.id}`,
-              name: teacherObj.name,
-              email: cleanEmail,
-              role: 'PROFESSOR',
-              phone: teacherObj.phone || '',
-              password: newPassword || teacherObj.password || '123',
-              approvalStatus: 'APPROVED',
-              isActivated: true,
-              avatarUrl: (teacherObj.avatarUrl && !teacherObj.avatarUrl.includes('unsplash.com')) ? teacherObj.avatarUrl : DEFAULT_BLACK_GI_AVATAR
-            };
-            currentUsers.push(newUser);
-            userIndex = currentUsers.length - 1;
-          }
-        } catch (e) {
-          console.error('Error finding teacher for first access:', e);
-        }
-      }
-    }
-
-    // Do not allow auto-creation of accounts; user must be registered beforehand
-    if (userIndex === -1) {
+    if (!targetUser) {
       return {
         success: false,
         message: 'E-mail não cadastrado no sistema! Por favor, realize o seu cadastro antes de acessar sua conta.'
       };
     }
-
-    const targetUser = currentUsers[userIndex];
 
     const updatedUser: User = {
       ...targetUser,
@@ -613,29 +229,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       approvalStatus: 'APPROVED',
     };
 
-    currentUsers[userIndex] = updatedUser;
-    setUsers(currentUsers);
-    localStorage.setItem('bjjcron_users', JSON.stringify(currentUsers));
+    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    saveToFirestore('users', updatedUser);
 
-    // Also activate matching student in bjjcron_students
-    const savedStudents = localStorage.getItem('bjjcron_students');
-    if (savedStudents) {
-      try {
-        const studentsList = JSON.parse(savedStudents);
-        const studentIdx = studentsList.findIndex((s: any) => s.email && s.email.trim().toLowerCase() === cleanEmail);
-        if (studentIdx !== -1) {
-          studentsList[studentIdx].hasActivatedAccount = true;
-          studentsList[studentIdx].approvalStatus = 'APPROVED';
-          studentsList[studentIdx].password = newPassword || '123';
-          studentsList[studentIdx].active = true;
-          localStorage.setItem('bjjcron_students', JSON.stringify(studentsList));
-        }
-      } catch (e) {
-        console.error('Error activating student in bjjcron_students:', e);
+    if (updatedUser.studentId) {
+      const matchStd = students.find(s => s.id === updatedUser.studentId);
+      if (matchStd) {
+        saveToFirestore('students', {
+          ...matchStd,
+          hasActivatedAccount: true,
+          approvalStatus: 'APPROVED',
+          password: newPassword || '123',
+          active: true,
+          updatedAt: new Date().toISOString()
+        });
       }
     }
 
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
+    try {
+      sessionStorage.setItem('bjjcron_auth_uid', updatedUser.id);
+      sessionStorage.setItem('bjjcron_auth_email', updatedUser.email);
+    } catch (e) {}
+
     setCurrentUser(updatedUser);
 
     return {
@@ -658,14 +273,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (users.some(u => u.email.trim().toLowerCase() === cleanEmail)) {
       return {
         success: false,
-        message: 'Este e-mail já possui cadastro no sistema! Para usar o mesmo e-mail em outro perfil (Mestre, Professor ou Aluno), você precisa excluir os dados da conta atual primeiro clicando em "Excluir Conta & Recadastrar".'
+        message: 'Este e-mail já possui cadastro no sistema! Se esqueceu a senha, utilize a opção "Esqueci minha senha".'
       };
     }
 
     const newStudentId = `std-self-${Date.now()}`;
     const newUserId = `user-self-${Date.now()}`;
 
-    // Create User with APPROVED status so student has instant access
     const newUser: User = {
       id: newUserId,
       name: studentData.name,
@@ -679,25 +293,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: DEFAULT_BLACK_GI_AVATAR
     };
 
-    setUsers(prev => [...prev, newUser]);
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
-    saveToFirestore('users', newUser);
-    fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser)
-    }).then(() => {
-      window.dispatchEvent(new Event('bjjcron_users_updated'));
-    }).catch(() => {});
-
-    // Create Student in bjjcron_students
-    const savedStudents = localStorage.getItem('bjjcron_students');
-    const studentsList = savedStudents ? JSON.parse(savedStudents) : [];
-
-    const newStudentObj = {
+    const newStudentObj: Student = {
       id: newStudentId,
-      registrationNumber: `BJJ-2026-${String(studentsList.length + 1).padStart(3, '0')}`,
+      registrationNumber: `BJJ-2026-${String(students.length + 1).padStart(3, '0')}`,
       name: studentData.name,
       email: cleanEmail,
       phone: studentData.phone,
@@ -719,20 +317,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       approvalStatus: 'PENDING',
       notes: 'Nova solicitação de matrícula aguardando aprovação na equipe.',
       hasActivatedAccount: true,
-      password: studentData.password
+      password: studentData.password,
+      updatedAt: new Date().toISOString()
     };
 
-    const filteredStudents = studentsList.filter((s: any) => s.email && s.email.trim().toLowerCase() !== cleanEmail);
-    filteredStudents.unshift(newStudentObj);
-    localStorage.setItem('bjjcron_students', JSON.stringify(filteredStudents));
-    saveToFirestore('students', newStudentObj);
-    fetch('/api/students', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newStudentObj)
-    }).catch(() => {});
+    setUsers(prev => [newUser, ...prev]);
+    setStudents(prev => [newStudentObj, ...prev]);
 
-    // Create a real-time notification in Firestore so all Teachers & Admins see the request immediately
+    saveToFirestore('users', newUser);
+    saveToFirestore('students', newStudentObj);
+
+    // Create real-time notification in Firestore
     const notifObj = {
       id: `notif-reg-${Date.now()}`,
       title: '🥋 Nova Solicitação de Matrícula',
@@ -742,15 +337,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       readBy: []
     };
     saveToFirestore('notifications', notifObj);
+
     try {
-      const savedNotifs = localStorage.getItem('bjjcron_notifications');
-      const notifsList = savedNotifs ? JSON.parse(savedNotifs) : [];
-      notifsList.unshift(notifObj);
-      localStorage.setItem('bjjcron_notifications', JSON.stringify(notifsList));
+      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
+      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
     } catch (e) {}
 
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
     setCurrentUser(newUser);
 
     return {
@@ -773,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (users.some(u => u.email.trim().toLowerCase() === cleanEmail)) {
       return {
         success: false,
-        message: 'Este e-mail já possui cadastro no sistema! Para usar o mesmo e-mail em outro perfil (Mestre, Professor ou Aluno), você precisa excluir os dados da conta atual primeiro clicando em "Excluir Conta & Recadastrar".'
+        message: 'Este e-mail já possui cadastro no sistema!'
       };
     }
 
@@ -793,22 +385,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: DEFAULT_BLACK_GI_AVATAR
     };
 
-    setUsers(prev => [...prev, newUser]);
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
-    saveToFirestore('users', newUser);
-    fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser)
-    }).then(() => {
-      window.dispatchEvent(new Event('bjjcron_users_updated'));
-    }).catch(() => {});
-
-    // Add to teachers list
-    const savedTeachers = localStorage.getItem('bjjcron_teachers');
-    const teachersList = savedTeachers ? JSON.parse(savedTeachers) : [];
-
     const newTeacherObj = {
       id: newTeacherId,
       name: teacherData.name,
@@ -818,12 +394,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       degrees: teacherData.degrees || 1,
       specialty: teacherData.specialty || 'Jiu-Jitsu / No-Gi',
       activeClassesCount: 2,
-      avatarUrl: newUser.avatarUrl
+      avatarUrl: newUser.avatarUrl,
+      active: true
     };
-    teachersList.push(newTeacherObj);
+
+    setUsers(prev => [newUser, ...prev]);
+    saveToFirestore('users', newUser);
     saveToFirestore('teachers', newTeacherObj);
 
-    localStorage.setItem('bjjcron_teachers', JSON.stringify(teachersList));
+    try {
+      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
+      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
+    } catch (e) {}
+
     setCurrentUser(newUser);
 
     return {
@@ -845,7 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (users.some(u => u.email.trim().toLowerCase() === cleanEmail)) {
       return {
         success: false,
-        message: 'Este e-mail já possui cadastro no sistema! Para usar o mesmo e-mail em outro perfil (Mestre, Professor ou Aluno), você precisa excluir os dados da conta atual primeiro clicando em "Excluir Conta & Recadastrar".'
+        message: 'Este e-mail já possui cadastro no sistema!'
       };
     }
 
@@ -863,31 +446,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: DEFAULT_BLACK_GI_AVATAR
     };
 
-    setUsers(prev => [...prev, newUser]);
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
-    fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser)
-    }).then(() => {
-      window.dispatchEvent(new Event('bjjcron_users_updated'));
-    }).catch(() => {});
+    setUsers(prev => [newUser, ...prev]);
+    saveToFirestore('users', newUser);
 
-    // Save Academy Config
     if (adminData.academyName) {
-      const savedConfig = localStorage.getItem('bjjcron_academy_config');
-      const currentConfig = savedConfig ? JSON.parse(savedConfig) : {};
-      const updatedConfig = {
-        ...currentConfig,
+      saveToFirestore('config', {
+        id: 'academyConfig',
         name: adminData.academyName,
         fantasyName: adminData.academyName,
         ownerName: adminData.name,
         contactEmail: cleanEmail,
         contactPhone: adminData.phone
-      };
-      localStorage.setItem('bjjcron_academy_config', JSON.stringify(updatedConfig));
+      });
     }
+
+    try {
+      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
+      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
+    } catch (e) {}
 
     setCurrentUser(newUser);
 
@@ -901,113 +477,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanId = identifier.trim().toLowerCase();
     let approvedUserObj: User | null = null;
 
-    // 1. Update Users in React state, Firestore, localStorage, and API
-    setUsers(prev => {
-      const updatedList = prev.map(u => {
+    // 1. Update Users in Firestore and local state
+    setUsers(prev =>
+      prev.map(u => {
         if (
           u.id === identifier || 
           u.studentId === identifier || 
           (u.email && u.email.trim().toLowerCase() === cleanId) ||
           (u.studentId && u.studentId.trim().toLowerCase() === cleanId)
         ) {
-          const updatedUser = { ...u, approvalStatus: 'APPROVED' as const, isActivated: true };
+          const updatedUser: User = { ...u, approvalStatus: 'APPROVED', isActivated: true };
           approvedUserObj = updatedUser;
           saveToFirestore('users', updatedUser);
-          fetch(`/api/users/${encodeURIComponent(u.id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ approvalStatus: 'APPROVED', isActivated: true })
-          }).catch(() => {});
           return updatedUser;
         }
         return u;
-      });
-      localStorage.setItem('bjjcron_users', JSON.stringify(updatedList));
-      return updatedList;
-    });
+      })
+    );
 
-    // 2. Update or Create Student in localStorage, Firestore, and API
-    try {
-      const savedStudents = localStorage.getItem('bjjcron_students');
-      const studentsList: any[] = savedStudents ? JSON.parse(savedStudents) : [];
-      let foundStudent = false;
-
-      const updatedStudents = studentsList.map((s: any) => {
+    // 2. Update Student in Firestore and local state
+    let studentUpdated = false;
+    setStudents(prev =>
+      prev.map(s => {
         if (
           s.id === identifier || 
           (s.email && s.email.trim().toLowerCase() === cleanId) ||
           (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
         ) {
-          foundStudent = true;
-          const updatedSt = { ...s, approvalStatus: 'APPROVED', active: true, updatedAt: new Date().toISOString() };
+          studentUpdated = true;
+          const updatedSt: Student = { ...s, approvalStatus: 'APPROVED', active: true, updatedAt: new Date().toISOString() };
           saveToFirestore('students', updatedSt);
           return updatedSt;
         }
         return s;
-      });
+      })
+    );
 
-      // If student was not yet in studentsList, synthesize full student object from the approved user
-      if (!foundStudent) {
-        const u = approvedUserObj || users.find(usr => usr.id === identifier || usr.studentId === identifier || (usr.email && usr.email.trim().toLowerCase() === cleanId));
-        if (u) {
-          const newStObj: Student = {
-            id: u.studentId || u.id,
-            registrationNumber: (u.studentId && u.studentId.startsWith('BJJ-')) ? u.studentId : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-            name: u.name,
-            email: u.email,
-            phone: u.phone || '',
-            birthDate: '2000-01-01',
-            photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
-            belt: 'BRANCA',
-            stripes: 0,
-            startDate: new Date().toISOString().split('T')[0],
-            totalClassesAttended: 0,
-            classesSinceLastGraduation: 0,
-            weightCategory: 'MÉDIO',
-            ageCategory: 'ADULTO',
-            active: true,
-            planName: 'Plano Mensal Padrão',
-            planPrice: 240,
-            paymentDueDateDay: 10,
-            paymentStatus: 'PAGO',
-            qrCodeToken: `BJJCRON-${u.id}`,
-            approvalStatus: 'APPROVED',
-            notes: 'Atleta aprovado na equipe.',
-            hasActivatedAccount: true,
-            updatedAt: new Date().toISOString()
-          };
-          updatedStudents.unshift(newStObj);
-          saveToFirestore('students', newStObj);
-        }
+    // If student was not found in students list, synthesize student document in Firestore
+    if (!studentUpdated) {
+      const u = approvedUserObj || users.find(usr => usr.id === identifier || usr.studentId === identifier || (usr.email && usr.email.trim().toLowerCase() === cleanId));
+      if (u) {
+        const newStObj: Student = {
+          id: u.studentId || u.id,
+          registrationNumber: (u.studentId && u.studentId.startsWith('BJJ-')) ? u.studentId : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '',
+          birthDate: '2000-01-01',
+          photoUrl: u.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+          belt: 'BRANCA',
+          stripes: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          totalClassesAttended: 0,
+          classesSinceLastGraduation: 0,
+          weightCategory: 'MÉDIO',
+          ageCategory: 'ADULTO',
+          active: true,
+          planName: 'Plano Mensal Padrão',
+          planPrice: 240,
+          paymentDueDateDay: 10,
+          paymentStatus: 'PAGO',
+          qrCodeToken: `BJJCRON-${u.id}`,
+          approvalStatus: 'APPROVED',
+          notes: 'Atleta aprovado na equipe.',
+          hasActivatedAccount: true,
+          updatedAt: new Date().toISOString()
+        };
+        setStudents(prev => [newStObj, ...prev]);
+        saveToFirestore('students', newStObj);
       }
-
-      localStorage.setItem('bjjcron_students', JSON.stringify(updatedStudents));
-    } catch (e) {
-      console.error('Error updating students in approveUser:', e);
     }
-
-    fetch('/api/students/' + encodeURIComponent(identifier), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approvalStatus: 'APPROVED', active: true })
-    }).catch(() => {});
-
-    fetch('/api/users/' + encodeURIComponent(identifier), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approvalStatus: 'APPROVED', isActivated: true })
-    }).catch(() => {});
-
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
   };
 
   const rejectUser = (identifier: string) => {
     const cleanId = identifier.trim().toLowerCase();
-
     markAsDeleted(identifier, cleanId);
 
-    // Purge matching users and student IDs from Firestore and mark deleted
+    // Remove from Firestore
     users.forEach(u => {
       if (
         u.id === identifier || 
@@ -1020,7 +566,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // 1. Delete from Firestore Cloud DB immediately
     removeFromFirestore('users', identifier);
     removeFromFirestore('students', identifier);
     if (cleanId) {
@@ -1028,53 +573,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeFromFirestore('students', cleanId);
     }
 
-    // 2. Filter out from Users state
     setUsers(prev => prev.filter(u => 
       u.id !== identifier && 
       u.studentId !== identifier && 
-      (!u.email || u.email.toLowerCase() !== cleanId) &&
-      !isDeletedRecord(u.id, u.email, u.studentId)
+      (!u.email || u.email.toLowerCase() !== cleanId)
     ));
-
-    // 3. Remove from localStorage bjjcron_users
-    try {
-      const savedUsers = localStorage.getItem('bjjcron_users');
-      if (savedUsers) {
-        const usersList = JSON.parse(savedUsers);
-        const updated = usersList.filter((u: any) => 
-          u.id !== identifier && 
-          u.studentId !== identifier && 
-          (!u.email || u.email.toLowerCase() !== cleanId) &&
-          !isDeletedRecord(u.id, u.email, u.studentId)
-        );
-        localStorage.setItem('bjjcron_users', JSON.stringify(updated));
-      }
-    } catch (e) {}
-
-    // 4. Remove from localStorage bjjcron_students
-    try {
-      const savedStudents = localStorage.getItem('bjjcron_students');
-      if (savedStudents) {
-        const studentsList = JSON.parse(savedStudents);
-        const updated = studentsList.filter((s: any) => 
-          s.id !== identifier && 
-          (!s.email || s.email.toLowerCase() !== cleanId) &&
-          !isDeletedRecord(s.id, s.email, s.registrationNumber)
-        );
-        localStorage.setItem('bjjcron_students', JSON.stringify(updated));
-      }
-    } catch (e) {}
-
-    fetch('/api/students/' + encodeURIComponent(identifier), { method: 'DELETE' }).catch(() => {});
-    fetch('/api/users/' + encodeURIComponent(identifier), { method: 'DELETE' }).catch(() => {});
-
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
+    setStudents(prev => prev.filter(s => 
+      s.id !== identifier && 
+      (!s.email || s.email.toLowerCase() !== cleanId)
+    ));
   };
 
   const switchRole = (role: UserRole) => {
     const target = users.find(u => u.role === role && u.approvalStatus !== 'PENDING' && u.approvalStatus !== 'REJECTED');
     if (target) {
+      try {
+        sessionStorage.setItem('bjjcron_auth_uid', target.id);
+        sessionStorage.setItem('bjjcron_auth_email', target.email);
+      } catch (e) {}
       setCurrentUser(target);
     }
   };
@@ -1082,11 +598,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const switchUser = (userId: string) => {
     const target = users.find(u => u.id === userId);
     if (target) {
+      try {
+        sessionStorage.setItem('bjjcron_auth_uid', target.id);
+        sessionStorage.setItem('bjjcron_auth_email', target.email);
+      } catch (e) {}
       setCurrentUser(target);
     }
   };
 
   const logout = () => {
+    try {
+      sessionStorage.removeItem('bjjcron_auth_uid');
+      sessionStorage.removeItem('bjjcron_auth_email');
+    } catch (e) {}
     setCurrentUser(null);
   };
 
@@ -1096,53 +620,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const cleanEmail = currentUser.email.trim().toLowerCase();
 
-    // 1. Remove from users list
-    const remainingUsers = users.filter(u => u.email.trim().toLowerCase() !== cleanEmail && u.id !== currentUser.id);
-    setUsers(remainingUsers);
-    localStorage.setItem('bjjcron_users', JSON.stringify(remainingUsers));
-
-    // 2. Remove from students list
-    const savedStudents = localStorage.getItem('bjjcron_students');
-    if (savedStudents) {
-      try {
-        const studentsList = JSON.parse(savedStudents);
-        const remainingStudents = studentsList.filter((s: any) => 
-          s.id !== currentUser.studentId && 
-          (!s.email || s.email.trim().toLowerCase() !== cleanEmail)
-        );
-        localStorage.setItem('bjjcron_students', JSON.stringify(remainingStudents));
-      } catch (e) {}
-    }
-
-    // 3. Remove from teachers list
-    const savedTeachers = localStorage.getItem('bjjcron_teachers');
-    if (savedTeachers) {
-      try {
-        const teachersList = JSON.parse(savedTeachers);
-        const remainingTeachers = teachersList.filter((t: any) => 
-          t.id !== currentUser.studentId && 
-          (!t.email || t.email.trim().toLowerCase() !== cleanEmail)
-        );
-        localStorage.setItem('bjjcron_teachers', JSON.stringify(remainingTeachers));
-      } catch (e) {}
-    }
-
-    fetch(`/api/users/${encodeURIComponent(currentUser.id)}`, { method: 'DELETE' }).catch(() => {});
+    removeFromFirestore('users', currentUser.id);
     if (currentUser.studentId) {
-      fetch(`/api/students/${encodeURIComponent(currentUser.studentId)}`, { method: 'DELETE' }).catch(() => {});
-      fetch(`/api/teachers/${encodeURIComponent(currentUser.studentId)}`, { method: 'DELETE' }).catch(() => {});
+      removeFromFirestore('students', currentUser.studentId);
+      removeFromFirestore('teachers', currentUser.studentId);
     }
 
-    // 4. Logout current user
-    setCurrentUser(null);
-    localStorage.removeItem('bjjcron_current_user');
+    setUsers(prev => prev.filter(u => u.id !== currentUser.id && (!cleanEmail || !u.email || u.email.trim().toLowerCase() !== cleanEmail)));
+    setStudents(prev => prev.filter(s => s.id !== currentUser.studentId && (!cleanEmail || !s.email || s.email.trim().toLowerCase() !== cleanEmail)));
 
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
+    logout();
 
     return {
       success: true,
-      message: 'Conta excluída com sucesso! Agora você pode criar um novo cadastro (como Mestre, Professor ou Aluno) usando o mesmo e-mail.'
+      message: 'Conta excluída com sucesso!'
     };
   };
 
@@ -1156,12 +647,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`=========================================`);
-    console.log(`📧 [E-MAIL DE RECUPERAÇÃO BJJCRON]`);
-    console.log(`Para: ${foundUser.email} (${foundUser.name})`);
-    console.log(`Assunto: Seu código de recuperação de senha`);
-    console.log(`Código de segurança: ${generatedCode}`);
-    console.log(`=========================================`);
 
     fetch('/api/auth/recover-password', {
       method: 'POST',
@@ -1196,27 +681,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const updatedUsers = users.map(u => {
-      if (u.email.trim().toLowerCase() === cleanEmail) {
-        return {
-          ...u,
-          password: newPassword,
-          isActivated: true
-        };
-      }
-      return u;
-    });
-
-    setUsers(updatedUsers);
-    localStorage.setItem('bjjcron_users', JSON.stringify(updatedUsers));
-
-    const targetUser = updatedUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
+    const targetUser = users.find(u => u.email.trim().toLowerCase() === cleanEmail);
     if (targetUser) {
-      fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(targetUser)
-      }).catch(() => {});
+      const updatedUser: User = {
+        ...targetUser,
+        password: newPassword,
+        isActivated: true
+      };
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      saveToFirestore('users', updatedUser);
     }
 
     return {
@@ -1237,10 +710,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: updates.avatarUrl || currentUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR
     };
 
-    // 1. Direct write to Firestore users collection
+    // Save directly to Firestore users collection
     await saveToFirestore('users', updatedUser);
 
-    // 2. Direct write to Firestore students collection if ALUNO
+    // Save directly to Firestore students collection if ALUNO
     if (currentUser.studentId || cleanEmail) {
       const studentId = currentUser.studentId || cleanId;
       await saveToFirestore('students', {
@@ -1253,16 +726,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } as any);
     }
 
-    // 3. Update local state
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => 
       (u.id === cleanId || (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail))
         ? updatedUser 
         : u
     ));
-    localStorage.setItem('bjjcron_current_user', JSON.stringify(updatedUser));
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
-    window.dispatchEvent(new Event('bjjcron_students_updated'));
 
     return true;
   };
@@ -1289,9 +758,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => prev.map(u => (u.id === userId ? merged : u)));
     if (currentUser?.id === userId) {
       setCurrentUser(merged);
-      localStorage.setItem('bjjcron_current_user', JSON.stringify(merged));
     }
-    window.dispatchEvent(new Event('bjjcron_users_updated'));
     return true;
   };
 
