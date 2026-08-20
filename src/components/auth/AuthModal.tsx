@@ -47,6 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   // Form States - All clean without pre-filled test data
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [firstAccessEmail, setFirstAccessEmail] = useState('');
   const [firstAccessPassword, setFirstAccessPassword] = useState('');
@@ -111,7 +112,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setFeedback(null);
 
-    const res = await loginWithPassword(loginEmail, loginPassword);
+    const res = await loginWithPassword(loginEmail, loginPassword, rememberMe);
     if (res.success) {
       setFeedback({ type: 'success', message: res.message || 'Login realizado com sucesso!' });
       setTimeout(() => {
@@ -811,6 +812,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
                 />
               </div>
+            </div>
+
+            <div className="flex items-center justify-between py-0.5">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 font-medium select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500"
+                />
+                <span>Manter-me conectado neste dispositivo</span>
+              </label>
             </div>
 
             <button

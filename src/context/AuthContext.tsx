@@ -15,7 +15,7 @@ export interface LoginResult {
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
-  loginWithPassword: (email: string, password?: string) => Promise<LoginResult> | LoginResult;
+  loginWithPassword: (email: string, password?: string, rememberMe?: boolean) => Promise<LoginResult> | LoginResult;
   firstAccessActivate: (email: string, newPassword?: string) => { success: boolean; message: string };
   registerStudentSelfService: (studentData: {
     name: string;
@@ -56,12 +56,77 @@ interface AuthContextType {
   resetPasswordWithCode: (email: string, code: string, expectedCode: string, newPassword: string) => { success: boolean; message: string };
 }
 
+const persistUserSession = (user: User, rememberMe: boolean = true) => {
+  try {
+    if (rememberMe) {
+      localStorage.setItem('bjjcron_auth_uid', user.id);
+      localStorage.setItem('bjjcron_auth_email', user.email);
+      localStorage.setItem('bjjcron_remember_me', 'true');
+      localStorage.setItem('bjjcron_cached_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('bjjcron_auth_uid');
+      localStorage.removeItem('bjjcron_auth_email');
+      localStorage.setItem('bjjcron_remember_me', 'false');
+      localStorage.removeItem('bjjcron_cached_user');
+    }
+    sessionStorage.setItem('bjjcron_auth_uid', user.id);
+    sessionStorage.setItem('bjjcron_auth_email', user.email);
+    sessionStorage.setItem('bjjcron_cached_user', JSON.stringify(user));
+  } catch (e) {}
+};
+
+const clearUserSession = () => {
+  try {
+    localStorage.removeItem('bjjcron_auth_uid');
+    localStorage.removeItem('bjjcron_auth_email');
+    localStorage.removeItem('bjjcron_remember_me');
+    localStorage.removeItem('bjjcron_cached_user');
+    sessionStorage.removeItem('bjjcron_auth_uid');
+    sessionStorage.removeItem('bjjcron_auth_email');
+    sessionStorage.removeItem('bjjcron_cached_user');
+  } catch (e) {}
+};
+
+const getPersistedAuthId = (): { uid: string | null; email: string | null } => {
+  try {
+    const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+    const localUid = isRemembered ? localStorage.getItem('bjjcron_auth_uid') : null;
+    const localEmail = isRemembered ? localStorage.getItem('bjjcron_auth_email') : null;
+    const sessionUid = sessionStorage.getItem('bjjcron_auth_uid');
+    const sessionEmail = sessionStorage.getItem('bjjcron_auth_email');
+
+    return {
+      uid: localUid || sessionUid || null,
+      email: localEmail || sessionEmail || null
+    };
+  } catch (e) {
+    return { uid: null, email: null };
+  }
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [students, setStudents] = useState<Student[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+      if (isRemembered) {
+        const cached = localStorage.getItem('bjjcron_cached_user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.id) return parsed;
+        }
+      }
+      const sessionCached = sessionStorage.getItem('bjjcron_cached_user');
+      if (sessionCached) {
+        const parsed = JSON.parse(sessionCached);
+        if (parsed && parsed.id) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  });
 
   // 1. Subscribe to Firestore `users` in real-time
   useEffect(() => {
@@ -88,9 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUsers(list);
 
-      // Reconcile active session user from sessionStorage
-      const sessionUid = sessionStorage.getItem('bjjcron_auth_uid');
-      const sessionEmail = sessionStorage.getItem('bjjcron_auth_email');
+      // Reconcile active session user from localStorage or sessionStorage
+      const { uid: sessionUid, email: sessionEmail } = getPersistedAuthId();
 
       if (sessionUid || sessionEmail) {
         const found = list.find(u => 
@@ -99,6 +163,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
         if (found) {
           setCurrentUser(found);
+          const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+          persistUserSession(found, isRemembered);
         }
       }
     });
@@ -338,11 +404,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     saveToFirestore('notifications', notifObj);
 
-    try {
-      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
-      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
-    } catch (e) {}
-
+    persistUserSession(newUser, true);
     setCurrentUser(newUser);
 
     return {
@@ -402,11 +464,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveToFirestore('users', newUser);
     saveToFirestore('teachers', newTeacherObj);
 
-    try {
-      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
-      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
-    } catch (e) {}
-
+    persistUserSession(newUser, true);
     setCurrentUser(newUser);
 
     return {
@@ -460,11 +518,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    try {
-      sessionStorage.setItem('bjjcron_auth_uid', newUser.id);
-      sessionStorage.setItem('bjjcron_auth_email', newUser.email);
-    } catch (e) {}
-
+    persistUserSession(newUser, true);
     setCurrentUser(newUser);
 
     return {
@@ -587,10 +641,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const switchRole = (role: UserRole) => {
     const target = users.find(u => u.role === role && u.approvalStatus !== 'PENDING' && u.approvalStatus !== 'REJECTED');
     if (target) {
-      try {
-        sessionStorage.setItem('bjjcron_auth_uid', target.id);
-        sessionStorage.setItem('bjjcron_auth_email', target.email);
-      } catch (e) {}
+      const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+      persistUserSession(target, isRemembered);
       setCurrentUser(target);
     }
   };
@@ -598,19 +650,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const switchUser = (userId: string) => {
     const target = users.find(u => u.id === userId);
     if (target) {
-      try {
-        sessionStorage.setItem('bjjcron_auth_uid', target.id);
-        sessionStorage.setItem('bjjcron_auth_email', target.email);
-      } catch (e) {}
+      const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+      persistUserSession(target, isRemembered);
       setCurrentUser(target);
     }
   };
 
   const logout = () => {
-    try {
-      sessionStorage.removeItem('bjjcron_auth_uid');
-      sessionStorage.removeItem('bjjcron_auth_email');
-    } catch (e) {}
+    clearUserSession();
     setCurrentUser(null);
   };
 
@@ -727,6 +774,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setCurrentUser(updatedUser);
+    const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+    persistUserSession(updatedUser, isRemembered);
+
     setUsers(prev => prev.map(u => 
       (u.id === cleanId || (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail))
         ? updatedUser 
@@ -758,6 +808,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => prev.map(u => (u.id === userId ? merged : u)));
     if (currentUser?.id === userId) {
       setCurrentUser(merged);
+      const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+      persistUserSession(merged, isRemembered);
     }
     return true;
   };
