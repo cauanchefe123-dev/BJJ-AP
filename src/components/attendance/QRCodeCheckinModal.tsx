@@ -18,6 +18,10 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
   const [inputToken, setInputToken] = useState('');
   const [feedback, setFeedback] = useState<{ success?: boolean; message?: string } | null>(null);
   const [teacherBypass, setTeacherBypass] = useState(false);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceTime, setAttendanceTime] = useState(
+    new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  );
 
   if (!isOpen) return null;
 
@@ -26,6 +30,7 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
   const loggedInStudent = resolveStudentForUser(currentUser, students);
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const isSelectedDateToday = attendanceDate === todayStr;
   const todayAttendance = loggedInStudent ? attendances.find(a => a.studentId === loggedInStudent.id && a.date === todayStr) : null;
 
   const handleCheckin = (tokenToUse?: string) => {
@@ -64,12 +69,17 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
     const method = currentUser?.role === 'ALUNO' ? 'QR_CODE_STUDENT' : 'MANUAL';
     const verifierName = currentUser?.name || 'Sistema';
 
+    const effectiveDateToRecord = isTeacherRole ? attendanceDate : todayStr;
+    const effectiveTimeToRecord = isTeacherRole ? attendanceTime : undefined;
+
     const res = recordAttendance(
       found.id,
       selectedClassId || currentClass?.id,
       method,
       verifierName,
-      isTeacherRole && teacherBypass
+      isTeacherRole ? (teacherBypass || !isSelectedDateToday) : false,
+      effectiveDateToRecord,
+      effectiveTimeToRecord
     );
 
     setFeedback(res);
@@ -231,6 +241,71 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
         {/* Staff Option & Manual Search */}
         {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR') && (
           <div className="space-y-4">
+            
+            {/* Custom Date & Time for Professor */}
+            <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-200 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  Data & Horário da Presença:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceDate(todayStr)}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      isSelectedDateToday
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Hoje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      setAttendanceDate(d.toISOString().split('T')[0]);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      attendanceDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Ontem
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="time"
+                    value={attendanceTime}
+                    onChange={(e) => setAttendanceTime(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              {!isSelectedDateToday && (
+                <p className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  Lançamento retroativo para o dia {attendanceDate.split('-').reverse().join('/')}
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
               <span className="text-slate-300 font-medium">Lançamento Especial (Professor / Admin):</span>
               <label className="flex items-center gap-2 cursor-pointer">

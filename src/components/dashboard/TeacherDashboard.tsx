@@ -5,7 +5,8 @@ import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
 import { QrCode, CalendarDays, Award, Users, CheckCircle, Flame, Clock, Megaphone, Send, X, Sparkles, Target, Edit3, Video, Play, Loader2, ArrowUpRight, UserCheck } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
-import { BJJClass } from '../../types';
+import { EditAttendanceModal } from '../attendance/EditAttendanceModal';
+import { BJJClass, AttendanceRecord } from '../../types';
 import { uploadVideoFile } from '../../lib/videoUpload';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
 
@@ -31,6 +32,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAttendances = attendances.filter(a => a.date === todayStr);
@@ -200,12 +202,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
 
       {/* Recent Presences Today */}
       <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
-        <div className="border-b border-slate-800/80 pb-3.5">
-          <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
-            Presenças Registradas Hoje ({todayAttendances.length})
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Check-ins de atletas validados no dia de hoje</p>
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
+          <div>
+            <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-400" />
+              Presenças Registradas Hoje ({todayAttendances.length})
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Check-ins de atletas validados no dia de hoje</p>
+          </div>
+          <button
+            onClick={() => onNavigate('attendance')}
+            className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            Ver Todas / Histórico <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {todayAttendances.length === 0 ? (
@@ -217,17 +227,26 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
             {todayAttendances.map(a => {
               const student = students.find(s => s.id === a.studentId);
               return (
-                <div key={a.id} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs">
-                  <div className="flex items-center gap-2.5">
-                    <img src={student?.photoUrl} alt={a.studentName} className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-900" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-200">{a.studentName}</p>
-                      <p className="text-[10px] text-slate-400">{a.className}</p>
+                <div key={a.id} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs hover:border-slate-700 transition-all">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img src={student?.photoUrl} alt={a.studentName} className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-200 truncate">{a.studentName}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{a.className}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                    {new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                      {new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button
+                      onClick={() => setEditingAttendance(a)}
+                      className="p-1 rounded-lg bg-slate-900 hover:bg-amber-950/80 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer"
+                      title="Editar / Alterar Presença"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -522,6 +541,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
         title={selectedVideoClass?.title || 'Vídeo da Posição'}
         focusText={selectedVideoClass?.weeklyFocus}
         videoUrl={selectedVideoClass?.weeklyFocusVideoUrl}
+      />
+
+      {/* Edit Attendance Modal for Professor */}
+      <EditAttendanceModal
+        isOpen={!!editingAttendance}
+        onClose={() => setEditingAttendance(null)}
+        attendance={editingAttendance}
       />
     </div>
   );

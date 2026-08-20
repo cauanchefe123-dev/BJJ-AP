@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar } from '../../constants/avatar';
-import { X, Calendar, UserCheck, Search, Filter, Clock, QrCode, CheckCircle2, Users } from 'lucide-react';
+import { X, Calendar, UserCheck, Search, Filter, Clock, QrCode, CheckCircle2, Users, Edit3, Trash2 } from 'lucide-react';
+import { EditAttendanceModal } from './EditAttendanceModal';
+import { AttendanceRecord } from '../../types';
 
 interface DailyAttendanceModalProps {
   isOpen: boolean;
@@ -15,14 +18,18 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
   onClose,
   initialDate,
 }) => {
-  const { attendances, students, classes } = useData();
+  const { attendances, students, classes, removeAttendance } = useData();
+  const { currentUser } = useAuth();
 
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('ALL');
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
 
   if (!isOpen) return null;
+
+  const isTeacherOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
 
   // Robust ISO / YYYY-MM-DD date normalizer
   const normalizeDateStr = (dStr: string) => {
@@ -203,14 +210,35 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center justify-end gap-1 text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-800/40">
-                      <Clock className="w-3 h-3" />
-                      {a.timestamp ? new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <div className="flex items-center justify-end gap-1 text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-800/40">
+                        <Clock className="w-3 h-3" />
+                        {a.timestamp ? new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1 block font-medium">
+                        {a.method === 'QR_CODE_STUDENT' || a.method === 'QR_CODE_TEACHER' ? '✓ Via QR Code' : '✓ Chamada Presencial'}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block font-medium">
-                      {a.method === 'QR_CODE_STUDENT' || a.method === 'QR_CODE_TEACHER' ? '✓ Via QR Code' : '✓ Chamada Presencial'}
-                    </span>
+
+                    {isTeacherOrAdmin && (
+                      <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+                        <button
+                          onClick={() => setEditingAttendance(a)}
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-amber-950/80 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer"
+                          title="Alterar Presença (Professor)"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => removeAttendance(a.id)}
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/40 transition-all cursor-pointer"
+                          title="Excluir Presença"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -229,6 +257,13 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
         </div>
 
       </div>
+
+      {/* Edit Attendance Modal */}
+      <EditAttendanceModal
+        isOpen={!!editingAttendance}
+        onClose={() => setEditingAttendance(null)}
+        attendance={editingAttendance}
+      />
     </div>
   );
 };

@@ -135,7 +135,16 @@ interface DataContextType {
   deleteClass: (id: string) => void;
 
   // Attendance Actions
-  recordAttendance: (studentId: string, classId: string, method?: 'MANUAL' | 'QR_CODE_STUDENT' | 'QR_CODE_TEACHER', verifiedBy?: string, bypassTimeCheck?: boolean) => { success: boolean; message: string };
+  recordAttendance: (
+    studentId: string,
+    classId: string,
+    method?: 'MANUAL' | 'QR_CODE_STUDENT' | 'QR_CODE_TEACHER',
+    verifiedBy?: string,
+    bypassTimeCheck?: boolean,
+    customDate?: string,
+    customTime?: string
+  ) => { success: boolean; message: string };
+  updateAttendance: (id: string, updates: Partial<AttendanceRecord>) => void;
   removeAttendance: (id: string) => void;
 
   // Payment Actions
@@ -799,7 +808,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     classId: string,
     method: 'MANUAL' | 'QR_CODE_STUDENT' | 'QR_CODE_TEACHER' = 'MANUAL',
     verifiedBy: string = 'Sistema',
-    bypassTimeCheck: boolean = false
+    bypassTimeCheck: boolean = false,
+    customDate?: string,
+    customTime?: string
   ): { success: boolean; message: string } => {
     const student = students.find(s => s.id === studentId || s.qrCodeToken === studentId);
     if (!student) {
@@ -812,7 +823,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const bjjClass = classes.find(c => c.id === classId) || classes[0];
 
-    if (!bypassTimeCheck) {
+    const todayStr = getLocalDateStr();
+    const effectiveDate = (customDate && customDate.trim()) ? customDate.trim() : todayStr;
+    const isCustomDate = effectiveDate !== todayStr;
+
+    if (!bypassTimeCheck && !isCustomDate) {
       const availability = checkClassCheckinAvailability(bjjClass);
       if (!availability.isAvailable) {
         return {
@@ -822,25 +837,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const todayStr = getLocalDateStr();
-
     const alreadyPresent = attendances.some(a => 
       a.studentId === student.id && 
-      a.date === todayStr
+      (a.date === effectiveDate || (a.timestamp && a.timestamp.startsWith(effectiveDate)))
     );
 
     if (alreadyPresent && !bypassTimeCheck) {
-      return { success: false, message: `Atenção: ${student.name} já registrou presença hoje! (Permitida apenas 1 presença por dia de aula)` };
+      const formattedDate = effectiveDate.split('-').reverse().join('/');
+      return { 
+        success: false, 
+        message: `Atenção: ${student.name} já possui presença registrada em ${formattedDate}! (Permitida apenas 1 presença por dia)` 
+      };
+    }
+
+    const now = new Date();
+    let finalTimestamp: string;
+    if (customTime) {
+      finalTimestamp = new Date(`${effectiveDate}T${customTime}:00`).toISOString();
+    } else if (isCustomDate) {
+      finalTimestamp = new Date(`${effectiveDate}T19:00:00`).toISOString();
+    } else {
+      finalTimestamp = now.toISOString();
     }
 
     const newRecord: AttendanceRecord = {
       id: `att-${Date.now()}`,
       studentId: student.id,
       studentName: student.name,
-      classId: bjjClass.id,
-      className: bjjClass.title,
-      date: todayStr,
-      timestamp: new Date().toISOString(),
+      classId: bjjClass ? bjjClass.id : classId,
+      className: bjjClass ? bjjClass.title : 'Aula Geral',
+      date: effectiveDate,
+      timestamp: finalTimestamp,
       method,
       verifiedBy,
     };
@@ -851,17 +878,71 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Update student's class counter directly in Firestore
     const updatedStudent: Student = {
       ...student,
-      totalClassesAttended: student.totalClassesAttended + 1,
-      classesSinceLastGraduation: student.classesSinceLastGraduation + 1,
+      totalClassesAttended: (student.totalClassesAttended || 0) + 1,
+      classesSinceLastGraduation: (student.classesSinceLastGraduation || 0) + 1,
       updatedAt: new Date().toISOString(),
     };
     setStudents(prev => prev.map(s => (s.id === student.id ? updatedStudent : s)));
     saveToFirestore('students', updatedStudent);
 
+    const formattedDate = effectiveDate.split('-').reverse().join('/');
     return {
       success: true,
-      message: `Oss! Presença confirmada para ${student.name} na aula de ${bjjClass.title}.`,
+      message: `Oss! Presença confirmada para ${student.name} em ${formattedDate} na aula de ${bjjClass ? bjjClass.title : 'Jiu-Jitsu'}.`,
     };
+  };
+
+  const updateAttendance = (id: string, updates: Partial<AttendanceRecord>) => {
+    const existing = attendances.find(a => a.id === id);
+    if (!existing) return;
+
+    // Check if student was changed
+    const prevStudentId = existing.studentId;
+    const newStudentId = updates.studentId && updates.studentId !== prevStudentId ? updates.studentId : null;
+
+    let updatedDate = updates.date || existing.date;
+    let updatedTimestamp = updates.timestamp || existing.timestamp;
+
+    if (updates.date && !updates.timestamp) {
+      updatedTimestamp = new Date(`${updates.date}T19:00:00`).toISOString();
+    }
+
+    const updatedRecord: AttendanceRecord = {
+      ...existing,
+      ...updates,
+      date: updatedDate,
+      timestamp: updatedTimestamp,
+    };
+
+    setAttendances(prev => prev.map(a => (a.id === id ? updatedRecord : a)));
+    saveToFirestore('attendances', updatedRecord);
+
+    // If student reassigned, adjust counters
+    if (newStudentId) {
+      const prevStudent = students.find(s => s.id === prevStudentId);
+      if (prevStudent) {
+        const decStudent: Student = {
+          ...prevStudent,
+          totalClassesAttended: Math.max(0, (prevStudent.totalClassesAttended || 0) - 1),
+          classesSinceLastGraduation: Math.max(0, (prevStudent.classesSinceLastGraduation || 0) - 1),
+          updatedAt: new Date().toISOString(),
+        };
+        setStudents(prev => prev.map(s => (s.id === prevStudent.id ? decStudent : s)));
+        saveToFirestore('students', decStudent);
+      }
+
+      const nextStudent = students.find(s => s.id === newStudentId);
+      if (nextStudent) {
+        const incStudent: Student = {
+          ...nextStudent,
+          totalClassesAttended: (nextStudent.totalClassesAttended || 0) + 1,
+          classesSinceLastGraduation: (nextStudent.classesSinceLastGraduation || 0) + 1,
+          updatedAt: new Date().toISOString(),
+        };
+        setStudents(prev => prev.map(s => (s.id === nextStudent.id ? incStudent : s)));
+        saveToFirestore('students', incStudent);
+      }
+    }
   };
 
   const removeAttendance = (id: string) => {
@@ -1212,6 +1293,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateClass,
         deleteClass,
         recordAttendance,
+        updateAttendance,
         removeAttendance,
         addPayment,
         markPaymentAsPaid,

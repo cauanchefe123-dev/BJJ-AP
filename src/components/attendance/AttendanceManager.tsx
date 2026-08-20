@@ -3,7 +3,9 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar } from '../../constants/avatar';
-import { UserCheck, Calendar, CheckCircle2, Trash2, Search, Filter, Clock, Sparkles, QrCode } from 'lucide-react';
+import { UserCheck, Calendar, CheckCircle2, Trash2, Search, Filter, Clock, Sparkles, QrCode, Edit3 } from 'lucide-react';
+import { EditAttendanceModal } from './EditAttendanceModal';
+import { AttendanceRecord } from '../../types';
 
 interface AttendanceManagerProps {
   onOpenCheckin: () => void;
@@ -18,6 +20,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
   const [dateFilterMode, setDateFilterMode] = useState<'SELECTED' | 'ALL'>('SELECTED');
   const [search, setSearch] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
 
   const currentStudent = students.find(s => s.id === currentUser?.studentId || s.email.toLowerCase() === currentUser?.email.toLowerCase());
 
@@ -233,13 +236,22 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
 
                       {isStaff && (
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => removeAttendance(a.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all cursor-pointer"
-                            title="Excluir Presença"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setEditingAttendance(a)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-950/80 text-slate-400 hover:text-amber-400 border border-slate-700 hover:border-amber-500/40 transition-all cursor-pointer"
+                              title="Alterar / Editar Presença (Professor)"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => removeAttendance(a.id)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition-all cursor-pointer"
+                              title="Excluir Presença"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -250,6 +262,13 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
           </table>
         </div>
       </div>
+
+      {/* Edit Attendance Modal for Professor */}
+      <EditAttendanceModal
+        isOpen={!!editingAttendance}
+        onClose={() => setEditingAttendance(null)}
+        attendance={editingAttendance}
+      />
     </div>
   );
 };
