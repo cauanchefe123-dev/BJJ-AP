@@ -1,4 +1,5 @@
 import { Student, AttendanceRecord } from '../types';
+import { getAttendanceLocalDate } from './dateUtils';
 
 export type RankingPeriod = 'WEEK' | 'MONTH' | 'ALL';
 
@@ -59,8 +60,9 @@ export function getStudentAttendances(
     startOfWeek.setHours(0, 0, 0, 0);
 
     return studentRecords.filter(a => {
-      if (!a.date) return false;
-      const attDate = new Date(a.date + 'T00:00:00');
+      const localDate = getAttendanceLocalDate(a);
+      if (!localDate) return false;
+      const attDate = new Date(localDate + 'T00:00:00');
       return attDate >= startOfWeek;
     });
   }
@@ -70,9 +72,10 @@ export function getStudentAttendances(
     const currentMonth = now.getMonth();
 
     return studentRecords.filter(a => {
-      if (!a.date) return false;
-      const attDate = new Date(a.date + 'T00:00:00');
-      return attDate.getFullYear() === currentYear && attDate.getMonth() === currentMonth;
+      const localDate = getAttendanceLocalDate(a);
+      if (!localDate) return false;
+      const [y, m] = localDate.split('-').map(Number);
+      return y === currentYear && m === (currentMonth + 1);
     });
   }
 

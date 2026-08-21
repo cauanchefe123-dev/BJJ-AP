@@ -9,6 +9,7 @@ import { EditAttendanceModal } from '../attendance/EditAttendanceModal';
 import { BJJClass, AttendanceRecord } from '../../types';
 import { uploadVideoFile } from '../../lib/videoUpload';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime } from '../../utils/dateUtils';
 
 interface TeacherDashboardProps {
   onNavigate: (tab: string) => void;
@@ -34,8 +35,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayAttendances = attendances.filter(a => a.date === todayStr);
+  const todayStr = getLocalDateStr();
+  const todayAttendances = attendances.filter(a => getAttendanceLocalDate(a) === todayStr);
 
   const handleSendNotice = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,7 +238,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                      {new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {getAttendanceLocalTime(a)}
                     </span>
                     <button
                       onClick={() => setEditingAttendance(a)}

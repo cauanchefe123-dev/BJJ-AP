@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar } from '../../constants/avatar';
+import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime } from '../../utils/dateUtils';
 import { X, Calendar, UserCheck, Search, Filter, Clock, QrCode, CheckCircle2, Users, Edit3, Trash2 } from 'lucide-react';
 import { EditAttendanceModal } from './EditAttendanceModal';
 import { AttendanceRecord } from '../../types';
@@ -21,7 +22,7 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
   const { attendances, students, classes, removeAttendance } = useData();
   const { currentUser } = useAuth();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('ALL');
@@ -31,16 +32,9 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
 
   const isTeacherOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
 
-  // Robust ISO / YYYY-MM-DD date normalizer
-  const normalizeDateStr = (dStr: string) => {
-    if (!dStr) return '';
-    if (dStr.includes('T')) return dStr.split('T')[0];
-    return dStr.trim();
-  };
-
   // Filter attendances by selected date and class/search
   const dayAttendances = attendances.filter(a => {
-    const recordDate = normalizeDateStr(a.date) || (a.timestamp ? normalizeDateStr(a.timestamp) : '');
+    const recordDate = getAttendanceLocalDate(a);
     return recordDate === selectedDate;
   });
 
@@ -112,10 +106,14 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
                 onClick={() => {
                   const d = new Date();
                   d.setDate(d.getDate() - 1);
-                  setSelectedDate(d.toISOString().split('T')[0]);
+                  setSelectedDate(getLocalDateStr(d));
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                  (() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    return selectedDate === getLocalDateStr(d);
+                  })()
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
@@ -214,7 +212,7 @@ export const DailyAttendanceModal: React.FC<DailyAttendanceModalProps> = ({
                     <div className="text-right">
                       <div className="flex items-center justify-end gap-1 text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-800/40">
                         <Clock className="w-3 h-3" />
-                        {a.timestamp ? new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                        {getAttendanceLocalTime(a)}
                       </div>
                       <span className="text-[10px] text-slate-500 mt-1 block font-medium">
                         {a.method === 'QR_CODE_STUDENT' || a.method === 'QR_CODE_TEACHER' ? '✓ Via QR Code' : '✓ Chamada Presencial'}

@@ -4,6 +4,7 @@ import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
 import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus } from 'lucide-react';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getLocalDateStr, getAttendanceLocalDate } from '../../utils/dateUtils';
 
 interface AdminDashboardProps {
   onNavigate: (tab: string) => void;
@@ -27,8 +28,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
     isStudentEligibleForGraduation(s, academyConfig)
   );
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayAttendances = attendances.filter(a => a.date === todayStr);
+  const todayStr = getLocalDateStr();
+  const todayAttendances = attendances.filter(a => getAttendanceLocalDate(a) === todayStr);
 
   return (
     <div className="space-y-6">

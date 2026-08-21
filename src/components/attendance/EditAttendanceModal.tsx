@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { AttendanceRecord } from '../../types';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar } from '../../constants/avatar';
+import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime } from '../../utils/dateUtils';
 import { X, Calendar, Clock, UserCheck, CheckCircle2, AlertCircle, Save, Trash2, Edit3 } from 'lucide-react';
 
 interface EditAttendanceModalProps {
@@ -36,18 +37,11 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
       setStudentId(attendance.studentId || '');
       setClassId(attendance.classId || '');
       
-      let dateVal = attendance.date;
-      if (!dateVal && attendance.timestamp) {
-        dateVal = attendance.timestamp.split('T')[0];
-      }
-      setDate(dateVal || new Date().toISOString().split('T')[0]);
+      const localDateVal = getAttendanceLocalDate(attendance);
+      setDate(localDateVal || getLocalDateStr());
 
-      if (attendance.timestamp && attendance.timestamp.includes('T')) {
-        const timePart = attendance.timestamp.split('T')[1]?.slice(0, 5);
-        setTime(timePart || '19:00');
-      } else {
-        setTime('19:00');
-      }
+      const localTimeVal = getAttendanceLocalTime(attendance);
+      setTime(localTimeVal !== '--:--' ? localTimeVal : '19:00');
 
       setMethod(attendance.method || 'MANUAL');
       setVerifiedBy(attendance.verifiedBy || currentUser?.name || 'Professor');
@@ -101,7 +95,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
   };
 
   const selectedStudentObj = students.find(s => s.id === studentId);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in print:hidden">
@@ -209,9 +203,17 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
                   onClick={() => {
                     const d = new Date();
                     d.setDate(d.getDate() - 1);
-                    setDate(d.toISOString().split('T')[0]);
+                    setDate(getLocalDateStr(d));
                   }}
-                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    (() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      return date === getLocalDateStr(d);
+                    })()
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
                 >
                   Ontem
                 </button>

@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar } from '../../constants/avatar';
+import { getLocalDateStr, getAttendanceLocalDate, formatDateBR, getAttendanceLocalTime } from '../../utils/dateUtils';
 import { UserCheck, Calendar, CheckCircle2, Trash2, Search, Filter, Clock, Sparkles, QrCode, Edit3 } from 'lucide-react';
 import { EditAttendanceModal } from './EditAttendanceModal';
 import { AttendanceRecord } from '../../types';
@@ -15,7 +16,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
   const { attendances, students, classes, removeAttendance } = useData();
   const { currentUser } = useAuth();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [dateFilterMode, setDateFilterMode] = useState<'SELECTED' | 'ALL'>('SELECTED');
   const [search, setSearch] = useState('');
@@ -24,20 +25,13 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
 
   const currentStudent = students.find(s => s.id === currentUser?.studentId || s.email.toLowerCase() === currentUser?.email.toLowerCase());
 
-  // Robust ISO / YYYY-MM-DD date normalizer
-  const normalizeDateStr = (dStr: string) => {
-    if (!dStr) return '';
-    if (dStr.includes('T')) return dStr.split('T')[0];
-    return dStr.trim();
-  };
-
   const filteredAttendances = attendances.filter(a => {
     // Student view isolation
     if (currentUser?.role === 'ALUNO') {
       if (a.studentId !== currentStudent?.id) return false;
     }
 
-    const recordDate = normalizeDateStr(a.date) || (a.timestamp ? normalizeDateStr(a.timestamp) : '');
+    const recordDate = getAttendanceLocalDate(a);
     const matchesDate = dateFilterMode === 'ALL' || recordDate === selectedDate;
     const matchesClass = selectedClass === 'ALL' || a.classId === selectedClass || a.className === selectedClass;
     const student = students.find(s => s.id === a.studentId);
@@ -97,11 +91,15 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
               onClick={() => {
                 const d = new Date();
                 d.setDate(d.getDate() - 1);
-                setSelectedDate(d.toISOString().split('T')[0]);
+                setSelectedDate(getLocalDateStr(d));
                 setDateFilterMode('SELECTED');
               }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                dateFilterMode === 'SELECTED' && selectedDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                (() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() - 1);
+                  return dateFilterMode === 'SELECTED' && selectedDate === getLocalDateStr(d);
+                })()
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
@@ -221,10 +219,10 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ onOpenChec
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-slate-200 block">{a.date ? a.date.split('-').reverse().join('/') : new Date(a.timestamp).toLocaleDateString('pt-BR')}</span>
+                        <span className="font-bold text-slate-200 block">{formatDateBR(getAttendanceLocalDate(a))}</span>
                         <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                           <Clock className="w-3 h-3 text-amber-400" />
-                          {a.timestamp ? new Date(a.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          {getAttendanceLocalTime(a)}
                         </span>
                       </td>
 

@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { BeltType, AgeCategory, WeightCategory } from '../../types';
 import { DEFAULT_BLACK_GI_AVATAR, getStudentAvatar, getGiAvatarForBelt } from '../../constants/avatar';
 import { compressImage } from '../../utils/imageCompressor';
+import { getLocalDateStr } from '../../utils/dateUtils';
 import { X, UserPlus, Check, Upload, Clock } from 'lucide-react';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 
@@ -23,8 +24,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
     photoUrl: DEFAULT_BLACK_GI_AVATAR,
     belt: 'BRANCA' as BeltType,
     stripes: 0,
-    lastGraduationDate: new Date().toISOString().split('T')[0],
-    startDate: new Date().toISOString().split('T')[0],
+    lastGraduationDate: getLocalDateStr(),
+    startDate: getLocalDateStr(),
     initialMonthsTrained: 0,
     customGraduationTargetClasses: undefined as number | undefined,
     weightCategory: 'MÉDIO' as WeightCategory,
@@ -48,8 +49,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
       photoUrl: DEFAULT_BLACK_GI_AVATAR,
       belt: 'BRANCA' as BeltType,
       stripes: 0,
-      lastGraduationDate: new Date().toISOString().split('T')[0],
-      startDate: new Date().toISOString().split('T')[0],
+      lastGraduationDate: getLocalDateStr(),
+      startDate: getLocalDateStr(),
       initialMonthsTrained: 0,
       customGraduationTargetClasses: undefined as number | undefined,
       weightCategory: 'MÉDIO' as WeightCategory,

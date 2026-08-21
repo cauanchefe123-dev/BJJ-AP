@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolveStudentForUser } from '../../constants/avatar';
 import { checkClassCheckinAvailability } from '../../utils/checkin';
+import { getLocalDateStr, getLocalTimeStr, getAttendanceLocalDate } from '../../utils/dateUtils';
 import { UserCheck, CheckCircle2, AlertCircle, X, Search, Sparkles, Clock, Lock, Check } from 'lucide-react';
 
 interface QRCodeCheckinModalProps {
@@ -14,14 +15,13 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
   const { students, classes, recordAttendance, attendances } = useData();
   const { currentUser } = useAuth();
 
+  const todayStr = getLocalDateStr();
   const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
   const [inputToken, setInputToken] = useState('');
   const [feedback, setFeedback] = useState<{ success?: boolean; message?: string } | null>(null);
   const [teacherBypass, setTeacherBypass] = useState(false);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceTime, setAttendanceTime] = useState(
-    new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  );
+  const [attendanceDate, setAttendanceDate] = useState(todayStr);
+  const [attendanceTime, setAttendanceTime] = useState(getLocalTimeStr());
 
   if (!isOpen) return null;
 
@@ -29,9 +29,8 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
   const availability = currentClass ? checkClassCheckinAvailability(currentClass) : null;
   const loggedInStudent = resolveStudentForUser(currentUser, students);
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const isSelectedDateToday = attendanceDate === todayStr;
-  const todayAttendance = loggedInStudent ? attendances.find(a => a.studentId === loggedInStudent.id && a.date === todayStr) : null;
+  const todayAttendance = loggedInStudent ? attendances.find(a => a.studentId === loggedInStudent.id && getAttendanceLocalDate(a) === todayStr) : null;
 
   const handleCheckin = (tokenToUse?: string) => {
     const token = tokenToUse || inputToken.trim();
@@ -266,10 +265,14 @@ export const QRCodeCheckinModal: React.FC<QRCodeCheckinModalProps> = ({ isOpen, 
                     onClick={() => {
                       const d = new Date();
                       d.setDate(d.getDate() - 1);
-                      setAttendanceDate(d.toISOString().split('T')[0]);
+                      setAttendanceDate(getLocalDateStr(d));
                     }}
                     className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                      attendanceDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                      (() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() - 1);
+                        return attendanceDate === getLocalDateStr(d);
+                      })()
                         ? 'bg-amber-500 text-slate-950 shadow-xs'
                         : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                     }`}

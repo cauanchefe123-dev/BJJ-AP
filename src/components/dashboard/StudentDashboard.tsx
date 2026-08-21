@@ -6,6 +6,7 @@ import { getStudentAvatar, resolveStudentForUser } from '../../constants/avatar'
 import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import { calculateRanking, getStudentTotalClasses } from '../../utils/ranking';
+import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, formatDateBR } from '../../utils/dateUtils';
 import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { BJJClass } from '../../types';
@@ -31,8 +32,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
   const myPayments = payments.filter(p => p.studentId === currentStudent?.id);
   const myAttendances = attendances.filter(a => a.studentId === currentStudent?.id);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayAttendance = myAttendances.find(a => a.date === todayStr);
+  const todayStr = getLocalDateStr();
+  const todayAttendance = myAttendances.find(a => getAttendanceLocalDate(a) === todayStr);
 
   // Calculate current student's weekly & monthly ranking
   const weekRanking = calculateRanking(students, attendances, 'WEEK');
@@ -145,7 +146,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-200">Presença do Dia ({todayStr.split('-').reverse().join('/')})</span>
+                <span className="text-xs font-bold text-slate-200">Presença do Dia ({formatDateBR(todayStr)})</span>
                 {todayAttendance ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                     ✓ CONFIRMADA
@@ -158,7 +159,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {todayAttendance
-                  ? `Presença na turma "${todayAttendance.className}" às ${todayAttendance.timestamp ? new Date(todayAttendance.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}. Bom treino!`
+                  ? `Presença na turma "${todayAttendance.className}" às ${getAttendanceLocalTime(todayAttendance)}. Bom treino!`
                   : 'Faça seu check-in na aula de hoje para contabilizar suas graduações e ranking.'}
               </p>
             </div>

@@ -4,6 +4,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_BLACK_GI_AVATAR, getStudentAvatar, getGiAvatarForBelt } from '../../constants/avatar';
 import { compressImage } from '../../utils/imageCompressor';
+import { getLocalDateStr } from '../../utils/dateUtils';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import {
@@ -67,7 +68,8 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
         photoUrl: student.photoUrl || '',
         belt: student.belt,
         stripes: student.stripes,
-        startDate: student.startDate || new Date().toISOString().split('T')[0],
+        lastGraduationDate: student.lastGraduationDate || student.startDate || getLocalDateStr(),
+        startDate: student.startDate || getLocalDateStr(),
         initialMonthsTrained: student.initialMonthsTrained || 0,
         customGraduationTargetClasses: student.customGraduationTargetClasses,
         ageCategory: student.ageCategory,
@@ -512,8 +514,8 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
                   <label className="text-amber-400 font-extrabold block mb-1">🗓️ Data da Graduação</label>
                   <input
                     type="date"
-                    value={formData.lastGraduationDate || new Date().toISOString().split('T')[0]}
-                    onChange={e => setFormData({ ...formData, lastGraduationDate: e.target.value })}
+                    value={formData.lastGraduationDate || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, lastGraduationDate: e.target.value }))}
                     className="w-full bg-slate-900 border border-amber-500/50 rounded-xl p-2.5 text-slate-100 font-bold focus:ring-2 focus:ring-amber-500 outline-none"
                   />
                 </div>

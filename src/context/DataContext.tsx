@@ -37,14 +37,7 @@ import {
   purgeAllLegacyLocalStorage,
 } from '../lib/firebaseStore';
 import { isDeletedRecord, markAsDeleted } from '../lib/deletionTracker';
-
-const getLocalDateStr = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { getLocalDateStr, getAttendanceLocalDate } from '../utils/dateUtils';
 
 const checkClassCheckinAvailability = (bjjClass?: BJJClass): { isAvailable: boolean; reason?: string } => {
   if (!bjjClass) return { isAvailable: true };
@@ -455,7 +448,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         belt: newStudent.belt,
         stripes: newStudent.stripes || 0,
         promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
-        promotedAt: studentData.startDate || new Date().toISOString().split('T')[0],
+        promotedAt: studentData.lastGraduationDate || studentData.startDate || getLocalDateStr(),
         notes: 'Graduação inicial no ato da matrícula.',
         classesCountAtPromotion: 0,
       };
@@ -536,7 +529,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Auto generate graduation record if belt or stripes changed
     if (updates.belt !== undefined || updates.stripes !== undefined || updates.lastGraduationDate !== undefined) {
-      const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || new Date().toISOString().split('T')[0];
+      const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || getLocalDateStr();
       const gradRec: Graduation = {
         id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         studentId: mergedStudent.id,
@@ -580,7 +573,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!student) return;
 
     const realId = student.id;
-    const graduationDate = promotedAt || new Date().toISOString().split('T')[0];
+    const graduationDate = promotedAt || getLocalDateStr();
 
     const newGraduation: Graduation = {
       id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -839,7 +832,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const alreadyPresent = attendances.some(a => 
       a.studentId === student.id && 
-      (a.date === effectiveDate || (a.timestamp && a.timestamp.startsWith(effectiveDate)))
+      getAttendanceLocalDate(a) === effectiveDate
     );
 
     if (alreadyPresent && !bypassTimeCheck) {
