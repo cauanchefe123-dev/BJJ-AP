@@ -192,55 +192,55 @@ export const StudentList: React.FC<StudentListProps> = ({
       )}
 
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white shadow-md">
         <div>
-          <h3 className="text-xl font-bold text-slate-100">Atletas e Alunos Cadastrados</h3>
-          <p className="text-xs text-slate-400">Total de {students.length} atletas vinculados à academia</p>
+          <h3 className="text-xl font-black text-slate-100 tracking-tight">Atletas e Alunos Cadastrados</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Total de {students.length} atletas vinculados à academia</p>
         </div>
 
         {canManage && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
             {students.length > 0 && (
               <button
                 onClick={() => onOpenGraduationModal(students[0])}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 transition-all cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 transition-all cursor-pointer active:scale-95 shadow-xs"
               >
                 <Award className="w-4 h-4" />
-                Graduar Atleta
+                <span>Graduar Atleta</span>
               </button>
             )}
             <button
               onClick={onOpenAddModal}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all cursor-pointer active:scale-95"
             >
-              <UserPlus className="w-4 h-4" />
-              Cadastrar Novo Aluno
+              <UserPlus className="w-4 h-4 stroke-[2.5]" />
+              <span>Cadastrar Aluno</span>
             </button>
           </div>
         )}
       </div>
 
       {/* Filters & Search */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-900/90 border border-slate-800/90 rounded-3xl p-4 sm:p-5 shadow-md">
         {/* Search Input */}
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Buscar por nome, matrícula..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-amber-500 outline-none"
+            className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-amber-500/80 outline-none transition-colors"
           />
         </div>
 
         {/* Belt Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">Faixa:</span>
+          <span className="text-xs text-slate-400 font-bold whitespace-nowrap">Faixa:</span>
           <select
             value={beltFilter}
             onChange={e => setBeltFilter(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+            className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl px-3 py-2.5 text-xs text-slate-100 focus:border-amber-500/80 outline-none transition-colors"
           >
             <option value="ALL">Todas as Faixas</option>
             <option value="BRANCA">Branca</option>
@@ -254,11 +254,11 @@ export const StudentList: React.FC<StudentListProps> = ({
 
         {/* Status Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">Status:</span>
+          <span className="text-xs text-slate-400 font-bold whitespace-nowrap">Status:</span>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+            className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl px-3 py-2.5 text-xs text-slate-100 focus:border-amber-500/80 outline-none transition-colors"
           >
             <option value="ALL">Todos os Status</option>
             <option value="ACTIVE">Matrícula Ativa</option>
@@ -269,17 +269,17 @@ export const StudentList: React.FC<StudentListProps> = ({
       </div>
 
       {/* Table / Grid */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl overflow-hidden shadow-lg">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
-                <th className="py-3.5 px-4">Atleta</th>
-                <th className="py-3.5 px-4">Matrícula</th>
-                <th className="py-3.5 px-4">Faixa & Graus</th>
-                <th className="py-3.5 px-4">Tempo de Treino</th>
-                <th className="py-3.5 px-4">Aulas Presenciais</th>
-                <th className="py-3.5 px-4 text-right">Ações</th>
+                <th className="py-4 px-4 sm:px-5">Atleta</th>
+                <th className="py-4 px-4">Matrícula</th>
+                <th className="py-4 px-4">Faixa & Graus</th>
+                <th className="py-4 px-4">Tempo de Treino</th>
+                <th className="py-4 px-4">Aulas Presenciais</th>
+                <th className="py-4 px-4 sm:px-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">

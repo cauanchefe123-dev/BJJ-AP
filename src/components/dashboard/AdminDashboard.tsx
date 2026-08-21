@@ -53,9 +53,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         <div className="flex items-center gap-2.5 z-10 w-full sm:w-auto">
           <button
             onClick={onOpenCheckin}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
           >
-            <UserCheck className="w-4 h-4 text-slate-950" />
+            <UserCheck className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Registrar Presença</span>
           </button>
           <button
@@ -74,7 +74,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-white space-y-3 shadow-md hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400">Atletas Ativos</span>
-            <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-2xl bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center shadow-xs">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -82,8 +82,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
             <span className="text-3xl sm:text-4xl font-black text-slate-100 tracking-tight">{totalActiveStudents}</span>
             <span className="text-xs font-semibold text-slate-400">alunos matriculados</span>
           </div>
-          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span>100% integrados à equipe</span>
           </div>
         </div>
@@ -96,7 +96,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 group-hover:text-amber-300 transition-colors">Treinos de Hoje</span>
-            <div className="w-9 h-9 rounded-2xl bg-blue-500/15 text-blue-400 group-hover:bg-amber-500/15 group-hover:text-amber-300 border border-blue-500/30 group-hover:border-amber-500/30 flex items-center justify-center transition-colors">
+            <div className="w-9 h-9 rounded-2xl bg-slate-800 text-slate-200 group-hover:bg-amber-500/15 group-hover:text-amber-300 border border-slate-700 group-hover:border-amber-500/30 flex items-center justify-center transition-colors shadow-xs">
               <QrCode className="w-4 h-4" />
             </div>
           </div>
@@ -105,7 +105,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
             <span className="text-xs font-semibold text-slate-400">presenças registradas</span>
           </div>
           <div className="pt-1 flex items-center justify-between text-[11px]">
-            <span className="text-blue-400 font-bold group-hover:text-amber-300 transition-colors">
+            <span className="text-slate-400 font-semibold group-hover:text-slate-200 transition-colors">
               Aulas em andamento
             </span>
             <span className="text-amber-400 font-bold group-hover:underline flex items-center gap-0.5">
@@ -117,11 +117,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         {/* Aptos para Graduação */}
         <div 
           onClick={() => onNavigate('students')}
-          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 sm:p-6 text-white space-y-3 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
+          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 sm:p-6 text-white space-y-3 cursor-pointer transition-all hover:scale-[1.01] shadow-md group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Aptos para Exame</span>
-            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+            <span className="text-xs font-bold text-slate-400 group-hover:text-amber-300 transition-colors">Aptos para Exame</span>
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/25 flex items-center justify-center shadow-xs">
               <Award className="w-4 h-4" />
             </div>
           </div>
@@ -129,7 +129,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
             <span className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight">{studentsReadyForGraduation.length}</span>
             <span className="text-xs font-semibold text-slate-400">atletas qualificados</span>
           </div>
-          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-amber-400 font-bold">
+          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-amber-400/90 font-bold">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Atingiram a meta de aulas</span>
           </div>

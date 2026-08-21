@@ -41,7 +41,7 @@ export const DigitalMembershipCard: React.FC<DigitalMembershipCardProps> = ({ st
           {onOpenEditModal && (
             <button
               onClick={onOpenEditModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all shadow-xs border border-slate-700 active:scale-95 cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
               Editar Cadastro
@@ -49,7 +49,7 @@ export const DigitalMembershipCard: React.FC<DigitalMembershipCardProps> = ({ st
           )}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all active:scale-95"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all active:scale-95 cursor-pointer shadow-xs"
           >
             <Printer className="w-4 h-4 text-amber-400" />
             Imprimir

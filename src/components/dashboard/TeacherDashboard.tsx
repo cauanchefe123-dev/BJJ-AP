@@ -91,9 +91,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => setIsNoticeModalOpen(true)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-white text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
           >
-            <Megaphone className="w-4 h-4 text-slate-950" />
+            <Megaphone className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Disparar Comunicado</span>
           </button>
           <button

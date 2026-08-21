@@ -111,18 +111,18 @@ export const RankingBoard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
         {/* 2nd Place */}
         {topThree[1] && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-white flex flex-col items-center text-center space-y-3 relative order-2 sm:order-1">
-            <span className="w-8 h-8 rounded-full bg-slate-300 text-slate-950 font-black text-xs flex items-center justify-center border-2 border-slate-400 shadow-md">
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white flex flex-col items-center text-center space-y-3 relative order-2 sm:order-1 shadow-md">
+            <span className="w-8 h-8 rounded-full bg-slate-700 text-slate-100 font-bold text-xs flex items-center justify-center border border-slate-600 shadow-xs">
               2º
             </span>
-            <img src={getStudentAvatar(topThree[1].student)} alt={topThree[1].student.name} className="w-16 h-16 rounded-full object-cover border-2 border-slate-400 bg-slate-900" />
+            <img src={getStudentAvatar(topThree[1].student)} alt={topThree[1].student.name} className="w-16 h-16 rounded-2xl object-cover border border-slate-700 bg-slate-950 shadow-xs" />
             <div>
               <h4 className="font-bold text-sm text-slate-100">{topThree[1].student.name}</h4>
               <p className="text-[10px] text-slate-400 font-mono">{topThree[1].student.registrationNumber}</p>
             </div>
             <BeltBadge belt={topThree[1].student.belt} stripes={topThree[1].student.stripes} size="sm" showLabel={false} />
-            <div className="pt-2 border-t border-slate-800 w-full">
-              <span className="text-lg font-black text-amber-400">{topThree[1].displayCount} treinos</span>
+            <div className="pt-2 border-t border-slate-800/80 w-full">
+              <span className="text-base font-bold text-slate-200">{topThree[1].displayCount} treinos</span>
               <span className="text-[10px] text-slate-500 block">{getPeriodLabel()}</span>
             </div>
           </div>
@@ -130,18 +130,18 @@ export const RankingBoard: React.FC = () => {
 
         {/* 1st Place (Champion) */}
         {topThree[0] && (
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 text-white flex flex-col items-center text-center space-y-3 relative order-1 sm:order-2 shadow-md transform sm:-translate-y-1">
-            <span className="w-9 h-9 rounded-full bg-slate-100 text-slate-950 font-bold text-xs flex items-center justify-center border border-slate-300 shadow-xs">
+          <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 text-white flex flex-col items-center text-center space-y-3 relative order-1 sm:order-2 shadow-lg sm:-translate-y-1">
+            <span className="w-9 h-9 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center border border-amber-400 shadow-sm">
               1º
             </span>
-            <img src={getStudentAvatar(topThree[0].student)} alt={topThree[0].student.name} className="w-18 h-18 rounded-full object-cover border-2 border-slate-600 shadow-sm bg-slate-900" />
+            <img src={getStudentAvatar(topThree[0].student)} alt={topThree[0].student.name} className="w-18 h-18 rounded-2xl object-cover border border-amber-500/50 shadow-sm bg-slate-950" />
             <div>
-              <h4 className="font-bold text-base text-slate-100">{topThree[0].student.name}</h4>
+              <h4 className="font-extrabold text-base text-slate-100">{topThree[0].student.name}</h4>
               <p className="text-[10px] text-slate-400 font-mono">{topThree[0].student.registrationNumber}</p>
             </div>
             <BeltBadge belt={topThree[0].student.belt} stripes={topThree[0].student.stripes} size="md" showLabel={false} />
-            <div className="pt-2 border-t border-slate-800 w-full">
-              <span className="text-xl font-bold text-white">{topThree[0].displayCount} treinos</span>
+            <div className="pt-2 border-t border-slate-800/80 w-full">
+              <span className="text-lg font-black text-amber-400">{topThree[0].displayCount} treinos</span>
               <span className="text-[10px] text-slate-400 block font-medium">{getPeriodLabel()}</span>
             </div>
           </div>
@@ -149,18 +149,18 @@ export const RankingBoard: React.FC = () => {
 
         {/* 3rd Place */}
         {topThree[2] && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-white flex flex-col items-center text-center space-y-3 relative order-3">
-            <span className="w-8 h-8 rounded-full bg-amber-700 text-amber-100 font-black text-xs flex items-center justify-center border-2 border-amber-800 shadow-md">
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white flex flex-col items-center text-center space-y-3 relative order-3 shadow-md">
+            <span className="w-8 h-8 rounded-full bg-amber-900/80 text-amber-200 font-bold text-xs flex items-center justify-center border border-amber-800 shadow-xs">
               3º
             </span>
-            <img src={getStudentAvatar(topThree[2].student)} alt={topThree[2].student.name} className="w-16 h-16 rounded-full object-cover border-2 border-amber-700 bg-slate-900" />
+            <img src={getStudentAvatar(topThree[2].student)} alt={topThree[2].student.name} className="w-16 h-16 rounded-2xl object-cover border border-slate-700 bg-slate-950 shadow-xs" />
             <div>
               <h4 className="font-bold text-sm text-slate-100">{topThree[2].student.name}</h4>
               <p className="text-[10px] text-slate-400 font-mono">{topThree[2].student.registrationNumber}</p>
             </div>
             <BeltBadge belt={topThree[2].student.belt} stripes={topThree[2].student.stripes} size="sm" showLabel={false} />
-            <div className="pt-2 border-t border-slate-800 w-full">
-              <span className="text-lg font-black text-amber-400">{topThree[2].displayCount} treinos</span>
+            <div className="pt-2 border-t border-slate-800/80 w-full">
+              <span className="text-base font-bold text-slate-200">{topThree[2].displayCount} treinos</span>
               <span className="text-[10px] text-slate-500 block">{getPeriodLabel()}</span>
             </div>
           </div>
@@ -168,52 +168,54 @@ export const RankingBoard: React.FC = () => {
       </div>
 
       {/* Remaining Leaderboard */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4 shadow-xl">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-white space-y-4 shadow-lg">
         <div className="flex items-center justify-between">
-          <h4 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
+          <h4 className="font-black text-sm text-slate-200 tracking-tight font-display">
             Classificação Geral — {getPeriodLabel()}
           </h4>
-          <span className="text-xs text-slate-400">Total de {ranking.length} Atletas</span>
+          <span className="text-xs text-slate-400 font-medium">Total de {ranking.length} Atletas</span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {ranking.length === 0 ? (
             <p className="text-xs text-slate-500 text-center py-6">Nenhum atleta registrado.</p>
           ) : (
             ranking.map((item) => (
               <div
                 key={item.student.id}
-                className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition-all ${
                   myRankItem?.student.id === item.student.id
                     ? 'bg-amber-500/10 border-amber-500/50 shadow-md'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    : 'bg-slate-950/80 border-slate-800/80 hover:border-slate-700/80'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold w-7 text-center rounded-lg py-1 ${
-                    item.rank === 1 ? 'bg-amber-500 text-slate-950 font-black' :
-                    item.rank === 2 ? 'bg-slate-300 text-slate-950 font-black' :
-                    item.rank === 3 ? 'bg-amber-800 text-amber-100 font-black' : 'text-slate-500'
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`font-black w-8 h-8 flex items-center justify-center rounded-xl text-xs shrink-0 ${
+                    item.rank === 1 ? 'bg-amber-500 text-slate-950' :
+                    item.rank === 2 ? 'bg-slate-300 text-slate-950' :
+                    item.rank === 3 ? 'bg-amber-800 text-amber-100' : 'bg-slate-900 text-slate-400 border border-slate-800 font-mono'
                   }`}>
                     #{item.rank}
                   </span>
-                  <img src={getStudentAvatar(item.student)} alt={item.student.name} className="w-8 h-8 rounded-full object-cover bg-slate-900 border border-slate-800" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-200">{item.student.name}</p>
+                  <img src={getStudentAvatar(item.student)} alt={item.student.name} className="w-10 h-10 rounded-xl object-cover bg-slate-900 border border-slate-800 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-slate-200 truncate">{item.student.name}</p>
                       {myRankItem?.student.id === item.student.id && (
-                        <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-500 text-slate-950">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 shrink-0 font-mono">
                           Você
                         </span>
                       )}
                     </div>
-                    <BeltBadge belt={item.student.belt} stripes={item.student.stripes} size="sm" showLabel={false} />
+                    <div className="mt-1">
+                      <BeltBadge belt={item.student.belt} stripes={item.student.stripes} size="sm" showLabel={false} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="font-extrabold text-amber-400 block text-sm">{item.displayCount} treinos</span>
-                  <span className="text-[10px] text-slate-500">{item.allTimeCount} total histórico</span>
+                <div className="text-right shrink-0 pl-3">
+                  <span className="font-black text-amber-400 block text-sm font-display">{item.displayCount} treinos</span>
+                  <span className="text-[10px] text-slate-500 font-medium">{item.allTimeCount} total</span>
                 </div>
               </div>
             ))

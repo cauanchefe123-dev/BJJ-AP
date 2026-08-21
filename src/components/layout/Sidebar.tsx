@@ -184,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {onOpenEditProfile && (
               <button
                 onClick={onOpenEditProfile}
-                className="p-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-all text-xs font-bold shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer"
+                className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs font-bold shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer shadow-xs"
                 title="Editar Perfil"
               >
                 <Edit3 className="w-3.5 h-3.5" />

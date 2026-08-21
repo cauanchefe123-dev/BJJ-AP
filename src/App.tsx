@@ -10,6 +10,7 @@ import { DataProvider, useData } from './context/DataContext';
 import { RoleSwitcher } from './components/layout/RoleSwitcher';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
+import { BottomTabBar } from './components/layout/BottomTabBar';
 
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
 import { TeacherDashboard } from './components/dashboard/TeacherDashboard';
@@ -142,7 +143,7 @@ function MainApp() {
           />
 
           {/* Page Content */}
-          <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
+          <main className="flex-1 p-3 sm:p-6 md:p-8 pb-24 sm:pb-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-5 sm:space-y-6">
             {currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING') ? (
               <PendingApprovalScreen onOpenAuthModal={() => setIsAuthModalOpen(true)} />
             ) : (
@@ -294,6 +295,14 @@ function MainApp() {
 
       {/* Global In-App Floating Toast Notification */}
       <InAppToastNotification />
+
+      {/* Mobile Bottom Tab Bar */}
+      <BottomTabBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+        onOpenQuickScan={() => setIsQuickCheckinOpen(true)}
+      />
 
       {/* PWA & Mobile Auto-Updater */}
       <PWAUpdateManager />

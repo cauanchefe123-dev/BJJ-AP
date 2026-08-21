@@ -48,29 +48,29 @@ export const BeltBadge: React.FC<BeltBadgeProps> = ({
   const beltName = BELT_NAMES[belt] || BELT_NAMES.BRANCA;
 
   const sizeClasses = {
-    sm: { height: 'h-6', width: 'w-24', barWidth: 'w-7', label: 'text-xs', stripe: 'w-1 h-3' },
-    md: { height: 'h-8', width: 'w-36', barWidth: 'w-10', label: 'text-xs font-bold', stripe: 'w-1.5 h-4' },
-    lg: { height: 'h-10', width: 'w-48', barWidth: 'w-12', label: 'text-sm font-extrabold', stripe: 'w-2 h-5' },
-    xl: { height: 'h-12', width: 'w-64', barWidth: 'w-16', label: 'text-base font-extrabold', stripe: 'w-2.5 h-6' },
+    sm: { height: 'h-6', width: 'w-24', barWidth: 'w-7', label: 'text-[11px] font-bold', stripe: 'w-1 h-3.5' },
+    md: { height: 'h-7', width: 'w-32', barWidth: 'w-9', label: 'text-xs font-bold', stripe: 'w-1.5 h-4' },
+    lg: { height: 'h-9', width: 'w-44', barWidth: 'w-12', label: 'text-sm font-extrabold', stripe: 'w-2 h-5' },
+    xl: { height: 'h-11', width: 'w-56', barWidth: 'w-16', label: 'text-base font-extrabold', stripe: 'w-2.5 h-6' },
   }[size];
 
   return (
-    <div className="inline-flex flex-col items-start gap-1">
+    <div className="inline-flex items-center gap-1.5 shrink-0">
       <div
-        className={`relative flex items-center justify-between rounded-md overflow-hidden shadow-sm border ${config.bg} ${config.border} ${sizeClasses.height} ${sizeClasses.width}`}
+        className={`relative flex items-center justify-between rounded-lg overflow-hidden shadow-xs border ${config.bg} ${config.border} ${sizeClasses.height} ${sizeClasses.width} shrink-0`}
         title={`${beltName} - ${stripes} grau(s)`}
       >
         {/* Main Belt Strap Texture / Seam details */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-black/10"></div>
 
         {/* Belt Name / Rank Text */}
-        <span className={`px-2 z-10 truncate tracking-wide ${config.text} ${sizeClasses.label}`}>
+        <span className={`px-2 z-10 truncate tracking-tight font-bold ${config.text} ${sizeClasses.label}`}>
           {beltName.replace('Faixa ', '')}
         </span>
 
         {/* Belt Bar (Ponteira) */}
         <div
-          className={`h-full flex items-center justify-center gap-1 px-1 border-l shadow-inner ${config.barBg} ${config.barBorder} ${sizeClasses.barWidth}`}
+          className={`h-full flex items-center justify-center gap-0.5 px-1 border-l shadow-inner shrink-0 ${config.barBg} ${config.barBorder} ${sizeClasses.barWidth}`}
         >
           {Array.from({ length: Math.min(stripes, 4) }).map((_, i) => (
             <div
@@ -83,8 +83,8 @@ export const BeltBadge: React.FC<BeltBadgeProps> = ({
       </div>
 
       {showLabel && (
-        <span className="text-[11px] font-medium text-slate-500 tracking-tight">
-          {stripes === 0 ? 'Sem grau' : `${stripes}º Grau${stripes > 1 ? 's' : ''}`}
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-800/90 text-slate-300 border border-slate-700/80 tracking-tight shrink-0">
+          {stripes === 0 ? 'Sem grau' : `${stripes}º Grau`}
         </span>
       )}
     </div>
