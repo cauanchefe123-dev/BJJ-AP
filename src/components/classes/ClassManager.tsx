@@ -6,16 +6,18 @@ import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { uploadVideoFile } from '../../lib/videoUpload';
 
 export const ClassManager: React.FC = () => {
-  const { classes, teachers, addClass, updateClass, deleteClass } = useData();
+  const { classes, teachers, addClass, updateClass, deleteClass, academyConfig } = useData();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
 
+  const defaultProfName = teachers[0]?.name || academyConfig.headCoachName || 'Professor Responsável';
+
   const [formData, setFormData] = useState({
     title: '',
-    professorName: teachers[0]?.name || 'Prof. Gabriel "Fera" Santos',
+    professorName: defaultProfName,
     professorId: teachers[0]?.id || 'prof-1',
     daysOfWeek: [1, 3, 5], // Seg, Qua, Sex
     time: '19:00',
@@ -40,7 +42,7 @@ export const ClassManager: React.FC = () => {
     setEditingClassId(null);
     setFormData({
       title: '',
-      professorName: teachers[0]?.name || 'Prof. Gabriel "Fera" Santos',
+      professorName: defaultProfName,
       professorId: teachers[0]?.id || 'prof-1',
       daysOfWeek: [1, 3, 5],
       time: '19:00',

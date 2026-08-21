@@ -39,8 +39,8 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   onClose,
 }) => {
   const { currentUser, updateUserProfile } = useAuth();
-  const { updateStudent, beltRequests, requestBeltChange, approveBeltChange, rejectBeltChange } = useData();
-  const availableAcademies = getStoredAcademiesList();
+  const { updateStudent, beltRequests, requestBeltChange, approveBeltChange, rejectBeltChange, academyConfig } = useData();
+  const availableAcademies = getStoredAcademiesList(academyConfig);
 
   const [formData, setFormData] = useState<Partial<Student>>({});
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

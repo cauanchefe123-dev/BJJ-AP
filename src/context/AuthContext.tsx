@@ -4,6 +4,8 @@ import { INITIAL_USERS } from '../data/initialData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore } from '../lib/firebaseStore';
 import { markAsDeleted, isDeletedRecord } from '../lib/deletionTracker';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 export interface LoginResult {
   success: boolean;
@@ -16,6 +18,7 @@ interface AuthContextType {
   currentUser: User | null;
   users: User[];
   loginWithPassword: (email: string, password?: string, rememberMe?: boolean) => Promise<LoginResult> | LoginResult;
+  loginWithGoogle: (rememberMe?: boolean) => Promise<LoginResult>;
   firstAccessActivate: (email: string, newPassword?: string) => { success: boolean; message: string };
   registerStudentSelfService: (studentData: {
     name: string;
@@ -247,6 +250,165 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user: found,
       message: `Bem-vindo(a) de volta, ${found.name}!`
     };
+  };
+
+  const loginWithGoogle = async (rememberMe: boolean = true): Promise<LoginResult> => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      
+      const result = await signInWithPopup(auth, provider);
+      const googleUser = result.user;
+
+      if (!googleUser || !googleUser.email) {
+        return {
+          success: false,
+          reason: 'INVALID_CREDENTIALS',
+          message: 'Não foi possível obter o e-mail da Conta Google selecionada.'
+        };
+      }
+
+      const cleanEmail = googleUser.email.trim().toLowerCase();
+      const googleDisplayName = googleUser.displayName || cleanEmail.split('@')[0];
+      const googlePhoto = googleUser.photoURL || undefined;
+      const googleUid = googleUser.uid;
+
+      // 1. Check if user already exists in `users` state
+      let found = users.find(u => u.email && u.email.trim().toLowerCase() === cleanEmail);
+
+      // 2. If not found in users state, check Firestore students collection
+      if (!found) {
+        const studentObj = students.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
+        if (studentObj) {
+          const newUser: User = {
+            id: `user-${studentObj.id}`,
+            name: studentObj.name || googleDisplayName,
+            email: cleanEmail,
+            role: 'ALUNO',
+            studentId: studentObj.id,
+            phone: studentObj.phone || '',
+            password: studentObj.password || '123',
+            approvalStatus: studentObj.approvalStatus || 'APPROVED',
+            isActivated: true,
+            authProvider: 'google',
+            googleUid: googleUid,
+            avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com'))
+              ? studentObj.photoUrl
+              : (googlePhoto || DEFAULT_BLACK_GI_AVATAR)
+          };
+          found = newUser;
+          setUsers(prev => [newUser, ...prev]);
+          saveToFirestore('users', newUser);
+        }
+      }
+
+      // 3. If still not found anywhere, auto-create a self-service Student account with Google
+      if (!found) {
+        const newStudentId = `std-google-${Date.now()}`;
+        const newUserId = `user-google-${Date.now()}`;
+
+        const newUser: User = {
+          id: newUserId,
+          name: googleDisplayName,
+          email: cleanEmail,
+          role: 'ALUNO',
+          studentId: newStudentId,
+          phone: '',
+          approvalStatus: 'PENDING',
+          isActivated: true,
+          authProvider: 'google',
+          googleUid: googleUid,
+          avatarUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR
+        };
+
+        const newStudentObj: Student = {
+          id: newStudentId,
+          registrationNumber: `BJJ-${new Date().getFullYear()}-${String(students.length + 1).padStart(3, '0')}`,
+          name: googleDisplayName,
+          email: cleanEmail,
+          phone: '',
+          birthDate: '2000-01-01',
+          photoUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR,
+          belt: 'BRANCA',
+          stripes: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          totalClassesAttended: 0,
+          classesSinceLastGraduation: 0,
+          weightCategory: 'MÉDIO',
+          ageCategory: 'ADULTO',
+          active: true,
+          planName: 'Plano Mensal Padrão',
+          planPrice: 240,
+          paymentDueDateDay: 10,
+          paymentStatus: 'PENDENTE',
+          qrCodeToken: `BJJCRON-${newStudentId}`,
+          approvalStatus: 'PENDING',
+          notes: 'Cadastro criado via Autenticação Google',
+          hasActivatedAccount: true,
+          updatedAt: new Date().toISOString()
+        };
+
+        const notifObj = {
+          id: `notif-google-${Date.now()}`,
+          title: 'Novo Aluno cadastrado via Google',
+          message: `${googleDisplayName} (${cleanEmail}) conectou-se com a Conta Google e aguarda aprovação.`,
+          date: new Date().toISOString(),
+          read: false,
+          type: 'INFO'
+        };
+
+        saveToFirestore('users', newUser);
+        saveToFirestore('students', newStudentObj);
+        saveToFirestore('notifications', notifObj);
+
+        setUsers(prev => [newUser, ...prev]);
+        found = newUser;
+      } else {
+        // Correlate existing account: update provider, UID and photo without overwriting customized photos
+        const updatedUser: User = {
+          ...found,
+          authProvider: 'google',
+          googleUid: googleUid,
+          isActivated: true,
+          avatarUrl: (found.avatarUrl && !found.avatarUrl.includes('unsplash.com') && found.avatarUrl !== DEFAULT_BLACK_GI_AVATAR)
+            ? found.avatarUrl
+            : (googlePhoto || found.avatarUrl || DEFAULT_BLACK_GI_AVATAR)
+        };
+        found = updatedUser;
+        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        saveToFirestore('users', updatedUser);
+      }
+
+      persistUserSession(found, rememberMe);
+      setCurrentUser(found);
+
+      return {
+        success: true,
+        user: found,
+        message: `Autenticado com sucesso via Google como ${found.name}!`
+      };
+    } catch (err: any) {
+      console.error('[Google Auth Error]', err);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return {
+          success: false,
+          reason: 'INVALID_CREDENTIALS',
+          message: 'O login com Google foi cancelado.'
+        };
+      }
+      if (err.code === 'auth/popup-blocked') {
+        return {
+          success: false,
+          reason: 'INVALID_CREDENTIALS',
+          message: 'A janela pop-up do Google foi bloqueada pelo navegador. Permita pop-ups para fazer login.'
+        };
+      }
+      return {
+        success: false,
+        reason: 'INVALID_CREDENTIALS',
+        message: err.message || 'Falha ao autenticar com a Conta Google.'
+      };
+    }
   };
 
   const firstAccessActivate = (email: string, newPassword?: string): { success: boolean; message: string } => {
@@ -813,6 +975,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentUser,
       users,
       loginWithPassword,
+      loginWithGoogle,
       firstAccessActivate,
       registerStudentSelfService,
       registerTeacherSelfService,

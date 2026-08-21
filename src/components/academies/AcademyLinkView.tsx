@@ -19,6 +19,8 @@ import {
   X
 } from 'lucide-react';
 
+import { AcademyConfig } from '../../types';
+
 export interface AcademyItem {
   id: string;
   name: string;
@@ -31,24 +33,21 @@ export interface AcademyItem {
   isDefault?: boolean;
 }
 
-const TEST_ACADEMY_NAMES = [
-  'gracie barra - matriz principal',
-  'alliance jiu-jitsu team - matriz',
-  'atos jiu-jitsu headquarters',
-  'checkmat bjj team - sp',
-  'nova união jiu-jitsu - matriz'
-];
+export const getStoredAcademiesList = (config?: Partial<AcademyConfig>): AcademyItem[] => {
+  const baseName = config?.name || config?.fantasyName || 'Escola de Jiu-Jitsu';
+  const baseHeadCoach = config?.headCoachName || 'Professor / Mestre Responsável';
+  const baseCity = config?.address || 'Matriz Oficial';
+  const baseLogo = config?.logoUrl || 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200';
 
-export const getStoredAcademiesList = (): AcademyItem[] => {
   return [{
     id: 'real-academy-matriz',
-    name: 'BJJCRON ACADEMY',
-    fantasyName: 'BJJCRON Jiu-Jitsu Headquarter',
-    logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=200',
-    headCoachName: 'Mestre Gabriel "Fera" Santos',
-    city: 'São Paulo - SP',
+    name: baseName,
+    fantasyName: config?.fantasyName || baseName,
+    logoUrl: baseLogo,
+    headCoachName: baseHeadCoach,
+    city: baseCity,
     studentsCount: 1,
-    isDefault: false
+    isDefault: true
   }];
 };
 
@@ -122,24 +121,9 @@ export const AcademyLinkView: React.FC<AcademyLinkViewProps> = ({ onNavigateHome
   };
 
   useEffect(() => {
-    const list = getStoredAcademiesList();
-    // Ensure current active academyConfig is in the list
-    const hasCurrent = list.some(a => a.name.toLowerCase() === academyConfig.name.toLowerCase());
-    if (!hasCurrent && academyConfig.name) {
-      const currentItem: AcademyItem = {
-        id: 'current-academy',
-        name: academyConfig.name,
-        fantasyName: academyConfig.fantasyName || academyConfig.name,
-        logoUrl: academyConfig.logoUrl || 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&q=80&w=300',
-        headCoachName: academyConfig.headCoachName || 'Prof. Gabriel "Fera" Santos',
-        city: academyConfig.address || 'São Paulo - SP',
-        studentsCount: students.length,
-        isDefault: false
-      };
-      list.unshift(currentItem);
-    }
+    const list = getStoredAcademiesList(academyConfig);
     setAcademiesList(list);
-    const match = list.find(a => a.name.toLowerCase() === academyConfig.name.toLowerCase());
+    const match = list.find(a => a.name.toLowerCase() === academyConfig.name.toLowerCase()) || list[0];
     if (match) {
       setLinkedAcademyId(match.id);
     }

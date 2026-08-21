@@ -54,6 +54,7 @@ export const WeeklyFocusPositionsView: React.FC = () => {
     deleteWeeklyPosition,
     toggleStudentLearnedPosition,
     updateClass,
+    academyConfig,
   } = useData();
 
   const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
@@ -84,7 +85,7 @@ export const WeeklyFocusPositionsView: React.FC = () => {
   const [formCategory, setFormCategory] = useState<WeeklyPosition['category']>('GUARDA');
   const [formClassId, setFormClassId] = useState('');
   const [formClassName, setFormClassName] = useState('');
-  const [formProfessorName, setFormProfessorName] = useState(currentUser?.name || 'Prof. Gabriel Santos');
+  const [formProfessorName, setFormProfessorName] = useState(currentUser?.name || academyConfig.headCoachName || 'Professor Responsável');
   const [formWeekLabel, setFormWeekLabel] = useState('Foco da Semana Atual');
   const [formDescription, setFormDescription] = useState('');
   const [formKeyDetails, setFormKeyDetails] = useState<string[]>(['', '', '']);
@@ -111,7 +112,7 @@ export const WeeklyFocusPositionsView: React.FC = () => {
     const firstClass = classes[0];
     setFormClassId(firstClass?.id || '');
     setFormClassName(firstClass?.title || 'Jiu-Jitsu Fundamental');
-    setFormProfessorName(currentUser?.name || 'Prof. Gabriel Santos');
+    setFormProfessorName(currentUser?.name || academyConfig.headCoachName || 'Professor Responsável');
     setFormWeekLabel('Semana de ' + new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
     setFormDescription('');
     setFormKeyDetails(['', '', '']);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 import { getStoredAcademiesList } from '../academies/AcademyLinkView';
 import { BeltType, AgeCategory, WeightCategory } from '../../types';
 import {
@@ -30,6 +31,7 @@ interface AuthModalProps {
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const {
     loginWithPassword,
+    loginWithGoogle,
     firstAccessActivate,
     registerStudentSelfService,
     registerTeacherSelfService,
@@ -39,15 +41,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     resetPasswordWithCode,
     currentUser
   } = useAuth();
+  const { academyConfig } = useData();
 
   const [activeTab, setActiveTab] = useState<'REGISTER' | 'LOGIN' | 'FIRST_ACCESS' | 'RECOVER'>('LOGIN');
   const [selectedRole, setSelectedRole] = useState<'ALUNO' | 'PROFESSOR' | 'ADMIN'>('ALUNO');
-  const availableAcademies = getStoredAcademiesList();
+  const availableAcademies = getStoredAcademiesList(academyConfig);
 
   // Form States - All clean without pre-filled test data
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [firstAccessEmail, setFirstAccessEmail] = useState('');
   const [firstAccessPassword, setFirstAccessPassword] = useState('');
@@ -123,6 +127,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         type: res.reason === 'PENDING' ? 'warning' : 'error',
         message: res.message || 'Falha na autenticação.'
       });
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    setFeedback(null);
+    try {
+      const res = await loginWithGoogle(rememberMe);
+      if (res.success) {
+        setFeedback({ type: 'success', message: res.message || 'Login com Google realizado com sucesso!' });
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        setFeedback({
+          type: res.reason === 'PENDING' ? 'warning' : 'error',
+          message: res.message || 'Falha ao autenticar com a Conta Google.'
+        });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Erro inesperado no login Google.' });
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -449,16 +476,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             {/* FORM FOR ALUNO */}
             {selectedRole === 'ALUNO' && (
-              <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-200">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                    Cadastro de Novo Aluno / Atleta
-                  </p>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
-                    Preencha seus dados para criar sua conta de aluno.
-                  </p>
+              <div className="space-y-3.5 text-xs">
+                {/* 1-Click Fast Register with Google */}
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading}
+                  className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-slate-100 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-md active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed group"
+                >
+                  {isGoogleLoading ? (
+                    <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                  )}
+                  <span>{isGoogleLoading ? 'Criando conta com Google...' : 'Cadastrar com 1-Clique via Google'}</span>
+                </button>
+
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="border-t border-slate-800 w-full" />
+                  <span className="bg-slate-900 px-3 text-[10px] text-slate-500 font-bold tracking-wider uppercase whitespace-nowrap">
+                    ou preencha o formulário manual
+                  </span>
+                  <div className="border-t border-slate-800 w-full" />
                 </div>
+
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-200">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <UserCheck className="w-4 h-4 text-emerald-400" />
+                      Cadastro de Novo Aluno / Atleta
+                    </p>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Preencha seus dados para criar sua conta de aluno.
+                    </p>
+                  </div>
 
                 <div>
                   <label className="text-slate-300 font-bold block mb-1">Nome Completo *</label>
@@ -576,7 +644,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-            )}
+            </div>
+          )}
 
             {/* FORM FOR PROFESSOR */}
             {selectedRole === 'PROFESSOR' && (
@@ -769,71 +838,113 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* TAB 2: LOGIN WITH PASSWORD */}
         {activeTab === 'LOGIN' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-            <div>
-              <label className="text-slate-300 font-bold block mb-1">E-mail Cadastrado</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  placeholder="seu.email@exemplo.com"
-                  value={loginEmail}
-                  onChange={e => setLoginEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-slate-300 font-bold block">Senha de Acesso</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('RECOVER');
-                    setRecoveryStep('EMAIL');
-                    setRecoveryEmail(loginEmail);
-                    setFeedback(null);
-                  }}
-                  className="text-amber-400 hover:text-amber-300 font-semibold underline text-[11px] transition-colors"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={loginPassword}
-                  onChange={e => setLoginPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between py-0.5">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 font-medium select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500"
-                />
-                <span>Manter-me conectado neste dispositivo</span>
-              </label>
-            </div>
-
+          <div className="space-y-4 text-xs">
+            {/* Google Fast Sign-In */}
             <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isGoogleLoading}
+              className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-100 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-md active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed group"
             >
-              Entrar na Plataforma
-              <ArrowRight className="w-4 h-4" />
+              {isGoogleLoading ? (
+                <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              )}
+              <span>{isGoogleLoading ? 'Conectando ao Google...' : 'Entrar com a Conta Google'}</span>
             </button>
-          </form>
+
+            <div className="relative flex items-center justify-center my-3">
+              <div className="border-t border-slate-800 w-full" />
+              <span className="bg-slate-900 px-3 text-[10px] text-slate-500 font-bold tracking-wider uppercase whitespace-nowrap">
+                ou com e-mail e senha
+              </span>
+              <div className="border-t border-slate-800 w-full" />
+            </div>
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">E-mail Cadastrado</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    value={loginEmail}
+                    onChange={e => setLoginEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold block">Senha de Acesso</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('RECOVER');
+                      setRecoveryStep('EMAIL');
+                      setRecoveryEmail(loginEmail);
+                      setFeedback(null);
+                    }}
+                    className="text-amber-400 hover:text-amber-300 font-semibold underline text-[11px] transition-colors"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={e => setLoginPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between py-0.5">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 font-medium select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500"
+                  />
+                  <span>Manter-me conectado neste dispositivo</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                Entrar com E-mail
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         )}
 
         {/* TAB 3: FIRST ACCESS */}
