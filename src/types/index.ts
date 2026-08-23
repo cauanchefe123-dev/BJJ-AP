@@ -257,3 +257,52 @@ export interface WeeklyPosition {
   learnedByStudentIds?: string[]; // IDs dos alunos que aprenderam esta técnica
   createdAt: string;
 }
+
+export type RollChallengeStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'COMPLETED' | 'CANCELLED';
+export type RollModality = 'GI' | 'NO_GI';
+export type RollRulesType = 'ESTUDO_LEVE' | 'SUBMISSION_ONLY' | 'PONTOS_IBJJF' | 'TEMPO_LIVRE';
+export type RollOutcomeType = 'SUBMISSION' | 'POINTS' | 'TECHNICAL_DRAW' | 'STUDY_ROUND' | 'DISQUALIFICATION';
+
+export interface RollChallengeResult {
+  winnerId?: string;
+  winnerName?: string;
+  outcomeType: RollOutcomeType;
+  submissionTechnique?: string;
+  submissionMinute?: number;
+  scoreChallenger?: number;
+  scoreChallenged?: number;
+  technicalNotes?: string;
+  registeredBy: string;
+  registeredAt: string;
+}
+
+export interface RollChallenge {
+  id: string;
+  challengerId: string;
+  challengerName: string;
+  challengerBelt: BeltType;
+  challengerStripes: number;
+  challengerPhotoUrl?: string;
+  challengedId?: string;
+  challengedName?: string;
+  challengedBelt?: BeltType;
+  challengedStripes?: number;
+  challengedPhotoUrl?: string;
+  isPublicOpenChallenge: boolean;
+  title: string;
+  status: RollChallengeStatus;
+  scheduledDate: string;
+  scheduledTime?: string;
+  classId?: string;
+  className?: string;
+  modality: RollModality;
+  rulesType: RollRulesType;
+  targetDurationMinutes: number;
+  targetWeightCategory?: string;
+  notes?: string;
+  declineReason?: string;
+  createdAt: string;
+  acceptedAt?: string;
+  completedAt?: string;
+  result?: RollChallengeResult;
+}

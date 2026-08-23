@@ -22,7 +22,8 @@ import {
   Edit3,
   Target,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Swords
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -61,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const trainingNav = [
     { id: 'attendance', label: 'Controle de Frequência', icon: UserCheck, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'classes', label: 'Turmas & Horários', icon: CalendarDays, roles: ['ADMIN', 'PROFESSOR'] },
+    { id: 'challenges', label: 'Desafios de Rola', icon: Swords, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },
     { id: 'timer', label: 'Cronômetro do Tatame', icon: Timer, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'ranking', label: 'Ranking da Academia', icon: Trophy, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },
     { id: 'observations', label: 'Observações do Mestre', icon: MessageSquareQuote, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },

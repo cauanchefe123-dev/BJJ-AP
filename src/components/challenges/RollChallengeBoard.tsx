@@ -1,0 +1,533 @@
+import React, { useState, useMemo } from 'react';
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
+import { RollChallenge, BeltType } from '../../types';
+import { resolveStudentForUser, getStudentAvatar } from '../../constants/avatar';
+import { ChallengeCard } from './ChallengeCard';
+import { NewChallengeModal } from './NewChallengeModal';
+import { RollResultModal } from './RollResultModal';
+import { BeltBadge } from '../belts/BeltBadge';
+import { 
+  Swords, 
+  Plus, 
+  Flame, 
+  Award, 
+  Users, 
+  Clock, 
+  Filter, 
+  Search, 
+  Trophy, 
+  Sparkles, 
+  CheckCircle, 
+  Shield, 
+  BarChart2, 
+  Zap,
+  TrendingUp,
+  RotateCcw
+} from 'lucide-react';
+
+interface RollChallengeBoardProps {
+  onNavigateToTimer?: (challenge?: RollChallenge) => void;
+}
+
+export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
+  onNavigateToTimer,
+}) => {
+  const { 
+    rollChallenges, 
+    students, 
+    acceptRollChallenge, 
+    declineRollChallenge, 
+    cancelRollChallenge, 
+    deleteRollChallenge,
+    academyConfig 
+  } = useData();
+  const { currentUser } = useAuth();
+
+  const currentStudent = resolveStudentForUser(currentUser, students);
+  const currentStudentId = currentStudent?.id;
+
+  const [activeViewTab, setActiveViewTab] = useState<'BOARD' | 'MY_CHALLENGES' | 'HISTORY' | 'STATS'>('BOARD');
+  const [modalityFilter, setModalityFilter] = useState<'ALL' | 'GI' | 'NO_GI'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isNewChallengeModalOpen, setIsNewChallengeModalOpen] = useState(false);
+  const [selectedChallengeForResult, setSelectedChallengeForResult] = useState<RollChallenge | null>(null);
+
+  // Challenges involving current student
+  const myChallenges = useMemo(() => {
+    if (!currentStudentId) return [];
+    return rollChallenges.filter(
+      c => c.challengerId === currentStudentId || c.challengedId === currentStudentId
+    );
+  }, [rollChallenges, currentStudentId]);
+
+  // Pending challenges where current student is challenged
+  const myPendingReceived = useMemo(() => {
+    if (!currentStudentId) return [];
+    return rollChallenges.filter(
+      c => c.status === 'PENDING' && c.challengedId === currentStudentId
+    );
+  }, [rollChallenges, currentStudentId]);
+
+  // Filtered lists based on active tab and filters
+  const displayedChallenges = useMemo(() => {
+    let list = [...rollChallenges];
+
+    // Tab filter
+    if (activeViewTab === 'BOARD') {
+      // Active challenges (Open mural + Accepted duels + Pending)
+      list = list.filter(c => c.status === 'PENDING' || c.status === 'ACCEPTED');
+    } else if (activeViewTab === 'MY_CHALLENGES') {
+      if (currentStudentId) {
+        list = list.filter(c => c.challengerId === currentStudentId || c.challengedId === currentStudentId);
+      }
+    } else if (activeViewTab === 'HISTORY') {
+      list = list.filter(c => c.status === 'COMPLETED' || c.status === 'DECLINED' || c.status === 'CANCELLED');
+    }
+
+    // Modality filter
+    if (modalityFilter !== 'ALL') {
+      list = list.filter(c => c.modality === modalityFilter);
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        c => c.challengerName.toLowerCase().includes(q) ||
+             (c.challengedName && c.challengedName.toLowerCase().includes(q)) ||
+             (c.title && c.title.toLowerCase().includes(q)) ||
+             (c.className && c.className.toLowerCase().includes(q))
+      );
+    }
+
+    // Sort: newest first
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [rollChallenges, activeViewTab, modalityFilter, searchQuery, currentStudentId]);
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const completed = rollChallenges.filter(c => c.status === 'COMPLETED');
+    const totalRolls = completed.length;
+
+    // Submissions map
+    const techCount: Record<string, number> = {};
+    let subCount = 0;
+    let pointsCount = 0;
+    let studyCount = 0;
+
+    // Most active rollers
+    const studentRollCount: Record<string, { name: string; belt: BeltType; stripes: number; photoUrl?: string; count: number; wins: number }> = {};
+
+    completed.forEach(c => {
+      if (c.result) {
+        if (c.result.outcomeType === 'SUBMISSION') {
+          subCount++;
+          const tech = c.result.submissionTechnique || 'Outro Golpe';
+          techCount[tech] = (techCount[tech] || 0) + 1;
+        } else if (c.result.outcomeType === 'POINTS') {
+          pointsCount++;
+        } else {
+          studyCount++;
+        }
+
+        // Count for challenger
+        if (!studentRollCount[c.challengerId]) {
+          studentRollCount[c.challengerId] = {
+            name: c.challengerName,
+            belt: c.challengerBelt,
+            stripes: c.challengerStripes,
+            photoUrl: c.challengerPhotoUrl,
+            count: 0,
+            wins: 0,
+          };
+        }
+        studentRollCount[c.challengerId].count++;
+        if (c.result.winnerId === c.challengerId) studentRollCount[c.challengerId].wins++;
+
+        // Count for challenged
+        if (c.challengedId && c.challengedName) {
+          if (!studentRollCount[c.challengedId]) {
+            studentRollCount[c.challengedId] = {
+              name: c.challengedName,
+              belt: c.challengedBelt || 'BRANCA',
+              stripes: c.challengedStripes || 0,
+              photoUrl: c.challengedPhotoUrl,
+              count: 0,
+              wins: 0,
+            };
+          }
+          studentRollCount[c.challengedId].count++;
+          if (c.result.winnerId === c.challengedId) studentRollCount[c.challengedId].wins++;
+        }
+      }
+    });
+
+    const topTechniques = Object.entries(techCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const topRollers = Object.values(studentRollCount)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      totalRolls,
+      subCount,
+      pointsCount,
+      studyCount,
+      topTechniques,
+      topRollers,
+      activeChallengesCount: rollChallenges.filter(c => c.status === 'PENDING' || c.status === 'ACCEPTED').length,
+    };
+  }, [rollChallenges]);
+
+  const handleAcceptChallenge = (challengeId: string) => {
+    if (currentStudent) {
+      acceptRollChallenge(challengeId, {
+        id: currentStudent.id,
+        name: currentStudent.name,
+        belt: currentStudent.belt,
+        stripes: currentStudent.stripes,
+        photoUrl: getStudentAvatar(currentStudent),
+      });
+    } else {
+      acceptRollChallenge(challengeId);
+    }
+  };
+
+  const handleDeclineChallenge = (challengeId: string) => {
+    declineRollChallenge(challengeId);
+  };
+
+  const handleCancelChallenge = (challengeId: string) => {
+    cancelRollChallenge(challengeId);
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header Banner */}
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-amber-500/20 border border-amber-400 shrink-0">
+              <Swords className="w-8 h-8 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight font-display">
+                  Dinâmica de Desafios de Rola 🥋
+                </h2>
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider font-mono">
+                  Tatame Fight Match
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl font-medium">
+                Desafie seus colegas para um rola, marque treinos específicos de estudo ou lance um desafio aberto no mural da academia.
+              </p>
+            </div>
+          </div>
+
+          {/* Action button */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <button
+              onClick={() => setIsNewChallengeModalOpen(true)}
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              Lançar Desafio 🥋
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Notification alert if pending challenges for user */}
+        {myPendingReceived.length > 0 && (
+          <div className="mt-5 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 flex-wrap animate-pulse">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚔️</span>
+              <p className="text-xs font-bold text-amber-300">
+                Você tem {myPendingReceived.length} convite{myPendingReceived.length > 1 ? 's' : ''} de desafio de rola aguardando sua resposta!
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveViewTab('MY_CHALLENGES')}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all cursor-pointer shadow-xs"
+            >
+              Ver Convites →
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Tabs Navigation & Filters */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          {[
+            { id: 'BOARD', label: 'Mural do Tatame', icon: Swords, count: stats.activeChallengesCount },
+            { id: 'MY_CHALLENGES', label: 'Meus Desafios', icon: Users, count: myChallenges.length, alertCount: myPendingReceived.length },
+            { id: 'HISTORY', label: 'Histórico de Rolas', icon: CheckCircle, count: stats.totalRolls },
+            { id: 'STATS', label: 'Estatísticas & Golpes', icon: BarChart2 },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeViewTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveViewTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer shrink-0 border ${
+                  isActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md shadow-amber-500/10'
+                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isActive ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+                {tab.alertCount ? (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search & Modality Filters */}
+        {activeViewTab !== 'STATS' && (
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            {/* Modality Filter Pills */}
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-2xl p-1 shrink-0">
+              {[
+                { id: 'ALL', label: 'Todos' },
+                { id: 'GI', label: 'Gi' },
+                { id: 'NO_GI', label: 'No-Gi' },
+              ].map((mod) => (
+                <button
+                  key={mod.id}
+                  onClick={() => setModalityFilter(mod.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    modalityFilter === mod.id
+                      ? 'bg-slate-800 text-amber-400 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {mod.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar atleta ou turma..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-8.5 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Tab Views */}
+      {activeViewTab === 'STATS' ? (
+        /* Stats & Analytics View */
+        <div className="space-y-6">
+          {/* Quick Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-1 shadow-md">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total de Rolas</span>
+              <p className="text-2xl sm:text-3xl font-black text-amber-400">{stats.totalRolls}</p>
+              <p className="text-[11px] text-slate-500">Confrontos concluídos</p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-1 shadow-md">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Finalizações</span>
+              <p className="text-2xl sm:text-3xl font-black text-emerald-400">{stats.subCount}</p>
+              <p className="text-[11px] text-slate-500">
+                {stats.totalRolls > 0 ? `${Math.round((stats.subCount / stats.totalRolls) * 100)}% dos combates` : 'Nenhum registro'}
+              </p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-1 shadow-md">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Por Pontos</span>
+              <p className="text-2xl sm:text-3xl font-black text-blue-400">{stats.pointsCount}</p>
+              <p className="text-[11px] text-slate-500">Decisão por placar</p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-1 shadow-md">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Rolas de Estudo</span>
+              <p className="text-2xl sm:text-3xl font-black text-purple-400">{stats.studyCount}</p>
+              <p className="text-[11px] text-slate-500">Treinos técnicos soltos</p>
+            </div>
+          </div>
+
+          {/* Top Submissions & Most Active Rollers Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Top Submissions */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 space-y-4 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Flame className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-100">Finalizações Mais Aplicadas</h3>
+                  <p className="text-xs text-slate-400">Golpes mais eficientes nos desafios da academia</p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                {stats.topTechniques.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-slate-500">
+                    Ainda não há finalizações registradas nos desafios.
+                  </p>
+                ) : (
+                  stats.topTechniques.map(([tech, count], index) => {
+                    const percentage = stats.subCount > 0 ? Math.round((count / stats.subCount) * 100) : 0;
+                    return (
+                      <div key={tech} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-slate-200 flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center text-[10px] font-black">
+                              {index + 1}
+                            </span>
+                            {tech}
+                          </span>
+                          <span className="text-amber-400">{count}x ({percentage}%)</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Most Active Rollers */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 space-y-4 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-100">Guerreiros do Tatame</h3>
+                  <p className="text-xs text-slate-400">Atletas mais ativos em desafios e combates</p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                {stats.topRollers.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-slate-500">
+                    Ainda não há duelos finalizados.
+                  </p>
+                ) : (
+                  stats.topRollers.map((roller, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 text-center font-black text-xs text-amber-400">#{idx + 1}</span>
+                        <img
+                          src={roller.photoUrl || '/avatar.png'}
+                          alt={roller.name}
+                          className="w-10 h-10 rounded-xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-bold text-xs text-slate-100 truncate">{roller.name}</p>
+                          <div className="mt-0.5">
+                            <BeltBadge belt={roller.belt} stripes={roller.stripes} size="sm" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-black text-amber-400">{roller.count} rolas</span>
+                        <p className="text-[10px] text-slate-400 font-semibold">{roller.wins} vitórias</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* List of Challenge Cards */
+        <div className="space-y-4">
+          {displayedChallenges.length === 0 ? (
+            <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-3xl p-10 sm:p-14 text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-slate-800/80 border border-slate-700 mx-auto flex items-center justify-center text-amber-400">
+                <Swords className="w-8 h-8 opacity-80" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <h3 className="text-base sm:text-lg font-black text-slate-200">
+                  {activeViewTab === 'MY_CHALLENGES'
+                    ? 'Você não tem desafios nesta lista'
+                    : activeViewTab === 'HISTORY'
+                    ? 'Nenhum rola finalizado no histórico'
+                    : 'Nenhum desafio aberto no mural no momento'}
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Que tal dar o primeiro passo e desafiar um colega de treino para um rola amistoso hoje?
+                </p>
+              </div>
+              <button
+                onClick={() => setIsNewChallengeModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                Lançar Desafio Agora 🥋
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {displayedChallenges.map((challenge) => (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  currentUserId={currentUser?.id}
+                  currentStudentId={currentStudentId}
+                  currentStudentBelt={currentStudent?.belt}
+                  currentStudentStripes={currentStudent?.stripes}
+                  currentStudentName={currentStudent?.name}
+                  currentStudentPhoto={currentStudent ? getStudentAvatar(currentStudent) : undefined}
+                  userRole={currentUser?.role}
+                  onAccept={handleAcceptChallenge}
+                  onDecline={handleDeclineChallenge}
+                  onOpenResultModal={(c) => setSelectedChallengeForResult(c)}
+                  onOpenTimerWithChallenge={onNavigateToTimer}
+                  onCancel={handleCancelChallenge}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* New Challenge Creation Modal */}
+      <NewChallengeModal
+        isOpen={isNewChallengeModalOpen}
+        onClose={() => setIsNewChallengeModalOpen(false)}
+        challengerStudent={currentStudent}
+      />
+
+      {/* Roll Result Outcome Modal */}
+      <RollResultModal
+        isOpen={!!selectedChallengeForResult}
+        onClose={() => setSelectedChallengeForResult(null)}
+        challenge={selectedChallengeForResult}
+      />
+    </div>
+  );
+};

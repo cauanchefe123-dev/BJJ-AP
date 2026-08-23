@@ -20,12 +20,18 @@ import {
   X,
   Share2,
   SkipForward,
-  SkipBack
+  SkipBack,
+  Swords
 } from 'lucide-react';
 import { SpotifyTatamePlayer } from './SpotifyTatamePlayer';
 import { SpotifyService, SpotifyPlaybackState } from '../../lib/spotifyService';
+import { useData } from '../../context/DataContext';
+import { RollChallenge } from '../../types';
 
 export const MatTimer: React.FC = () => {
+  const { rollChallenges } = useData();
+  const [selectedChallenge, setSelectedChallenge] = useState<RollChallenge | null>(null);
+
   const [roundTimeMinutes, setRoundTimeMinutes] = useState(6);
   const [restTimeSeconds, setRestTimeSeconds] = useState(60);
   const [totalRounds, setTotalRounds] = useState(5);
@@ -349,6 +355,61 @@ export const MatTimer: React.FC = () => {
         </div>
       </div>
 
+      {/* Active Roll Challenges quick bar (Casar confrontos no tatame) */}
+      {(() => {
+        const activeMatches = rollChallenges.filter(c => c.status === 'ACCEPTED' || (c.status === 'PENDING' && c.challengedId));
+        if (activeMatches.length === 0) return null;
+
+        return (
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Swords className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-200">Rolas Casados da Academia:</span>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-1">
+              {activeMatches.map((match) => {
+                const isCurrentSelected = selectedChallenge?.id === match.id;
+                return (
+                  <button
+                    key={match.id}
+                    onClick={() => {
+                      if (isCurrentSelected) {
+                        setSelectedChallenge(null);
+                      } else {
+                        setSelectedChallenge(match);
+                        setRoundTimeMinutes(match.targetDurationMinutes);
+                        setTimeLeft(match.targetDurationMinutes * 60);
+                        setIsRunning(false);
+                        setIsResting(false);
+                        setCurrentRound(1);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
+                      isCurrentSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-amber-500/40'
+                    }`}
+                  >
+                    <span>{match.challengerName} vs {match.challengedName || 'Adversário'}</span>
+                    <span className="text-[10px] opacity-80">({match.targetDurationMinutes}m)</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedChallenge && (
+              <button
+                onClick={() => setSelectedChallenge(null)}
+                className="text-[11px] text-slate-400 hover:text-white font-medium cursor-pointer"
+              >
+                Limpar Confronto ✕
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Main Big Display Panel (Dojo Scoreboard) */}
       <div
         ref={timerContainerRef}
@@ -367,6 +428,22 @@ export const MatTimer: React.FC = () => {
             : 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-slate-800'
         }`}
       >
+        {/* Duel Confrontation Banner (when selected) */}
+        {selectedChallenge && (
+          <div className="z-20 w-full max-w-xl mb-3 bg-slate-950/90 border border-amber-500/50 rounded-2xl p-3 shadow-xl flex items-center justify-between gap-3 text-center">
+            <div className="flex-1 text-right truncate">
+              <span className="text-[10px] font-bold uppercase text-amber-400 block">Desafiante</span>
+              <p className="font-extrabold text-sm text-slate-100 truncate">{selectedChallenge.challengerName}</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-xs text-amber-400 shrink-0">
+              VS
+            </div>
+            <div className="flex-1 text-left truncate">
+              <span className="text-[10px] font-bold uppercase text-blue-400 block">Desafiado</span>
+              <p className="font-extrabold text-sm text-slate-100 truncate">{selectedChallenge.challengedName || 'Adversário'}</p>
+            </div>
+          </div>
+        )}
         {/* Subtle Background Radial Glow */}
         <div className={`absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none opacity-20 ${
           timeLeft === 0 

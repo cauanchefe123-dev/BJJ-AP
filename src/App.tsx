@@ -40,6 +40,7 @@ import { AcademySettings } from './components/settings/AcademySettings';
 import { AcademyLinkView } from './components/academies/AcademyLinkView';
 import { AdminStudentDashboardView } from './components/dashboard/AdminStudentDashboardView';
 import { WeeklyFocusPositionsView } from './components/positions/WeeklyFocusPositionsView';
+import { RollChallengeBoard } from './components/challenges/RollChallengeBoard';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
@@ -218,6 +219,12 @@ function MainApp() {
                 {activeTab === 'teachers' && <TeacherManager />}
 
                 {activeTab === 'classes' && <ClassManager />}
+
+                {activeTab === 'challenges' && (
+                  <RollChallengeBoard
+                    onNavigateToTimer={() => setActiveTab('timer')}
+                  />
+                )}
 
                 {activeTab === 'card' && (
                   <div className="py-4">

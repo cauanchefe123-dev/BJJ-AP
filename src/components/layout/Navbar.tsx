@@ -44,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     'students-dashboard': 'Dashboard dos Alunos',
     attendance: 'Controle de Frequência',
     academies: 'Vincular Academia',
+    challenges: 'Desafios de Rola',
     students: 'Alunos & Graduações',
     teachers: 'Professores & Staff',
     classes: 'Turmas & Horários',

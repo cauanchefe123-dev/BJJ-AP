@@ -7,7 +7,7 @@ import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import { calculateRanking, getStudentTotalClasses } from '../../utils/ranking';
 import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, formatDateBR } from '../../utils/dateUtils';
-import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck } from 'lucide-react';
+import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { BJJClass } from '../../types';
 
@@ -21,7 +21,7 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, onOpenPixModal, onOpenEditModal, onOpenCheckin, selectedStudentId }) => {
   const { currentUser } = useAuth();
-  const { students, payments, attendances, academyConfig, classes } = useData();
+  const { students, payments, attendances, academyConfig, classes, rollChallenges } = useData();
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
 
@@ -218,6 +218,116 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           <p className="text-[11px] text-slate-400 truncate">Jornada acumulada</p>
         </div>
       </div>
+
+      {/* Desafios de Rola no Tatame */}
+      {(() => {
+        const studentId = currentStudent?.id;
+        const myPending = rollChallenges.filter(c => c.status === 'PENDING' && c.challengedId === studentId);
+        const myActive = rollChallenges.filter(c => (c.status === 'PENDING' || c.status === 'ACCEPTED') && (c.challengerId === studentId || c.challengedId === studentId));
+        const openChallenges = rollChallenges.filter(c => c.status === 'PENDING' && c.isPublicOpenChallenge && c.challengerId !== studentId);
+
+        return (
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-white space-y-4 shadow-lg relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-lg shadow-sm shrink-0">
+                  <Swords className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+                    Desafios de Rola no Tatame 🥋
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Desafie colegas, participe de rolas de estudo ou aceite confrontos do mural.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onNavigate('challenges')}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Swords className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Ver Todos os Desafios →</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Banner Alert if Pending Challenge for Current Student */}
+            {myPending.length > 0 && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-950 to-slate-950 border border-amber-500/40 flex items-center justify-between gap-3 flex-wrap animate-pulse">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">⚔️</span>
+                  <div>
+                    <p className="font-extrabold text-xs text-amber-300">
+                      Você foi desafiado por {myPending[0].challengerName}!
+                    </p>
+                    <p className="text-[11px] text-slate-300">
+                      Modalidade: {myPending[0].modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'} ({myPending[0].targetDurationMinutes} min)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onNavigate('challenges')}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all cursor-pointer shadow-xs"
+                >
+                  Responder Desafio
+                </button>
+              </div>
+            )}
+
+            {/* Open and active previews */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {openChallenges.slice(0, 3).map(ch => (
+                <div
+                  key={ch.id}
+                  className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 transition-all space-y-2.5 flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                      ch.modality === 'NO_GI' ? 'bg-purple-500/15 text-purple-300' : 'bg-indigo-500/15 text-indigo-300'
+                    }`}>
+                      {ch.modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-400">
+                      {ch.targetDurationMinutes} min
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={ch.challengerPhotoUrl || '/avatar.png'}
+                      alt={ch.challengerName}
+                      className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs text-slate-100 truncate">{ch.challengerName}</p>
+                      <div className="mt-0.5">
+                        <BeltBadge belt={ch.challengerBelt} stripes={ch.challengerStripes} size="sm" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onNavigate('challenges')}
+                    className="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 transition-colors cursor-pointer"
+                  >
+                    Topar Rola no Mural 🥋
+                  </button>
+                </div>
+              ))}
+
+              {openChallenges.length === 0 && myActive.length === 0 && (
+                <div className="col-span-full py-4 text-center text-xs text-slate-400 bg-slate-950/40 rounded-2xl border border-slate-800/60 p-4">
+                  <p className="font-semibold text-slate-300">Nenhum desafio ativo no momento.</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Clique em "Ver Todos os Desafios" para convidar um colega para rolar!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Foco Técnico da Semana por Turma */}
       <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">

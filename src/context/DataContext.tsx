@@ -13,6 +13,8 @@ import {
   AppNotification,
   WeeklyPosition,
   BeltType,
+  RollChallenge,
+  RollChallengeResult,
 } from '../types';
 import {
   INITIAL_ACADEMY_CONFIG,
@@ -25,6 +27,7 @@ import {
   INITIAL_BELT_REQUESTS,
   INITIAL_TRAINING_LOGS,
   INITIAL_TEACHER_OBSERVATIONS,
+  INITIAL_ROLL_CHALLENGES,
 } from '../data/initialData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import {
@@ -161,6 +164,18 @@ interface DataContextType {
   deleteWeeklyPosition: (id: string) => void;
   toggleStudentLearnedPosition: (positionId: string, studentId: string) => void;
 
+  // Roll Challenges Actions (Dinâmica de Desafio para um Rola)
+  rollChallenges: RollChallenge[];
+  createRollChallenge: (challengeData: Omit<RollChallenge, 'id' | 'createdAt' | 'status'>) => RollChallenge;
+  acceptRollChallenge: (
+    challengeId: string,
+    acceptingStudent?: { id: string; name: string; belt: BeltType; stripes: number; photoUrl?: string }
+  ) => void;
+  declineRollChallenge: (challengeId: string, reason?: string) => void;
+  cancelRollChallenge: (challengeId: string) => void;
+  completeRollChallenge: (challengeId: string, result: RollChallengeResult) => void;
+  deleteRollChallenge: (challengeId: string) => void;
+
   // Config Actions
   updateAcademyConfig: (updates: Partial<AcademyConfig>) => void;
 
@@ -215,6 +230,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [trainingLogs, setTrainingLogs] = useState<TrainingLog[]>([]);
   const [teacherObservations, setTeacherObservations] = useState<TeacherObservation[]>([]);
   const [weeklyPositions, setWeeklyPositions] = useState<WeeklyPosition[]>([]);
+  const [rollChallenges, setRollChallenges] = useState<RollChallenge[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [academyConfig, setAcademyConfig] = useState<AcademyConfig>(INITIAL_ACADEMY_CONFIG);
 
@@ -302,6 +318,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setWeeklyPositions(valid);
     });
 
+    const unsubRollChallenges = subscribeFirestoreCollection<RollChallenge>('rollChallenges', (docs) => {
+      const valid = docs.filter(c => !isDeletedRecord(c.id));
+      setRollChallenges(valid);
+    });
+
     const unsubNotifications = subscribeFirestoreCollection<AppNotification>('notifications', (docs) => {
       const valid = docs.filter(n => !isDeletedRecord(n.id));
       setNotifications(valid);
@@ -327,6 +348,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTrainingLogs();
       unsubTeacherObservations();
       unsubWeeklyPositions();
+      unsubRollChallenges();
       unsubNotifications();
       unsubConfig();
     };
@@ -1129,6 +1151,169 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Roll Challenges Actions (Dinâmica de Desafio para um Rola)
+  const createRollChallenge = (challengeData: Omit<RollChallenge, 'id' | 'createdAt' | 'status'>): RollChallenge => {
+    const newChallenge: RollChallenge = {
+      ...challengeData,
+      id: `challenge-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+    };
+
+    setRollChallenges(prev => [newChallenge, ...prev]);
+    saveToFirestore('rollChallenges', newChallenge);
+
+    // Enviar notificação para o desafiado ou para o mural do tatame
+    if (newChallenge.isPublicOpenChallenge) {
+      addNotification({
+        title: `🔥 Desafio Aberto: ${newChallenge.challengerName} no Tatame!`,
+        message: `${newChallenge.challengerName} lançou um desafio aberto de rola (${newChallenge.modality === 'NO_GI' ? 'No-Gi / Sem Kimono' : 'Gi / Com Kimono'} - ${newChallenge.targetDurationMinutes} min). Quem topa?`,
+        type: 'ANNOUNCEMENT',
+        targetClassName: newChallenge.className || 'Tatame Aberto',
+        authorName: newChallenge.challengerName,
+      });
+    } else if (newChallenge.challengedName) {
+      addNotification({
+        title: `🥋 Desafio de Rola: ${newChallenge.challengerName} vs ${newChallenge.challengedName}`,
+        message: `${newChallenge.challengerName} desafiou ${newChallenge.challengedName} para um rola (${newChallenge.modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'}, ${newChallenge.targetDurationMinutes} min)!`,
+        type: 'TEACHER_NOTICE',
+        targetClassName: newChallenge.className || 'Tatame',
+        authorName: newChallenge.challengerName,
+      });
+    }
+
+    return newChallenge;
+  };
+
+  const acceptRollChallenge = (
+    challengeId: string,
+    acceptingStudent?: { id: string; name: string; belt: BeltType; stripes: number; photoUrl?: string }
+  ) => {
+    let updated: RollChallenge | null = null;
+    const nowIso = new Date().toISOString();
+
+    setRollChallenges(prev =>
+      prev.map(c => {
+        if (c.id === challengeId) {
+          updated = {
+            ...c,
+            status: 'ACCEPTED',
+            acceptedAt: nowIso,
+            ...(acceptingStudent && c.isPublicOpenChallenge ? {
+              challengedId: acceptingStudent.id,
+              challengedName: acceptingStudent.name,
+              challengedBelt: acceptingStudent.belt,
+              challengedStripes: acceptingStudent.stripes,
+              challengedPhotoUrl: acceptingStudent.photoUrl,
+            } : {}),
+          };
+          return updated;
+        }
+        return c;
+      })
+    );
+
+    if (updated) {
+      saveToFirestore('rollChallenges', updated);
+      const challengerName = (updated as RollChallenge).challengerName;
+      const challengedName = (updated as RollChallenge).challengedName || acceptingStudent?.name || 'Seu colega';
+
+      addNotification({
+        title: `⚔️ Rola Casado: ${challengerName} vs ${challengedName}!`,
+        message: `O desafio foi aceito! O rola acontecerá no treino (${(updated as RollChallenge).modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'}, ${(updated as RollChallenge).targetDurationMinutes} min). Bom treino e respeito no tatame! Oss!`,
+        type: 'GENERAL',
+        authorName: challengedName,
+      });
+    }
+  };
+
+  const declineRollChallenge = (challengeId: string, reason?: string) => {
+    let updated: RollChallenge | null = null;
+    setRollChallenges(prev =>
+      prev.map(c => {
+        if (c.id === challengeId) {
+          updated = {
+            ...c,
+            status: 'DECLINED',
+            declineReason: reason || 'Não poderei rolar no momento.',
+          };
+          return updated;
+        }
+        return c;
+      })
+    );
+
+    if (updated) {
+      saveToFirestore('rollChallenges', updated);
+    }
+  };
+
+  const cancelRollChallenge = (challengeId: string) => {
+    let updated: RollChallenge | null = null;
+    setRollChallenges(prev =>
+      prev.map(c => {
+        if (c.id === challengeId) {
+          updated = {
+            ...c,
+            status: 'CANCELLED',
+          };
+          return updated;
+        }
+        return c;
+      })
+    );
+
+    if (updated) {
+      saveToFirestore('rollChallenges', updated);
+    }
+  };
+
+  const completeRollChallenge = (challengeId: string, result: RollChallengeResult) => {
+    let updated: RollChallenge | null = null;
+    const nowIso = new Date().toISOString();
+
+    setRollChallenges(prev =>
+      prev.map(c => {
+        if (c.id === challengeId) {
+          updated = {
+            ...c,
+            status: 'COMPLETED',
+            completedAt: nowIso,
+            result,
+          };
+          return updated;
+        }
+        return c;
+      })
+    );
+
+    if (updated) {
+      saveToFirestore('rollChallenges', updated);
+
+      const challenger = (updated as RollChallenge).challengerName;
+      const opponent = (updated as RollChallenge).challengedName || 'Adversário';
+      const outcomeText = result.outcomeType === 'SUBMISSION'
+        ? `Finalização (${result.submissionTechnique || 'Finalização'}) aos ${result.submissionMinute || 0} min`
+        : result.outcomeType === 'POINTS'
+        ? `Vitória por Pontos`
+        : result.outcomeType === 'STUDY_ROUND'
+        ? `Rola de Estudo / Treino Técnico`
+        : 'Empate Técnico';
+
+      addNotification({
+        title: `🏆 Rola Finalizado: ${challenger} & ${opponent}`,
+        message: `Resultado registrado: ${result.winnerName ? `${result.winnerName} venceu por ${outcomeText}` : outcomeText}. Parabéns aos guerreiros pelo espírito esportivo! Oss!`,
+        type: 'GENERAL',
+        authorName: result.registeredBy,
+      });
+    }
+  };
+
+  const deleteRollChallenge = (id: string) => {
+    setRollChallenges(prev => prev.filter(c => c.id !== id));
+    removeFromFirestore('rollChallenges', id);
+  };
+
   // Config
   const updateAcademyConfig = (updates: Partial<AcademyConfig>) => {
     setAcademyConfig(prev => {
@@ -1148,6 +1333,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBeltRequests(INITIAL_BELT_REQUESTS);
     setTrainingLogs(INITIAL_TRAINING_LOGS);
     setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
+    setRollChallenges(INITIAL_ROLL_CHALLENGES);
   };
 
   const resetToDefaultData = () => {
@@ -1160,6 +1346,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBeltRequests(INITIAL_BELT_REQUESTS);
     setTrainingLogs(INITIAL_TRAINING_LOGS);
     setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
+    setRollChallenges(INITIAL_ROLL_CHALLENGES);
     setAcademyConfig(INITIAL_ACADEMY_CONFIG);
   };
 
@@ -1173,6 +1360,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBeltRequests([]);
     setTrainingLogs([]);
     setTeacherObservations([]);
+    setWeeklyPositions([]);
+    setRollChallenges([]);
     setNotifications([]);
 
     clearAllFirestoreCollections();
@@ -1192,6 +1381,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       beltRequests,
       trainingLogs,
       teacherObservations,
+      weeklyPositions,
+      rollChallenges,
     };
     return JSON.stringify(dbPayload, null, 2);
   };
@@ -1238,6 +1429,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.teacherObservations && Array.isArray(data.teacherObservations)) {
         setTeacherObservations(data.teacherObservations);
         data.teacherObservations.forEach((o: any) => saveToFirestore('teacherObservations', o));
+      }
+      if (data.weeklyPositions && Array.isArray(data.weeklyPositions)) {
+        setWeeklyPositions(data.weeklyPositions);
+        data.weeklyPositions.forEach((wp: any) => saveToFirestore('weeklyPositions', wp));
+      }
+      if (data.rollChallenges && Array.isArray(data.rollChallenges)) {
+        setRollChallenges(data.rollChallenges);
+        data.rollChallenges.forEach((rc: any) => saveToFirestore('rollChallenges', rc));
       }
       if (data.academyConfig && typeof data.academyConfig === 'object') {
         setAcademyConfig(data.academyConfig);
@@ -1301,6 +1500,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateWeeklyPosition,
         deleteWeeklyPosition,
         toggleStudentLearnedPosition,
+        rollChallenges,
+        createRollChallenge,
+        acceptRollChallenge,
+        declineRollChallenge,
+        cancelRollChallenge,
+        completeRollChallenge,
+        deleteRollChallenge,
         updateAcademyConfig,
         environmentMode,
         isHomologationMode: environmentMode === 'HOMOLOG',
