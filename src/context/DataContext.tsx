@@ -222,6 +222,7 @@ interface DataContextType {
   // Training Photos Actions (Mural do Tatame / Fotos dos Treinos em Alta Resolução)
   trainingPhotos: TrainingPhoto[];
   addTrainingPhoto: (photo: Omit<TrainingPhoto, 'id' | 'createdAt'>) => TrainingPhoto;
+  addTrainingPhotosBatch: (photos: Omit<TrainingPhoto, 'id' | 'createdAt'>[]) => TrainingPhoto[];
   updateTrainingPhoto: (id: string, updates: Partial<TrainingPhoto>) => void;
   deleteTrainingPhoto: (id: string) => void;
   toggleLikeTrainingPhoto: (photoId: string, studentId: string) => void;
@@ -1641,6 +1642,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newPhoto;
   };
 
+  const addTrainingPhotosBatch = (photosData: Omit<TrainingPhoto, 'id' | 'createdAt'>[]): TrainingPhoto[] => {
+    if (!photosData || photosData.length === 0) return [];
+
+    const now = Date.now();
+    const createdPhotos: TrainingPhoto[] = photosData.map((p, idx) => ({
+      ...p,
+      id: `photo-${now + idx}-${Math.random().toString(36).substr(2, 5)}`,
+      likesCount: 0,
+      likedBy: [],
+      createdAt: new Date(now + idx).toISOString(),
+    }));
+
+    setTrainingPhotos(prev => [...createdPhotos, ...prev]);
+    createdPhotos.forEach(p => saveToFirestore('trainingPhotos', p));
+
+    const count = createdPhotos.length;
+    const firstTitle = createdPhotos[0]?.title || 'Treino';
+    addNotification({
+      title: count === 1 ? `📸 Nova Foto do Treino Publicada!` : `📸 ${count} Novas Fotos do Treino Publicadas!`,
+      message: count === 1
+        ? `A foto "${firstTitle}" já está disponível para download em alta resolução no Mural!`
+        : `${count} fotos do treino foram publicadas no Mural e já estão disponíveis em alta resolução original!`,
+      type: 'ANNOUNCEMENT',
+      targetClassName: createdPhotos[0]?.className,
+      authorName: createdPhotos[0]?.professorName,
+    });
+
+    return createdPhotos;
+  };
+
   const updateTrainingPhoto = (id: string, updates: Partial<TrainingPhoto>) => {
     setTrainingPhotos(prev => prev.map(p => {
       if (p.id === id) {
@@ -1901,6 +1932,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetCategoryBracket,
         trainingPhotos,
         addTrainingPhoto,
+        addTrainingPhotosBatch,
         updateTrainingPhoto,
         deleteTrainingPhoto,
         toggleLikeTrainingPhoto,

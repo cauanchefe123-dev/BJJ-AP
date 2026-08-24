@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { TrainingPhoto } from '../../types';
@@ -22,17 +22,30 @@ import {
   Filter,
   Layers,
   ArrowDownToLine,
-  Eye,
-  Info,
+  ChevronLeft,
+  ChevronRight,
+  UploadCloud,
+  CheckSquare,
+  Square,
+  Loader2,
 } from 'lucide-react';
+
+interface PendingUploadPhoto {
+  id: string;
+  file: File;
+  dataUrl: string;
+  sizeFormatted: string;
+  dimensions: string;
+  customTitle?: string;
+}
 
 export const TrainingGalleryView: React.FC = () => {
   const { currentUser } = useAuth();
   const {
     trainingPhotos,
     classes,
-    teachers,
     addTrainingPhoto,
+    addTrainingPhotosBatch,
     deleteTrainingPhoto,
     toggleLikeTrainingPhoto,
     academyConfig,
@@ -47,8 +60,9 @@ export const TrainingGalleryView: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Upload Modal State
+  // Upload Modal State (Multiple Photos)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingUploadPhoto[]>([]);
   const [newTitle, setNewTitle] = useState<string>('');
   const [newDate, setNewDate] = useState<string>(todayStr);
   const [newTime, setNewTime] = useState<string>('19:30');
@@ -56,13 +70,14 @@ export const TrainingGalleryView: React.FC = () => {
   const [newClassName, setNewClassName] = useState<string>('');
   const [newProfessorName, setNewProfessorName] = useState<string>(currentUser?.name || academyConfig.headCoachName || 'Professor');
   const [newCaption, setNewCaption] = useState<string>('');
-  const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
-  const [fileSizeFormatted, setFileSizeFormatted] = useState<string>('');
-  const [dimensions, setDimensions] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Lightbox / Fullscreen Modal State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addMoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Lightbox / Fullscreen Modal State with Navigation
   const [lightboxPhoto, setLightboxPhoto] = useState<TrainingPhoto | null>(null);
 
   // Feedback State
@@ -89,62 +104,119 @@ export const TrainingGalleryView: React.FC = () => {
   // Today's or Most Recent Featured Photo
   const latestPhoto = filteredPhotos.length > 0 ? filteredPhotos[0] : null;
 
-  // Handle Image File Selection (Preserving Full High Quality)
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Process and append multiple files to pending list
+  const processFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileArray.length === 0) return;
 
-    // Calculate file size
-    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    const sizeFormatted = file.size > 1024 * 1024 ? `${sizeInMB} MB` : `${Math.round(file.size / 1024)} KB`;
-    setFileSizeFormatted(sizeFormatted);
+    const newPendingItems: PendingUploadPhoto[] = [];
 
-    const reader = new FileReader();
-    reader.onload = (loadEvt) => {
-      const dataUrl = loadEvt.target?.result as string;
-      setPhotoDataUrl(dataUrl);
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+      const sizeFormatted = file.size > 1024 * 1024 ? `${sizeInMB} MB` : `${Math.round(file.size / 1024)} KB`;
 
-      // Extract original image resolution dimensions
-      const img = new Image();
-      img.onload = () => {
-        setDimensions(`${img.naturalWidth} x ${img.naturalHeight}`);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+      // Read as DataURL
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) || '');
+        reader.readAsDataURL(file);
+      });
+
+      // Get dimensions
+      const dimensions = await new Promise<string>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(`${img.naturalWidth} x ${img.naturalHeight}`);
+        img.onerror = () => resolve('Original');
+        img.src = dataUrl;
+      });
+
+      newPendingItems.push({
+        id: `pending-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
+        file,
+        dataUrl,
+        sizeFormatted,
+        dimensions,
+      });
+    }
+
+    setPendingPhotos((prev) => [...prev, ...newPendingItems]);
   };
 
-  // Submit New Training Photo
-  const handleCreatePhoto = (e: React.FormEvent) => {
+  // File input change handler (Multiple files supported)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await processFiles(e.target.files);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (addMoreInputRef.current) addMoreInputRef.current.value = '';
+    }
+  };
+
+  // Drag & Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!photoDataUrl) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await processFiles(e.dataTransfer.files);
+    }
+  };
+
+  // Remove a photo from the pending upload list
+  const handleRemovePendingPhoto = (id: string) => {
+    setPendingPhotos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // Submit All Selected Training Photos in Batch
+  const handleCreatePhotosBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pendingPhotos.length === 0) return;
 
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: pendingPhotos.length });
 
-    const finalTitle = newTitle.trim() || (newClassName ? `Treino - ${newClassName}` : `Treino de ${formatDateBR(newDate)}`);
+    const totalCount = pendingPhotos.length;
+    const baseTitle = newTitle.trim() || (newClassName ? `Treino - ${newClassName}` : `Treino de ${formatDateBR(newDate)}`);
 
-    addTrainingPhoto({
-      title: finalTitle,
-      date: newDate,
-      time: newTime,
-      classId: newClassId || undefined,
-      className: newClassName || undefined,
-      professorName: newProfessorName || 'Professor',
-      photoUrl: photoDataUrl,
-      caption: newCaption.trim() || undefined,
-      fileSizeFormatted: fileSizeFormatted || undefined,
-      dimensions: dimensions || undefined,
-      uploadedBy: currentUser?.name,
+    const photosToInsert = pendingPhotos.map((photo, idx) => {
+      let finalPhotoTitle = photo.customTitle?.trim();
+      if (!finalPhotoTitle) {
+        finalPhotoTitle = totalCount > 1 ? `${baseTitle} (${idx + 1}/${totalCount})` : baseTitle;
+      }
+
+      return {
+        title: finalPhotoTitle,
+        date: newDate,
+        time: newTime,
+        classId: newClassId || undefined,
+        className: newClassName || undefined,
+        professorName: newProfessorName || 'Professor',
+        photoUrl: photo.dataUrl,
+        caption: newCaption.trim() || undefined,
+        fileSizeFormatted: photo.sizeFormatted || undefined,
+        dimensions: photo.dimensions || undefined,
+        uploadedBy: currentUser?.name,
+      };
     });
 
-    // Reset Form
+    addTrainingPhotosBatch(photosToInsert);
+
+    // Reset Form and Modal
     setIsUploading(false);
+    setUploadProgress(null);
     setIsUploadModalOpen(false);
-    setPhotoDataUrl('');
+    setPendingPhotos([]);
     setNewTitle('');
     setNewCaption('');
-    setFileSizeFormatted('');
-    setDimensions('');
   };
 
   // Direct High-Resolution Download Handler
@@ -155,7 +227,6 @@ export const TrainingGalleryView: React.FC = () => {
         .toLowerCase();
       const filename = `bjjcron_${photo.date}_${safeTitle}.jpg`;
 
-      // Create download link
       const link = document.createElement('a');
       link.href = photo.photoUrl;
       link.download = filename;
@@ -187,18 +258,47 @@ export const TrainingGalleryView: React.FC = () => {
       }
     }
 
-    // Fallback: Copy Link
     navigator.clipboard.writeText(`${shareText}\n${window.location.href}`);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
   };
+
+  // Lightbox Navigation (Next / Prev)
+  const currentLightboxIndex = lightboxPhoto
+    ? filteredPhotos.findIndex((p) => p.id === lightboxPhoto.id)
+    : -1;
+
+  const handleNextPhoto = useCallback(() => {
+    if (currentLightboxIndex >= 0 && currentLightboxIndex < filteredPhotos.length - 1) {
+      setLightboxPhoto(filteredPhotos[currentLightboxIndex + 1]);
+    }
+  }, [currentLightboxIndex, filteredPhotos]);
+
+  const handlePrevPhoto = useCallback(() => {
+    if (currentLightboxIndex > 0) {
+      setLightboxPhoto(filteredPhotos[currentLightboxIndex - 1]);
+    }
+  }, [currentLightboxIndex, filteredPhotos]);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!lightboxPhoto) return;
+      if (e.key === 'Escape') setLightboxPhoto(null);
+      if (e.key === 'ArrowRight') handleNextPhoto();
+      if (e.key === 'ArrowLeft') handlePrevPhoto();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxPhoto, handleNextPhoto, handlePrevPhoto]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Header Bar */}
       <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5">
@@ -218,12 +318,13 @@ export const TrainingGalleryView: React.FC = () => {
             <button
               onClick={() => {
                 setNewDate(todayStr);
+                setPendingPhotos([]);
                 setIsUploadModalOpen(true);
               }}
               className="w-full md:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              Publicar Foto do Treino
+              Publicar Fotos do Treino
             </button>
           )}
         </div>
@@ -309,15 +410,17 @@ export const TrainingGalleryView: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
             {/* Image Preview with Zoom Overlay */}
-            <div className="lg:col-span-7 relative group rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl aspect-video sm:aspect-16/10 cursor-pointer"
-                 onClick={() => setLightboxPhoto(latestPhoto)}>
+            <div
+              className="lg:col-span-7 relative group rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl aspect-video sm:aspect-16/10 cursor-pointer"
+              onClick={() => setLightboxPhoto(latestPhoto)}
+            >
               <img
                 src={latestPhoto.photoUrl}
                 alt={latestPhoto.title}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
-              
+
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
                 <span className="font-semibold drop-shadow-md flex items-center gap-1.5">
                   <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
@@ -422,17 +525,21 @@ export const TrainingGalleryView: React.FC = () => {
               <p className="font-black text-slate-200 text-base">Nenhuma foto encontrada</p>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 {isStaff
-                  ? 'Clique em "Publicar Foto do Treino" para subir a primeira foto oficial do tatame em alta resolução.'
+                  ? 'Clique em "Publicar Fotos do Treino" para subir fotos oficiais do tatame em alta resolução (uma ou várias fotos de uma vez).'
                   : 'Nenhuma foto foi postada ainda para os filtros selecionados. Volte em breve!'}
               </p>
             </div>
             {isStaff && (
               <button
-                onClick={() => setIsUploadModalOpen(true)}
+                onClick={() => {
+                  setNewDate(todayStr);
+                  setPendingPhotos([]);
+                  setIsUploadModalOpen(true);
+                }}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-2 cursor-pointer shadow-md"
               >
                 <Plus className="w-4 h-4" />
-                Publicar Primeira Foto
+                Publicar Fotos
               </button>
             )}
           </div>
@@ -560,7 +667,7 @@ export const TrainingGalleryView: React.FC = () => {
         )}
       </div>
 
-      {/* Lightbox / Fullscreen Modal */}
+      {/* Lightbox / Fullscreen Modal with Next/Prev Carousel */}
       {lightboxPhoto && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col justify-between p-3 sm:p-6 animate-fade-in"
@@ -568,7 +675,7 @@ export const TrainingGalleryView: React.FC = () => {
         >
           {/* Top Bar */}
           <div
-            className="flex items-center justify-between gap-4 text-white z-10"
+            className="flex items-center justify-between gap-4 text-white z-20"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
@@ -577,6 +684,11 @@ export const TrainingGalleryView: React.FC = () => {
               </h3>
               <p className="text-xs text-slate-400">
                 {formatDateBR(lightboxPhoto.date)} • {lightboxPhoto.professorName} {lightboxPhoto.className ? `• ${lightboxPhoto.className}` : ''}
+                {filteredPhotos.length > 1 && (
+                  <span className="ml-2 px-2 py-0.5 rounded bg-slate-800 text-amber-400 font-bold">
+                    {currentLightboxIndex + 1} de {filteredPhotos.length}
+                  </span>
+                )}
               </p>
             </div>
 
@@ -591,23 +703,45 @@ export const TrainingGalleryView: React.FC = () => {
               <button
                 onClick={() => setLightboxPhoto(null)}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
-                title="Fechar"
+                title="Fechar (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {/* Center Image Container */}
+          {/* Center Image Container with Prev/Next Buttons */}
           <div
             className="flex-1 flex items-center justify-center my-4 overflow-hidden relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Prev Button */}
+            {currentLightboxIndex > 0 && (
+              <button
+                onClick={handlePrevPhoto}
+                className="absolute left-2 sm:left-4 z-20 p-3 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-white border border-slate-700/80 backdrop-blur-md shadow-2xl transition-all cursor-pointer active:scale-90"
+                title="Foto Anterior (Seta Esquerda)"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
             <img
               src={lightboxPhoto.photoUrl}
               alt={lightboxPhoto.title}
-              className="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border border-slate-800"
+              className="max-h-[80vh] max-w-full object-contain rounded-2xl shadow-2xl border border-slate-800"
             />
+
+            {/* Next Button */}
+            {currentLightboxIndex < filteredPhotos.length - 1 && (
+              <button
+                onClick={handleNextPhoto}
+                className="absolute right-2 sm:right-4 z-20 p-3 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-white border border-slate-700/80 backdrop-blur-md shadow-2xl transition-all cursor-pointer active:scale-90"
+                title="Próxima Foto (Seta Direita)"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
           </div>
 
           {/* Bottom Details Bar */}
@@ -648,89 +782,173 @@ export const TrainingGalleryView: React.FC = () => {
         </div>
       )}
 
-      {/* Upload Modal (Staff / Admin / Teacher) */}
+      {/* Multiple Photos Upload Modal (Staff / Admin / Teacher) */}
       {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-5 sm:p-7 text-white shadow-2xl space-y-5 my-8">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-5 sm:p-7 text-white shadow-2xl space-y-5 my-8">
+            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
                   <Camera className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-black text-lg font-display text-slate-100">Publicar Foto do Treino</h3>
-                  <p className="text-xs text-slate-400">Suba a foto oficial para os alunos baixarem em qualidade máxima.</p>
+                  <h3 className="font-black text-lg font-display text-slate-100">
+                    Publicar Fotos do Treino
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Selecione uma ou várias fotos de uma vez em máxima qualidade original.
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsUploadModalOpen(false)}
-                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                onClick={() => {
+                  if (!isUploading) {
+                    setIsUploadModalOpen(false);
+                    setPendingPhotos([]);
+                  }
+                }}
+                disabled={isUploading}
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreatePhoto} className="space-y-4">
-              {/* Photo Picker Area */}
+            <form onSubmit={handleCreatePhotosBatch} className="space-y-4">
+              {/* Multi-Photo Picker & Drag-Drop Area */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Foto do Treino (Original / Alta Definição) *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span>Fotos Selecionadas ({pendingPhotos.length})</span>
+                    {pendingPhotos.length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        {pendingPhotos.length} {pendingPhotos.length === 1 ? 'foto pronta' : 'fotos prontas'}
+                      </span>
+                    )}
+                  </label>
+
+                  {pendingPhotos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => addMoreInputRef.current?.click()}
+                      className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Adicionar Mais Fotos
+                    </button>
+                  )}
+                </div>
+
+                {/* Hidden Multi-file inputs */}
                 <input
                   type="file"
+                  multiple
                   accept="image/*"
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   className="hidden"
                 />
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  ref={addMoreInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
 
-                {photoDataUrl ? (
-                  <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-amber-500/40 aspect-16/10 group">
-                    <img
-                      src={photoDataUrl}
-                      alt="Prévia"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs cursor-pointer shadow-md"
-                      >
-                        Trocar Foto
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPhotoDataUrl('');
-                          setFileSizeFormatted('');
-                          setDimensions('');
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md"
-                      >
-                        Remover
-                      </button>
+                {pendingPhotos.length === 0 ? (
+                  /* Empty state / dropzone */
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-3xl p-8 sm:p-10 text-center transition-all cursor-pointer group ${
+                      isDragging
+                        ? 'border-amber-400 bg-amber-500/10'
+                        : 'border-slate-700 hover:border-amber-500/60 bg-slate-950/50 hover:bg-slate-950/80'
+                    }`}
+                  >
+                    <div className="w-14 h-14 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                      <UploadCloud className="w-7 h-7 stroke-[2]" />
                     </div>
-
-                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-amber-300 border border-slate-800">
-                      <span>✓ 100% Qualidade Preservada</span>
-                      {dimensions && <span>{dimensions} ({fileSizeFormatted})</span>}
+                    <p className="font-extrabold text-sm sm:text-base text-slate-100">
+                      Clique aqui para selecionar uma ou VÁRIAS fotos do treino
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1.5 max-w-md mx-auto">
+                      Você pode selecionar múltiplos arquivos ao mesmo tempo ou arrastar diretamente para cá. Mantém 100% da resolução original.
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-[11px] text-amber-300 border border-slate-700">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <span>Suporta múltiplas fotos (JPG, PNG, HEIC)</span>
                     </div>
                   </div>
                 ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 sm:p-8 text-center bg-slate-950/50 hover:bg-slate-950/80 transition-all cursor-pointer group"
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      <ImageIcon className="w-6 h-6" />
+                  /* Grid of selected photos */
+                  <div className="space-y-3">
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950/80 rounded-2xl border border-slate-800"
+                    >
+                      {pendingPhotos.map((photo, index) => (
+                        <div
+                          key={photo.id}
+                          className="relative group rounded-xl overflow-hidden bg-slate-900 border border-slate-800 aspect-16/10"
+                        >
+                          <img
+                            src={photo.dataUrl}
+                            alt={`Foto ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent opacity-80" />
+
+                          {/* Index Number Badge */}
+                          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 text-amber-300 font-mono text-[10px] font-bold border border-slate-800">
+                            #{index + 1}
+                          </span>
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePendingPhoto(photo.id)}
+                            className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-500/90 hover:bg-rose-500 text-white cursor-pointer shadow-md"
+                            title="Remover esta foto"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Resolution & Size info */}
+                          <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] font-mono text-slate-300 truncate">
+                            {photo.dimensions} • {photo.sizeFormatted}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Add More Tile */}
+                      <button
+                        type="button"
+                        onClick={() => addMoreInputRef.current?.click()}
+                        className="rounded-xl border-2 border-dashed border-slate-700 hover:border-amber-500/60 bg-slate-900/50 hover:bg-slate-900 flex flex-col items-center justify-center p-3 text-slate-400 hover:text-amber-300 transition-all aspect-16/10 cursor-pointer"
+                      >
+                        <Plus className="w-5 h-5 mb-1" />
+                        <span className="text-[11px] font-bold">+ Adicionar</span>
+                      </button>
                     </div>
-                    <p className="font-bold text-sm text-slate-200">
-                      Clique para escolher a foto ou tirar agora
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Aceita JPG, PNG e HEIC. Mantém 100% dos pixels para que nenhum aluno perca qualidade.
-                    </p>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                      <span>{pendingPhotos.length} {pendingPhotos.length === 1 ? 'arquivo selecionado' : 'arquivos selecionados'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPendingPhotos([])}
+                        className="text-rose-400 hover:underline cursor-pointer"
+                      >
+                        Limpar todas as fotos
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -775,7 +993,7 @@ export const TrainingGalleryView: React.FC = () => {
                     onChange={(e) => {
                       const cid = e.target.value;
                       setNewClassId(cid);
-                      const found = classes.find(c => c.id === cid);
+                      const found = classes.find((c) => c.id === cid);
                       if (found) {
                         setNewClassName(found.title);
                         if (found.time) setNewTime(found.time);
@@ -807,10 +1025,10 @@ export const TrainingGalleryView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Custom Title */}
+              {/* Custom Base Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Título da Foto / Chamada
+                  Título da Foto / Álbum
                 </label>
                 <input
                   type="text"
@@ -819,6 +1037,11 @@ export const TrainingGalleryView: React.FC = () => {
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
+                {pendingPhotos.length > 1 && (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Como foram selecionadas {pendingPhotos.length} fotos, elas serão numeradas automaticamente (ex: "{newTitle || 'Treino'} (1/{pendingPhotos.length})").
+                  </p>
+                )}
               </div>
 
               {/* Caption / Technique Highlights */}
@@ -835,22 +1058,48 @@ export const TrainingGalleryView: React.FC = () => {
                 />
               </div>
 
+              {/* Upload Progress Bar */}
+              {isUploading && (
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-amber-500/30 flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-amber-400 animate-spin shrink-0" />
+                  <div className="text-xs text-slate-200">
+                    <p className="font-bold">Publicando fotos em alta definição original...</p>
+                    <p className="text-slate-400 text-[11px]">Salvando e sincronizando com o Mural do Tatame.</p>
+                  </div>
+                </div>
+              )}
+
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsUploadModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                  disabled={isUploading}
+                  onClick={() => {
+                    setIsUploadModalOpen(false);
+                    setPendingPhotos([]);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={!photoDataUrl || isUploading}
+                  disabled={pendingPhotos.length === 0 || isUploading}
                   className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  {isUploading ? 'Publicando...' : 'Publicar no Mural'}
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Publicando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      {pendingPhotos.length > 1
+                        ? `Publicar ${pendingPhotos.length} Fotos no Mural`
+                        : 'Publicar Foto no Mural'}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
