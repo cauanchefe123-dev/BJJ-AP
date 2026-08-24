@@ -15,6 +15,14 @@ import {
   BeltType,
   RollChallenge,
   RollChallengeResult,
+  InternalTournament,
+  TournamentCategory,
+  TournamentCompetitor,
+  TournamentMatch,
+  TournamentPodium,
+  TournamentCategoryStatus,
+  RollOutcomeType,
+  TrainingPhoto,
 } from '../types';
 import {
   INITIAL_ACADEMY_CONFIG,
@@ -28,7 +36,10 @@ import {
   INITIAL_TRAINING_LOGS,
   INITIAL_TEACHER_OBSERVATIONS,
   INITIAL_ROLL_CHALLENGES,
+  INITIAL_TOURNAMENTS,
+  INITIAL_TRAINING_PHOTOS,
 } from '../data/initialData';
+import { generateSingleEliminationBracket, advanceTournamentBracket } from '../utils/bracketUtils';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import {
   subscribeFirestoreCollection,
@@ -176,6 +187,45 @@ interface DataContextType {
   completeRollChallenge: (challengeId: string, result: RollChallengeResult) => void;
   deleteRollChallenge: (challengeId: string) => void;
 
+  // Campeonatos Internos & Chaveamento (In-House Tournaments & Brackets)
+  tournaments: InternalTournament[];
+  createTournament: (tournamentData: Omit<InternalTournament, 'id' | 'createdAt'>) => InternalTournament;
+  updateTournament: (id: string, updates: Partial<InternalTournament>) => void;
+  deleteTournament: (id: string) => void;
+  addCategoryToTournament: (tournamentId: string, category: Omit<TournamentCategory, 'id' | 'matches'>) => void;
+  updateTournamentCategory: (tournamentId: string, categoryId: string, updates: Partial<TournamentCategory>) => void;
+  deleteTournamentCategory: (tournamentId: string, categoryId: string) => void;
+  registerCompetitorToCategory: (tournamentId: string, categoryId: string, competitor: TournamentCompetitor) => void;
+  removeCompetitorFromCategory: (tournamentId: string, categoryId: string, competitorId: string) => void;
+  generateCategoryBracket: (tournamentId: string, categoryId: string, includeThirdPlace?: boolean) => void;
+  updateTournamentMatch: (
+    tournamentId: string,
+    categoryId: string,
+    matchId: string,
+    result: {
+      winnerId: string;
+      winnerName: string;
+      outcomeType?: RollOutcomeType;
+      submissionTechnique?: string;
+      submissionMinute?: number;
+      score1?: number;
+      score2?: number;
+      advantages1?: number;
+      advantages2?: number;
+      penalties1?: number;
+      penalties2?: number;
+      notes?: string;
+    }
+  ) => void;
+  resetCategoryBracket: (tournamentId: string, categoryId: string) => void;
+
+  // Training Photos Actions (Mural do Tatame / Fotos dos Treinos em Alta Resolução)
+  trainingPhotos: TrainingPhoto[];
+  addTrainingPhoto: (photo: Omit<TrainingPhoto, 'id' | 'createdAt'>) => TrainingPhoto;
+  updateTrainingPhoto: (id: string, updates: Partial<TrainingPhoto>) => void;
+  deleteTrainingPhoto: (id: string) => void;
+  toggleLikeTrainingPhoto: (photoId: string, studentId: string) => void;
+
   // Config Actions
   updateAcademyConfig: (updates: Partial<AcademyConfig>) => void;
 
@@ -231,6 +281,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [teacherObservations, setTeacherObservations] = useState<TeacherObservation[]>([]);
   const [weeklyPositions, setWeeklyPositions] = useState<WeeklyPosition[]>([]);
   const [rollChallenges, setRollChallenges] = useState<RollChallenge[]>([]);
+  const [tournaments, setTournaments] = useState<InternalTournament[]>([]);
+  const [trainingPhotos, setTrainingPhotos] = useState<TrainingPhoto[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [academyConfig, setAcademyConfig] = useState<AcademyConfig>(INITIAL_ACADEMY_CONFIG);
 
@@ -323,6 +375,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRollChallenges(valid);
     });
 
+    const unsubTournaments = subscribeFirestoreCollection<InternalTournament>('tournaments', (docs) => {
+      const valid = docs.filter(t => !isDeletedRecord(t.id));
+      setTournaments(valid);
+    });
+
+    const unsubTrainingPhotos = subscribeFirestoreCollection<TrainingPhoto>('trainingPhotos', (docs) => {
+      const valid = docs.filter(p => !isDeletedRecord(p.id));
+      setTrainingPhotos(valid);
+    });
+
     const unsubNotifications = subscribeFirestoreCollection<AppNotification>('notifications', (docs) => {
       const valid = docs.filter(n => !isDeletedRecord(n.id));
       setNotifications(valid);
@@ -349,6 +411,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTeacherObservations();
       unsubWeeklyPositions();
       unsubRollChallenges();
+      unsubTournaments();
+      unsubTrainingPhotos();
       unsubNotifications();
       unsubConfig();
     };
@@ -1314,6 +1378,306 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeFromFirestore('rollChallenges', id);
   };
 
+  // Campeonatos Internos & Chaveamentos (In-House Tournaments)
+  const createTournament = (tournamentData: Omit<InternalTournament, 'id' | 'createdAt'>): InternalTournament => {
+    const newTournament: InternalTournament = {
+      ...tournamentData,
+      id: `tourn-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      categories: tournamentData.categories || [],
+      createdAt: new Date().toISOString(),
+    };
+    setTournaments(prev => [newTournament, ...prev]);
+    saveToFirestore('tournaments', newTournament);
+
+    addNotification({
+      title: `🥋 Novo Campeonato Interno: ${newTournament.title}`,
+      message: `As inscrições e categorias já estão disponíveis no mural de Campeonatos Internos! Data prevista: ${newTournament.date}.`,
+      type: 'GENERAL',
+    });
+
+    return newTournament;
+  };
+
+  const updateTournament = (id: string, updates: Partial<InternalTournament>) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, ...updates };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const deleteTournament = (id: string) => {
+    markAsDeleted(id);
+    setTournaments(prev => prev.filter(t => t.id !== id));
+    removeFromFirestore('tournaments', id);
+  };
+
+  const addCategoryToTournament = (tournamentId: string, category: Omit<TournamentCategory, 'id' | 'matches'>) => {
+    const newCategory: TournamentCategory = {
+      ...category,
+      id: `cat-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      competitors: category.competitors || [],
+      matches: [],
+      status: category.status || 'REGISTRATION',
+    };
+
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = [...(t.categories || []), newCategory];
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const updateTournamentCategory = (tournamentId: string, categoryId: string, updates: Partial<TournamentCategory>) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            return { ...cat, ...updates };
+          }
+          return cat;
+        });
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const deleteTournamentCategory = (tournamentId: string, categoryId: string) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).filter(cat => cat.id !== categoryId);
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const registerCompetitorToCategory = (tournamentId: string, categoryId: string, competitor: TournamentCompetitor) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            if (cat.competitors.some(c => c.id === competitor.id)) {
+              return cat; // already registered
+            }
+            return {
+              ...cat,
+              competitors: [...cat.competitors, competitor],
+            };
+          }
+          return cat;
+        });
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const removeCompetitorFromCategory = (tournamentId: string, categoryId: string, competitorId: string) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              competitors: cat.competitors.filter(c => c.id !== competitorId),
+            };
+          }
+          return cat;
+        });
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const generateCategoryBracket = (tournamentId: string, categoryId: string, includeThirdPlace: boolean = true) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            const matches = generateSingleEliminationBracket(cat.id, cat.competitors, includeThirdPlace);
+            return {
+              ...cat,
+              matches,
+              podium: undefined,
+              status: 'BRACKET_READY' as const,
+            };
+          }
+          return cat;
+        });
+        const updated = {
+          ...t,
+          status: t.status === 'REGISTRATION' ? ('IN_PROGRESS' as const) : t.status,
+          categories: updatedCategories,
+        };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const updateTournamentMatch = (
+    tournamentId: string,
+    categoryId: string,
+    matchId: string,
+    result: {
+      winnerId: string;
+      winnerName: string;
+      outcomeType?: RollOutcomeType;
+      submissionTechnique?: string;
+      submissionMinute?: number;
+      score1?: number;
+      score2?: number;
+      advantages1?: number;
+      advantages2?: number;
+      penalties1?: number;
+      penalties2?: number;
+      notes?: string;
+    }
+  ) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        let categoryFinished = false;
+        let finishedCategoryName = '';
+        let champName = '';
+
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            const { updatedCategory, finishedTournamentCategory } = advanceTournamentBracket(cat, matchId, result);
+            if (finishedTournamentCategory) {
+              categoryFinished = true;
+              finishedCategoryName = cat.name;
+              champName = updatedCategory.podium?.first?.name || result.winnerName;
+            }
+            return updatedCategory;
+          }
+          return cat;
+        });
+
+        const allCatsCompleted = updatedCategories.length > 0 && updatedCategories.every(c => c.status === 'COMPLETED');
+        const updated: InternalTournament = {
+          ...t,
+          status: allCatsCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+          categories: updatedCategories,
+        };
+
+        saveToFirestore('tournaments', updated);
+
+        if (categoryFinished) {
+          addNotification({
+            title: `🥇 Campeão da Categoria: ${champName}!`,
+            message: `A categoria "${finishedCategoryName}" do torneio "${t.title}" foi concluída! Parabéns a todos os atletas! Oss!`,
+            type: 'GENERAL',
+          });
+        }
+
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  const resetCategoryBracket = (tournamentId: string, categoryId: string) => {
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const updatedCategories = (t.categories || []).map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              matches: [],
+              podium: undefined,
+              status: 'REGISTRATION' as const,
+            };
+          }
+          return cat;
+        });
+        const updated = { ...t, categories: updatedCategories };
+        saveToFirestore('tournaments', updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  // Fotos do Treino / Mural do Tatame em Alta Resolução
+  const addTrainingPhoto = (photoData: Omit<TrainingPhoto, 'id' | 'createdAt'>): TrainingPhoto => {
+    const newPhoto: TrainingPhoto = {
+      ...photoData,
+      id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      likesCount: 0,
+      likedBy: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    setTrainingPhotos(prev => [newPhoto, ...prev]);
+    saveToFirestore('trainingPhotos', newPhoto);
+
+    addNotification({
+      title: `📸 Nova Foto do Treino Publicada!`,
+      message: `A foto do treino "${newPhoto.title}" já está disponível para download em alta resolução no Mural!`,
+      type: 'ANNOUNCEMENT',
+      targetClassName: newPhoto.className,
+      authorName: newPhoto.professorName,
+    });
+
+    return newPhoto;
+  };
+
+  const updateTrainingPhoto = (id: string, updates: Partial<TrainingPhoto>) => {
+    setTrainingPhotos(prev => prev.map(p => {
+      if (p.id === id) {
+        const updated = { ...p, ...updates };
+        saveToFirestore('trainingPhotos', updated);
+        return updated;
+      }
+      return p;
+    }));
+  };
+
+  const deleteTrainingPhoto = (id: string) => {
+    markAsDeleted(id);
+    setTrainingPhotos(prev => prev.filter(p => p.id !== id));
+    removeFromFirestore('trainingPhotos', id);
+  };
+
+  const toggleLikeTrainingPhoto = (photoId: string, studentId: string) => {
+    setTrainingPhotos(prev => prev.map(p => {
+      if (p.id === photoId) {
+        const currentLikes = p.likedBy || [];
+        const isLiked = currentLikes.includes(studentId);
+        const nextLikes = isLiked
+          ? currentLikes.filter(id => id !== studentId)
+          : [...currentLikes, studentId];
+        const updated = {
+          ...p,
+          likedBy: nextLikes,
+          likesCount: nextLikes.length,
+        };
+        saveToFirestore('trainingPhotos', updated);
+        return updated;
+      }
+      return p;
+    }));
+  };
+
   // Config
   const updateAcademyConfig = (updates: Partial<AcademyConfig>) => {
     setAcademyConfig(prev => {
@@ -1334,6 +1698,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTrainingLogs(INITIAL_TRAINING_LOGS);
     setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
     setRollChallenges(INITIAL_ROLL_CHALLENGES);
+    setTournaments(INITIAL_TOURNAMENTS);
+    setTrainingPhotos(INITIAL_TRAINING_PHOTOS);
   };
 
   const resetToDefaultData = () => {
@@ -1347,6 +1713,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTrainingLogs(INITIAL_TRAINING_LOGS);
     setTeacherObservations(INITIAL_TEACHER_OBSERVATIONS);
     setRollChallenges(INITIAL_ROLL_CHALLENGES);
+    setTournaments(INITIAL_TOURNAMENTS);
+    setTrainingPhotos(INITIAL_TRAINING_PHOTOS);
     setAcademyConfig(INITIAL_ACADEMY_CONFIG);
   };
 
@@ -1362,6 +1730,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTeacherObservations([]);
     setWeeklyPositions([]);
     setRollChallenges([]);
+    setTournaments([]);
+    setTrainingPhotos([]);
     setNotifications([]);
 
     clearAllFirestoreCollections();
@@ -1383,6 +1753,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       teacherObservations,
       weeklyPositions,
       rollChallenges,
+      tournaments,
+      trainingPhotos,
     };
     return JSON.stringify(dbPayload, null, 2);
   };
@@ -1437,6 +1809,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.rollChallenges && Array.isArray(data.rollChallenges)) {
         setRollChallenges(data.rollChallenges);
         data.rollChallenges.forEach((rc: any) => saveToFirestore('rollChallenges', rc));
+      }
+      if (data.tournaments && Array.isArray(data.tournaments)) {
+        setTournaments(data.tournaments);
+        data.tournaments.forEach((tn: any) => saveToFirestore('tournaments', tn));
+      }
+      if (data.trainingPhotos && Array.isArray(data.trainingPhotos)) {
+        setTrainingPhotos(data.trainingPhotos);
+        data.trainingPhotos.forEach((tp: any) => saveToFirestore('trainingPhotos', tp));
       }
       if (data.academyConfig && typeof data.academyConfig === 'object') {
         setAcademyConfig(data.academyConfig);
@@ -1507,6 +1887,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cancelRollChallenge,
         completeRollChallenge,
         deleteRollChallenge,
+        tournaments,
+        createTournament,
+        updateTournament,
+        deleteTournament,
+        addCategoryToTournament,
+        updateTournamentCategory,
+        deleteTournamentCategory,
+        registerCompetitorToCategory,
+        removeCompetitorFromCategory,
+        generateCategoryBracket,
+        updateTournamentMatch,
+        resetCategoryBracket,
+        trainingPhotos,
+        addTrainingPhoto,
+        updateTrainingPhoto,
+        deleteTrainingPhoto,
+        toggleLikeTrainingPhoto,
         updateAcademyConfig,
         environmentMode,
         isHomologationMode: environmentMode === 'HOMOLOG',

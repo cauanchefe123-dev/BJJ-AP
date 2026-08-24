@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
-import { QrCode, CalendarDays, Award, Users, CheckCircle, Flame, Clock, Megaphone, Send, X, Sparkles, Target, Edit3, Video, Play, Loader2, ArrowUpRight, UserCheck } from 'lucide-react';
+import { QrCode, CalendarDays, Award, Users, CheckCircle, Flame, Clock, Megaphone, Send, X, Sparkles, Target, Edit3, Video, Play, Loader2, ArrowUpRight, UserCheck, Camera } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { EditAttendanceModal } from '../attendance/EditAttendanceModal';
 import { BJJClass, AttendanceRecord } from '../../types';
@@ -90,10 +90,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
 
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
-            onClick={() => setIsNoticeModalOpen(true)}
+            onClick={() => onNavigate('gallery')}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
           >
-            <Megaphone className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <Camera className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <span>Fotos do Treino</span>
+          </button>
+          <button
+            onClick={() => setIsNoticeModalOpen(true)}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
+          >
+            <Megaphone className="w-4 h-4 text-amber-400 stroke-[2.5]" />
             <span>Disparar Comunicado</span>
           </button>
           <button

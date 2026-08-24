@@ -1,4 +1,4 @@
-import { AcademyConfig, BJJClass, Graduation, PaymentRecord, Student, Teacher, TeacherObservation, TrainingLog, User, AttendanceRecord, BeltChangeRequest, RollChallenge } from '../types';
+import { AcademyConfig, BJJClass, Graduation, PaymentRecord, Student, Teacher, TeacherObservation, TrainingLog, User, AttendanceRecord, BeltChangeRequest, RollChallenge, InternalTournament } from '../types';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 
 export const INITIAL_TEACHERS: Teacher[] = [];
@@ -67,3 +67,8 @@ export const INITIAL_BELT_REQUESTS: BeltChangeRequest[] = [];
 export const INITIAL_TEACHER_OBSERVATIONS: TeacherObservation[] = [];
 
 export const INITIAL_ROLL_CHALLENGES: RollChallenge[] = [];
+
+export const INITIAL_TOURNAMENTS: InternalTournament[] = [];
+
+export const INITIAL_TRAINING_PHOTOS: any[] = [];
+

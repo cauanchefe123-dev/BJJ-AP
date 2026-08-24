@@ -41,6 +41,7 @@ import { AcademyLinkView } from './components/academies/AcademyLinkView';
 import { AdminStudentDashboardView } from './components/dashboard/AdminStudentDashboardView';
 import { WeeklyFocusPositionsView } from './components/positions/WeeklyFocusPositionsView';
 import { RollChallengeBoard } from './components/challenges/RollChallengeBoard';
+import { TrainingGalleryView } from './components/gallery/TrainingGalleryView';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
@@ -219,6 +220,8 @@ function MainApp() {
                 {activeTab === 'teachers' && <TeacherManager />}
 
                 {activeTab === 'classes' && <ClassManager />}
+
+                {activeTab === 'gallery' && <TrainingGalleryView />}
 
                 {activeTab === 'challenges' && (
                   <RollChallengeBoard

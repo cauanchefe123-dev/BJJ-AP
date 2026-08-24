@@ -2,7 +2,7 @@ import React from 'react';
 import { useData } from '../../context/DataContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
-import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus } from 'lucide-react';
+import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus, Camera } from 'lucide-react';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
 import { getLocalDateStr, getAttendanceLocalDate } from '../../utils/dateUtils';
 
@@ -52,10 +52,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
 
         <div className="flex items-center gap-2.5 z-10 w-full sm:w-auto">
           <button
-            onClick={onOpenCheckin}
+            onClick={() => onNavigate('gallery')}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
           >
-            <UserCheck className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <Camera className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <span>Fotos do Treino</span>
+          </button>
+          <button
+            onClick={onOpenCheckin}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
+          >
+            <UserCheck className="w-4 h-4 text-slate-400" />
             <span>Registrar Presença</span>
           </button>
           <button

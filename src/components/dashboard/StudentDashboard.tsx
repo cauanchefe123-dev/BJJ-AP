@@ -7,7 +7,7 @@ import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import { calculateRanking, getStudentTotalClasses } from '../../utils/ranking';
 import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, formatDateBR } from '../../utils/dateUtils';
-import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords } from 'lucide-react';
+import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords, Camera, Download } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { BJJClass } from '../../types';
 
@@ -21,7 +21,7 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, onOpenPixModal, onOpenEditModal, onOpenCheckin, selectedStudentId }) => {
   const { currentUser } = useAuth();
-  const { students, payments, attendances, academyConfig, classes, rollChallenges } = useData();
+  const { students, payments, attendances, academyConfig, classes, rollChallenges, trainingPhotos } = useData();
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
 
@@ -218,6 +218,89 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           <p className="text-[11px] text-slate-400 truncate">Jornada acumulada</p>
         </div>
       </div>
+
+      {/* Foto Oficial do Treino do Dia / Mural */}
+      {(() => {
+        const latestPhoto = trainingPhotos && trainingPhotos.length > 0
+          ? [...trainingPhotos].sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())[0]
+          : null;
+
+        if (!latestPhoto) return null;
+
+        return (
+          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-xl space-y-4 relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base text-slate-100">
+                      Foto do Treino Oficial 📸
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Alta Definição
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {latestPhoto.date === todayStr ? 'Foto do treino de hoje' : `Treino de ${formatDateBR(latestPhoto.date)}`} • {latestPhoto.className || latestPhoto.title}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate('gallery')}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span>Ver Mural Completo</span>
+                <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+              <div
+                onClick={() => onNavigate('gallery')}
+                className="sm:col-span-4 aspect-16/10 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group relative"
+              >
+                <img
+                  src={latestPhoto.photoUrl}
+                  alt={latestPhoto.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                  Ampliar Imagem
+                </div>
+              </div>
+
+              <div className="sm:col-span-8 space-y-3">
+                <div>
+                  <h4 className="font-black text-slate-100 text-sm">{latestPhoto.title}</h4>
+                  {latestPhoto.caption && (
+                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                      "{latestPhoto.caption}"
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Ministrado por: <strong className="text-slate-300">{latestPhoto.professorName}</strong>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 pt-1">
+                  <a
+                    href={latestPhoto.photoUrl}
+                    download={`treino_${latestPhoto.date}.jpg`}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs inline-flex items-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                  >
+                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Baixar Foto em Alta Resolução (Original)</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Desafios de Rola no Tatame */}
       {(() => {

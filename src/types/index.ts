@@ -306,3 +306,103 @@ export interface RollChallenge {
   completedAt?: string;
   result?: RollChallengeResult;
 }
+
+// Campeonato Interno & Chaveamento (Internal In-House Tournaments)
+export interface TournamentCompetitor {
+  id: string; // studentId or generated competitor id
+  name: string;
+  belt: BeltType;
+  stripes: number;
+  photoUrl?: string;
+  weightKg?: number;
+  seed?: number;
+  academy?: string;
+}
+
+export type TournamentMatchStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'BYE';
+
+export interface TournamentMatch {
+  id: string;
+  round: number; // 1 = Oitavas/Primeira Fase, 2 = Quartas, 3 = Semi, 4 = Final
+  roundLabel?: string; // Ex: "Quartas de Final", "Semifinal", "Final", "Disputa de 3º Lugar"
+  matchNumber: number;
+  bracketPosition: number; // Index in the round (0, 1, 2...)
+  competitor1?: TournamentCompetitor;
+  competitor2?: TournamentCompetitor;
+  winnerId?: string;
+  winnerName?: string;
+  outcomeType?: RollOutcomeType;
+  submissionTechnique?: string;
+  submissionMinute?: number;
+  score1?: number;
+  score2?: number;
+  advantages1?: number;
+  advantages2?: number;
+  penalties1?: number;
+  penalties2?: number;
+  status: TournamentMatchStatus;
+  nextMatchId?: string;
+  nextMatchSlot?: 1 | 2;
+  isThirdPlaceMatch?: boolean;
+  notes?: string;
+}
+
+export interface TournamentPodium {
+  first?: TournamentCompetitor;
+  second?: TournamentCompetitor;
+  third?: TournamentCompetitor;
+  thirdSecond?: TournamentCompetitor;
+}
+
+export type TournamentCategoryStatus = 'REGISTRATION' | 'BRACKET_READY' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface TournamentCategory {
+  id: string;
+  name: string; // Ex: "Absoluto Adulto Gi", "Até 76kg Leve - Branca/Azul", "No-Gi Master"
+  modality: RollModality;
+  beltGroup?: string; // Ex: "Branca & Azul", "Roxa, Marrom & Preta", "Livre"
+  gender?: 'MASCULINO' | 'FEMININO' | 'MISTO';
+  weightLimitKg?: number;
+  matchDurationMinutes: number;
+  rulesType: RollRulesType;
+  competitors: TournamentCompetitor[];
+  matches: TournamentMatch[];
+  podium?: TournamentPodium;
+  status: TournamentCategoryStatus;
+}
+
+export type InternalTournamentStatus = 'REGISTRATION' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface InternalTournament {
+  id: string;
+  title: string; // Ex: "I Copa Interna BJJCRON 2026", "Desafio Interno Sem Kimono"
+  description?: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // Ex: "09:00"
+  location?: string;
+  modality: 'GI' | 'NO_GI' | 'BOTH';
+  status: InternalTournamentStatus;
+  categories: TournamentCategory[];
+  createdAt: string;
+  createdBy?: string;
+}
+
+// Foto do Treino do Dia / Mural do Tatame em Alta Resolução
+export interface TrainingPhoto {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // Ex: "19:30"
+  title: string; // Ex: "Treino Noturno - Turma Adulto", "Treino de Meio-Dia"
+  classId?: string;
+  className?: string;
+  professorName: string;
+  photoUrl: string; // Imagem em máxima resolução original (Data URL / Cloud URL)
+  caption?: string; // Resumo da aula / técnica do dia
+  likesCount?: number;
+  likedBy?: string[]; // IDs dos usuários que curtiram
+  createdAt: string; // ISO String
+  fileSizeFormatted?: string; // Ex: "3.4 MB"
+  dimensions?: string; // Ex: "4032 x 3024"
+  uploadedBy?: string; // Nome do autor do upload
+}
+

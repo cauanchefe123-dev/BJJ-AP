@@ -181,3 +181,32 @@
   }
 }
 
+/* Print Styles for Certificate & Documents */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header, nav, aside, .print\:hidden {
+    display: none !important;
+  }
+
+  #official-graduation-certificate {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+
