@@ -13,8 +13,8 @@ import {
   ArrowLeft, 
   Plus, 
   UserPlus, 
-  Users,
-  X,
+  Users, 
+  X, 
   Zap, 
   RotateCcw, 
   Trash2, 
@@ -23,9 +23,13 @@ import {
   MapPin, 
   Award, 
   Swords, 
-  Layers,
-  Sparkles,
-  Play
+  Layers, 
+  Sparkles, 
+  Play,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
+  Info
 } from 'lucide-react';
 
 interface TournamentDetailProps {
@@ -61,6 +65,10 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
   });
 
   const activeCategory = tournament.categories.find(c => c.id === selectedCategoryId) || tournament.categories[0];
+
+  // Mobile Collapse / Expand states
+  const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
+  const [isCompetitorsCollapsed, setIsCompetitorsCollapsed] = useState(false);
 
   // Modals state
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -185,32 +193,47 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       {/* Top Breadcrumb & Action Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2.5">
         <button
           onClick={onBack}
           className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Voltar aos Campeonatos</span>
+          <span>Voltar aos Torneios</span>
         </button>
 
-        {canManage && (
+        <div className="flex items-center gap-2">
+          {/* Mobile Collapse Toggle Button */}
           <button
-            onClick={handleDeleteTournament}
-            className="px-3.5 py-2 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            type="button"
+            onClick={() => setIsBannerCollapsed(!isBannerCollapsed)}
+            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title={isBannerCollapsed ? 'Expandir Detalhes' : 'Recolher Detalhes'}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Excluir Torneio</span>
+            <Info className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">{isBannerCollapsed ? 'Expandir Informações' : 'Recolher Informações'}</span>
+            {isBannerCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </button>
-        )}
+
+          {canManage && (
+            <button
+              onClick={handleDeleteTournament}
+              className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Excluir Torneio</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Main Tournament Banner Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
+      {/* Main Tournament Banner Card (Collapsible) */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-6 text-white shadow-xl relative overflow-hidden space-y-3">
+        {/* Banner Header Row */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider ${
                 tournament.status === 'COMPLETED'
@@ -231,47 +254,64 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
               </span>
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-black text-slate-100 flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-amber-400 stroke-[2.5]" />
-              <span>{tournament.title}</span>
+            <h1 className="text-lg sm:text-2xl font-black text-slate-100 flex items-center gap-2">
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 stroke-[2.5] shrink-0" />
+              <span className="truncate">{tournament.title}</span>
             </h1>
-
-            {tournament.description && (
-              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
-                {tournament.description}
-              </p>
-            )}
           </div>
 
-          {/* Metadata chips */}
-          <div className="flex md:flex-col items-start gap-2 text-xs text-slate-300 shrink-0 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-            <div className="flex items-center gap-2">
+          {/* Compact Metadata chips */}
+          <div className="flex items-center gap-2 text-xs text-slate-300 shrink-0 bg-slate-950/80 p-2.5 sm:p-3 rounded-2xl border border-slate-800/80 flex-wrap">
+            <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-amber-400" />
               <span>{new Date(tournament.date).toLocaleDateString('pt-BR')}</span>
             </div>
             {tournament.time && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
                 <span>{tournament.time}</span>
               </div>
             )}
             {tournament.location && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                <span className="truncate max-w-[180px]">{tournament.location}</span>
+                <span className="truncate max-w-[140px] sm:max-w-[200px]">{tournament.location}</span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Expanded Description if not collapsed */}
+        {!isBannerCollapsed && tournament.description && (
+          <p className="text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-800/70 leading-relaxed">
+            {tournament.description}
+          </p>
+        )}
       </div>
 
       {/* Category Selection Tabs Bar */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3">
+          {/* Mobile Category Dropdown Selector for quick navigation */}
+          <div className="sm:hidden flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400">Categoria:</span>
+            <select
+              value={activeCategory?.id || ''}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+            >
+              {tournament.categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({cat.competitors.length} atletas) {cat.status === 'COMPLETED' ? '🥇' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Desktop & Tablet Category Tabs with Scroll */}
+          <div className="hidden sm:flex items-center gap-2 overflow-x-auto max-w-full pb-1 scrollbar-thin">
             {tournament.categories.map((cat) => {
               const isSelected = activeCategory?.id === cat.id;
-              const hasMatches = (cat.matches || []).length > 0;
               const isCompleted = cat.status === 'COMPLETED';
 
               return (
@@ -279,7 +319,7 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`px-4 py-2 rounded-2xl font-bold text-xs whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-2xl font-bold text-xs whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-400'
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
@@ -301,7 +341,7 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
           {canManage && (
             <button
               onClick={() => setIsNewCategoryModalOpen(true)}
-              className="px-3.5 py-2 rounded-2xl bg-slate-900 border border-slate-700 hover:border-amber-500 text-amber-400 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              className="px-3.5 py-2 rounded-2xl bg-slate-900 border border-slate-700 hover:border-amber-500 text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 self-start sm:self-auto w-full sm:w-auto"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
               <span>Nova Categoria</span>
@@ -311,9 +351,9 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
 
         {/* Active Category Content */}
         {activeCategory ? (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Category Action & Stats Bar */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base sm:text-lg font-black text-slate-100">
@@ -333,23 +373,23 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
                 </p>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Action buttons (Grid on mobile, flex on desktop) */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 flex-wrap">
                 {canManage && (
                   <>
                     <button
                       onClick={handleOpenRegisterStudents}
-                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
                     >
                       <UserPlus className="w-3.5 h-3.5 text-amber-400" />
-                      <span>+ Inscrever Alunos ({activeCategory.competitors.length})</span>
+                      <span>+ Alunos ({activeCategory.competitors.length})</span>
                     </button>
 
                     <button
                       onClick={handleOpenAddGuest}
-                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-amber-500/30"
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-amber-500/30"
                     >
-                      <span>+ Convidado Avulso</span>
+                      <span>+ Convidado</span>
                     </button>
                   </>
                 )}
@@ -357,96 +397,111 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
                 {canManage && (
                   <button
                     onClick={() => handleGenerateBracket(activeCategory)}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                    className="col-span-2 sm:col-span-1 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5 fill-slate-950" />
-                    <span>{activeCategory.matches?.length ? 'Regerar Chaveamento' : 'Gerar Chaveamento ⚡'}</span>
+                    <span>{activeCategory.matches?.length ? 'Regerar Chave' : 'Gerar Chaveamento ⚡'}</span>
                   </button>
                 )}
 
                 {canManage && activeCategory.matches && activeCategory.matches.length > 0 && (
                   <button
                     onClick={() => handleResetBracket(activeCategory)}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
                     title="Resetar Chave da Categoria"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Resetar Chave</span>
+                    <span>Resetar</span>
                   </button>
                 )}
 
                 {canManage && tournament.categories.length > 1 && (
                   <button
                     onClick={() => handleDeleteCategory(activeCategory)}
-                    className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-red-500/20"
+                    className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-red-500/20"
                     title="Excluir Categoria"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Excluir Categoria</span>
+                    <span>Excluir</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Competitor Roster Pill Bar */}
+            {/* Competitor Roster Pill Bar (Collapsible on Mobile) */}
             {activeCategory.competitors.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div 
+                  onClick={() => setIsCompetitorsCollapsed(!isCompetitorsCollapsed)}
+                  className="flex items-center justify-between cursor-pointer select-none"
+                >
                   <div className="flex items-center gap-2">
                     <Users className="w-3.5 h-3.5 text-amber-400" />
                     <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
-                      Atletas Inscritos nesta Categoria ({activeCategory.competitors.length})
+                      Atletas Inscritos ({activeCategory.competitors.length})
                     </span>
                   </div>
 
-                  {canManage && (
-                    <button
-                      onClick={handleOpenRegisterStudents}
-                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
-                    >
-                      Gerenciar Inscrições
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenRegisterStudents();
+                        }}
+                        className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                      >
+                        Gerenciar
+                      </button>
+                    )}
+                    {isCompetitorsCollapsed ? (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronUp className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                  {activeCategory.competitors.map((comp) => (
-                    <div
-                      key={comp.id}
-                      className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shrink-0 text-xs text-slate-200"
-                    >
-                      {comp.photoUrl ? (
-                        <img src={comp.photoUrl} alt={comp.name} className="w-5 h-5 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-slate-800 text-amber-400 text-[10px] font-black flex items-center justify-center">
-                          {comp.name.charAt(0)}
-                        </div>
-                      )}
-                      <span className="font-bold truncate max-w-[120px]">{comp.name}</span>
-                      <BeltBadge belt={comp.belt} stripes={comp.stripes} size="sm" />
-                      {canManage && (!activeCategory.matches || activeCategory.matches.length === 0) && (
-                        <button
-                          type="button"
-                          onClick={() => removeCompetitorFromCategory(tournament.id, activeCategory.id, comp.id)}
-                          className="text-slate-500 hover:text-red-400 ml-1 cursor-pointer"
-                          title="Remover Atleta"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {!isCompetitorsCollapsed && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin pt-1">
+                    {activeCategory.competitors.map((comp) => (
+                      <div
+                        key={comp.id}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shrink-0 text-xs text-slate-200"
+                      >
+                        {comp.photoUrl ? (
+                          <img src={comp.photoUrl} alt={comp.name} className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-slate-800 text-amber-400 text-[10px] font-black flex items-center justify-center">
+                            {comp.name.charAt(0)}
+                          </div>
+                        )}
+                        <span className="font-bold truncate max-w-[120px]">{comp.name}</span>
+                        <BeltBadge belt={comp.belt} stripes={comp.stripes} size="sm" />
+                        {canManage && (!activeCategory.matches || activeCategory.matches.length === 0) && (
+                          <button
+                            type="button"
+                            onClick={() => removeCompetitorFromCategory(tournament.id, activeCategory.id, comp.id)}
+                            className="text-slate-500 hover:text-red-400 ml-1 cursor-pointer"
+                            title="Remover Atleta"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-
 
             {/* Podium Display if category is completed or has podium */}
             {activeCategory.podium && (
               <PodiumCard podium={activeCategory.podium} categoryName={activeCategory.name} />
             )}
 
-            {/* Interactive Tournament Bracket Visualizer */}
+            {/* Interactive Tournament Bracket Visualizer (List mode + Tree diagram mode with zoom) */}
             <BracketViewer
               category={activeCategory}
               onSelectMatch={(match) => setActiveMatchForScore(match)}
