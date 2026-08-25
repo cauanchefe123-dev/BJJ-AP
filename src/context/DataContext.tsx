@@ -316,7 +316,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...s,
           approvalStatus: s.approvalStatus || 'APPROVED',
           active: s.approvalStatus === 'APPROVED' || s.active !== false,
-          photoUrl: (!s.photoUrl || s.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : s.photoUrl,
+          photoUrl: s.photoUrl || '',
         }));
       setStudents(valid);
     });
@@ -326,7 +326,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .filter(t => !isDeletedRecord(t.id, t.email))
         .map(t => ({
           ...t,
-          photoUrl: (!t.photoUrl || t.photoUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : t.photoUrl,
+          photoUrl: t.photoUrl || '',
         }));
       setTeachers(valid);
     });

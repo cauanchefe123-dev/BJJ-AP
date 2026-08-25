@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { TrainingPhoto } from '../../types';
 import { formatDateBR, getLocalDateStr } from '../../utils/dateUtils';
+import { compressImage } from '../../utils/imageCompressor';
 import {
   Camera,
   Download,
@@ -104,42 +105,48 @@ export const TrainingGalleryView: React.FC = () => {
   // Today's or Most Recent Featured Photo
   const latestPhoto = filteredPhotos.length > 0 ? filteredPhotos[0] : null;
 
-  // Process and append multiple files to pending list
+  // Process and append multiple files to pending list (Compressed to HD 1600px, under 1MB Firestore limit)
   const processFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
     if (fileArray.length === 0) return;
 
+    setIsUploading(true);
     const newPendingItems: PendingUploadPhoto[] = [];
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
-      const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-      const sizeFormatted = file.size > 1024 * 1024 ? `${sizeInMB} MB` : `${Math.round(file.size / 1024)} KB`;
 
-      // Read as DataURL
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve((e.target?.result as string) || '');
-        reader.readAsDataURL(file);
-      });
+      try {
+        // Compress to crisp HD (max 1600px width/height, 0.82 JPEG) to ensure document stays safely under Firestore 1MB limit
+        const dataUrl = await compressImage(file, 1600, 1600, 0.82);
+        
+        // Calculate compressed size in KB/MB
+        const approxBytes = Math.round((dataUrl.length * 3) / 4);
+        const sizeFormatted = approxBytes > 1024 * 1024 
+          ? `${(approxBytes / (1024 * 1024)).toFixed(2)} MB` 
+          : `${Math.round(approxBytes / 1024)} KB HD`;
 
-      // Get dimensions
-      const dimensions = await new Promise<string>((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(`${img.naturalWidth} x ${img.naturalHeight}`);
-        img.onerror = () => resolve('Original');
-        img.src = dataUrl;
-      });
+        // Get dimensions
+        const dimensions = await new Promise<string>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(`${img.naturalWidth} x ${img.naturalHeight}`);
+          img.onerror = () => resolve('Alta Definição');
+          img.src = dataUrl;
+        });
 
-      newPendingItems.push({
-        id: `pending-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
-        file,
-        dataUrl,
-        sizeFormatted,
-        dimensions,
-      });
+        newPendingItems.push({
+          id: `pending-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
+          file,
+          dataUrl,
+          sizeFormatted,
+          dimensions,
+        });
+      } catch (err) {
+        console.error('Erro ao processar foto:', err);
+      }
     }
 
+    setIsUploading(false);
     setPendingPhotos((prev) => [...prev, ...newPendingItems]);
   };
 

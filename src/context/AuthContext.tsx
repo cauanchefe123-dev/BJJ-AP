@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .map(u => ({
           ...u,
           approvalStatus: u.approvalStatus || 'APPROVED',
-          avatarUrl: (!u.avatarUrl || u.avatarUrl.includes('unsplash.com')) ? DEFAULT_BLACK_GI_AVATAR : u.avatarUrl,
+          avatarUrl: u.avatarUrl || '',
         }));
 
       // Ensure Master Admin exists in Firestore if list is empty

@@ -1,12 +1,13 @@
 /**
- * Utility to compress images (File, Data URL, or Blob) to lightweight Data URLs (~15KB - 40KB JPEG).
- * Prevents localStorage quota errors, Firestore document size limit errors (1MB max), and browser crashes.
+ * Utility to compress images (File, Data URL, or Blob) to lightweight Data URLs (~20KB - 350KB JPEG).
+ * Prevents localStorage quota errors, Firestore document size limit errors (1MB max), and browser crashes,
+ * while keeping high visual fidelity.
  */
 export async function compressImage(
-  input: File | string,
-  maxWidth = 350,
-  maxHeight = 350,
-  quality = 0.8
+  input: File | Blob | string,
+  maxWidth = 400,
+  maxHeight = 400,
+  quality = 0.82
 ): Promise<string> {
   return new Promise((resolve) => {
     if (!input) {
@@ -15,8 +16,13 @@ export async function compressImage(
     }
 
     const processDataUrl = (dataUrl: string) => {
-      // If it's already small or an SVG, return directly
-      if (!dataUrl || dataUrl.startsWith('data:image/svg+xml') || dataUrl.length < 20000) {
+      if (!dataUrl) {
+        resolve('');
+        return;
+      }
+
+      // If it's an SVG, return directly
+      if (dataUrl.startsWith('data:image/svg+xml')) {
         resolve(dataUrl);
         return;
       }
@@ -26,8 +32,8 @@ export async function compressImage(
 
       img.onload = () => {
         try {
-          let width = img.width;
-          let height = img.height;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
 
           if (width > height) {
             if (width > maxWidth) {
@@ -47,25 +53,25 @@ export async function compressImage(
 
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            resolve(dataUrl.length > 300000 ? dataUrl.slice(0, 300000) : dataUrl);
+            resolve(dataUrl);
             return;
           }
 
-          // Fill white background for transparent PNGs converted to JPEG
-          ctx.fillStyle = '#FFFFFF';
+          // Fill background to avoid black transparency artifacts
+          ctx.fillStyle = '#0f172a';
           ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
           const compressed = canvas.toDataURL('image/jpeg', quality);
           resolve(compressed);
         } catch (err) {
-          console.warn('[imageCompressor] Fallback due to error:', err);
+          console.warn('[imageCompressor] Fallback due to canvas error:', err);
           resolve(dataUrl);
         }
       };
 
       img.onerror = () => {
-        console.warn('[imageCompressor] Failed to load image element');
+        console.warn('[imageCompressor] Image element failed to load dataUrl');
         resolve(dataUrl);
       };
 
@@ -73,7 +79,11 @@ export async function compressImage(
     };
 
     if (typeof input === 'string') {
-      processDataUrl(input);
+      if (input.startsWith('data:') || input.startsWith('blob:') || input.startsWith('http')) {
+        processDataUrl(input);
+      } else {
+        resolve(input);
+      }
     } else {
       const reader = new FileReader();
       reader.onerror = () => resolve('');
@@ -89,3 +99,4 @@ export async function compressImage(
     }
   });
 }
+

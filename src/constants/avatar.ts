@@ -68,7 +68,6 @@ export function getStudentAvatar(student?: Partial<Student> | null): string {
   if (
     student.photoUrl && 
     student.photoUrl.trim() !== '' && 
-    !student.photoUrl.includes('unsplash.com') && 
     !student.photoUrl.startsWith('data:image/svg+xml')
   ) {
     return student.photoUrl;
@@ -83,10 +82,16 @@ export function getUserAvatar(user?: Partial<User> | null, studentObj?: Partial<
   if (
     user?.avatarUrl && 
     user.avatarUrl.trim() !== '' && 
-    !user.avatarUrl.includes('unsplash.com') && 
     !user.avatarUrl.startsWith('data:image/svg+xml')
   ) {
     return user.avatarUrl;
+  }
+  if (
+    studentObj?.photoUrl && 
+    studentObj.photoUrl.trim() !== '' && 
+    !studentObj.photoUrl.startsWith('data:image/svg+xml')
+  ) {
+    return studentObj.photoUrl;
   }
   if (user?.role === 'ALUNO' && studentObj) {
     return getStudentAvatar(studentObj);
