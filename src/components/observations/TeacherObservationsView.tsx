@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { TeacherObservation } from '../../types';
@@ -15,12 +15,24 @@ import {
   BookOpen,
   X,
   CheckCircle2,
-  Award
+  Award,
+  Eye,
+  CheckCheck,
+  Clock
 } from 'lucide-react';
+import { resolveStudentForUser } from '../../constants/avatar';
 
 export const TeacherObservationsView: React.FC = () => {
   const { currentUser } = useAuth();
-  const { students, teacherObservations, addTeacherObservation, updateTeacherObservation, deleteTeacherObservation } = useData();
+  const {
+    students,
+    teacherObservations,
+    addTeacherObservation,
+    updateTeacherObservation,
+    deleteTeacherObservation,
+    markTeacherObservationAsRead,
+    markAllTeacherObservationsAsRead,
+  } = useData();
 
   const isTeacherOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
 
@@ -38,18 +50,41 @@ export const TeacherObservationsView: React.FC = () => {
   const [content, setContent] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Find student ID associated with logged in student
-  const currentStudentObj = students.find(
-    s => s.id === currentUser?.studentId || (s.email && s.email.trim().toLowerCase() === currentUser?.email.trim().toLowerCase())
-  );
-  const currentStudentId = currentStudentObj?.id || currentUser?.studentId;
+  // Find student associated with logged in user
+  const currentStudent = resolveStudentForUser(currentUser, students);
+  const userId = currentUser?.id || 'guest';
+
+  // Auto-mark observations as read when student views this page (or allow manual click)
+  useEffect(() => {
+    if (!isTeacherOrAdmin && currentStudent && currentUser) {
+      const unreadForMe = teacherObservations.filter(
+        obs =>
+          (obs.studentId === currentStudent.id ||
+            obs.studentId === currentUser.studentId ||
+            (obs.studentName && currentStudent.name && obs.studentName.toLowerCase() === currentStudent.name.toLowerCase())) &&
+          (!obs.read || (obs.readBy && !obs.readBy.includes(userId)))
+      );
+
+      if (unreadForMe.length > 0) {
+        // Mark as read after a short delay so the user clearly sees they are opening them
+        const timer = setTimeout(() => {
+          unreadForMe.forEach(obs => {
+            markTeacherObservationAsRead(obs.id, userId);
+          });
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [teacherObservations, currentStudent, currentUser, isTeacherOrAdmin, userId, markTeacherObservationAsRead]);
 
   // Filter observations
   const displayedObservations = teacherObservations.filter(obs => {
     // If student, only show observations for this student
     if (!isTeacherOrAdmin) {
-      if (currentStudentId) {
-        if (obs.studentId !== currentStudentId && obs.studentName !== currentUser?.name) return false;
+      if (currentStudent) {
+        const matchesId = obs.studentId === currentStudent.id || obs.studentId === currentUser?.studentId;
+        const matchesName = obs.studentName && currentStudent.name && obs.studentName.toLowerCase() === currentStudent.name.toLowerCase();
+        if (!matchesId && !matchesName) return false;
       } else {
         if (obs.studentName?.toLowerCase() !== currentUser?.name.toLowerCase()) return false;
       }
@@ -96,6 +131,12 @@ export const TeacherObservationsView: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleCardClick = (obs: TeacherObservation) => {
+    if (!isTeacherOrAdmin && currentUser) {
+      markTeacherObservationAsRead(obs.id, userId);
+    }
+  };
+
   const handleSubmitObservation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetStudentId || !title.trim() || !content.trim()) return;
@@ -121,10 +162,10 @@ export const TeacherObservationsView: React.FC = () => {
         content: content.trim(),
         category,
       });
-      setSuccessMessage('Observação enviada com sucesso para o aluno!');
+      setSuccessMessage(`Observação enviada individualmente para ${selectedStudent ? selectedStudent.name : 'o aluno'}!`);
     }
 
-    setTimeout(() => setSuccessMessage(null), 3000);
+    setTimeout(() => setSuccessMessage(null), 3500);
 
     // Reset Form
     setTitle('');
@@ -164,8 +205,8 @@ export const TeacherObservationsView: React.FC = () => {
               </h1>
               <p className="text-xs text-slate-400 mt-1">
                 {isTeacherOrAdmin
-                  ? 'Cadastre avaliações, dicas técnicas e feedbacks de evolução para os seus alunos.'
-                  : 'Acompanhe as observações, dicas técnicas e feedback deixados pelos seus professores.'}
+                  ? 'Cadastre avaliações, dicas técnicas e feedbacks individuais confidenciais para os seus alunos.'
+                  : 'Acompanhe as observações técnicas e feedback individuais deixados exclusivamente para você pelos seus professores.'}
               </p>
             </div>
           </div>
@@ -213,7 +254,7 @@ export const TeacherObservationsView: React.FC = () => {
               onChange={e => setSelectedCategoryFilter(e.target.value)}
               className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer"
             >
-              <option value="ALL">Todas Categoria</option>
+              <option value="ALL">Todas Categorias</option>
               <option value="TÉCNICA">Técnica</option>
               <option value="EVOLUÇÃO">Evolução</option>
               <option value="COMPORTAMENTO">Comportamento</option>
@@ -252,23 +293,40 @@ export const TeacherObservationsView: React.FC = () => {
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
             {isTeacherOrAdmin
               ? 'Nenhuma observação foi cadastrada para os filtros selecionados. Clique em "Nova Observação" para adicionar um feedback para um aluno.'
-              : 'Seus professores ainda não registraram observações técnicas para a sua conta.'}
+              : 'Seus professores ainda não registraram observações técnicas individuais para você.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {displayedObservations.map(obs => {
             const student = students.find(s => s.id === obs.studentId);
+            const isUnreadForMe = !isTeacherOrAdmin && (!obs.read || (obs.readBy && !obs.readBy.includes(userId)));
+            const isReadByStudent = obs.read || (obs.readBy && obs.readBy.length > 0);
+
             return (
               <div
                 key={obs.id}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 space-y-4 transition-all shadow-md relative group"
+                onClick={() => handleCardClick(obs)}
+                className={`rounded-2xl p-5 space-y-4 transition-all shadow-md relative group border ${
+                  isUnreadForMe
+                    ? 'bg-slate-900 border-amber-500 shadow-amber-500/10 ring-1 ring-amber-500/40'
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                }`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {getCategoryBadge(obs.category)}
+
+                      {/* Visual Indicator: New Observation for the student */}
+                      {isUnreadForMe && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 flex items-center gap-1 shadow-sm animate-pulse">
+                          <Sparkles className="w-3 h-3" />
+                          NOVA
+                        </span>
+                      )}
+
                       <span className="text-[11px] text-slate-500 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-slate-600" />
                         {new Date(obs.date + 'T12:00:00').toLocaleDateString('pt-BR')}
@@ -278,10 +336,13 @@ export const TeacherObservationsView: React.FC = () => {
                   </div>
 
                   {isTeacherOrAdmin && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() => handleOpenEditModal(obs)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(obs);
+                        }}
                         title="Editar observação"
                         className="text-slate-500 hover:text-amber-400 p-1.5 rounded-lg hover:bg-amber-500/10 transition-all opacity-80 group-hover:opacity-100 cursor-pointer"
                       >
@@ -289,7 +350,10 @@ export const TeacherObservationsView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteTeacherObservation(obs.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTeacherObservation(obs.id);
+                        }}
                         title="Excluir observação"
                         className="text-slate-600 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-950/30 transition-all opacity-70 group-hover:opacity-100 cursor-pointer"
                       >
@@ -300,21 +364,56 @@ export const TeacherObservationsView: React.FC = () => {
                 </div>
 
                 {/* Content */}
-                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 whitespace-pre-wrap">
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 whitespace-pre-wrap font-normal">
                   {obs.content}
                 </p>
 
-                {/* Author & Recipient Info */}
-                <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+                {/* Author & Recipient & Read Status Info */}
+                <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
                   <div className="flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-amber-400" />
                     <span>Prof: <strong className="text-slate-200">{obs.teacherName}</strong></span>
                   </div>
 
-                  {isTeacherOrAdmin && (
-                    <div className="flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Aluno: <strong className="text-slate-200">{student ? student.name : obs.studentName}</strong></span>
+                  {isTeacherOrAdmin ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Aluno: <strong className="text-slate-200">{student ? student.name : obs.studentName}</strong></span>
+                      </div>
+                      
+                      {/* Teacher View: Status if student has read */}
+                      <span className={`text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md ${
+                        isReadByStudent
+                          ? 'text-emerald-400 bg-emerald-950/50 border border-emerald-500/30'
+                          : 'text-amber-400 bg-amber-950/50 border border-amber-500/30'
+                      }`}>
+                        {isReadByStudent ? (
+                          <>
+                            <CheckCheck className="w-3 h-3 text-emerald-400" />
+                            Visualizado pelo aluno
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            Aguardando leitura
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      {isUnreadForMe ? (
+                        <span className="text-amber-400 font-bold flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          Clique para confirmar leitura
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400/90 font-medium flex items-center gap-1">
+                          <CheckCheck className="w-3 h-3 text-emerald-400" />
+                          Observação visualizada
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -332,13 +431,13 @@ export const TeacherObservationsView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <MessageSquareQuote className="w-5 h-5 text-amber-400" />
                 <h2 className="text-sm font-bold text-white">
-                  {editingObservationId ? 'Editar Observação do Professor' : 'Nova Observação do Professor'}
+                  {editingObservationId ? 'Editar Observação do Professor' : 'Nova Observação Individual do Professor'}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -347,7 +446,7 @@ export const TeacherObservationsView: React.FC = () => {
             <form onSubmit={handleSubmitObservation} className="p-5 space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 font-medium mb-1.5">
-                  Selecione o Aluno *
+                  Selecione o Aluno Destinatário *
                 </label>
                 <select
                   required
@@ -362,6 +461,9 @@ export const TeacherObservationsView: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  🔒 Esta observação é individual e confidencial. Somente este aluno e os professores terão acesso.
+                </p>
               </div>
 
               <div>
@@ -374,7 +476,7 @@ export const TeacherObservationsView: React.FC = () => {
                       key={cat}
                       type="button"
                       onClick={() => setCategory(cat)}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                         category === cat
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-xs'
                           : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
@@ -418,13 +520,13 @@ export const TeacherObservationsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800 transition-all"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800 transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
                 >
                   {editingObservationId ? 'Salvar Alterações' : 'Enviar Observação'}
                 </button>

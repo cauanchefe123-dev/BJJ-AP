@@ -142,6 +142,7 @@ function MainApp() {
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
             isNotifOpen={isNotifOpen}
             setIsNotifOpen={setIsNotifOpen}
+            onNavigateTab={setActiveTab}
           />
 
           {/* Page Content */}

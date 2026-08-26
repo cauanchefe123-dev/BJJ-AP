@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenEditProfile,
 }) => {
   const { currentUser, logout } = useAuth();
-  const { academyConfig, students } = useData();
+  const { academyConfig, students, teacherObservations } = useData();
 
   if (!currentUser) return null;
 
@@ -52,6 +52,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const role = currentUser.role;
 
   const isPendingStudent = currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING');
+
+  // Contagem de observações não lidas para o aluno atual
+  const unreadObsCount = currentUser.role === 'ALUNO' && currentStudent
+    ? teacherObservations.filter(obs =>
+        (obs.studentId === currentStudent.id || obs.studentId === currentUser.studentId || (obs.studentName && currentStudent.name && obs.studentName.toLowerCase() === currentStudent.name.toLowerCase())) &&
+        !obs.read &&
+        (!obs.readBy || !obs.readBy.includes(currentUser.id))
+      ).length
+    : 0;
 
   // Categorized Navigation Items for pristine organization & easy visual scanning
   const mainNav = [
@@ -98,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {visible.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const hasObservationBadge = item.id === 'observations' && unreadObsCount > 0;
           return (
             <button
               key={item.id}
@@ -105,17 +115,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setActiveTab(item.id);
                 setIsOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 relative cursor-pointer group ${
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 relative cursor-pointer group ${
                 isActive
                   ? 'bg-slate-800/90 text-white font-bold border border-slate-700/80 shadow-xs'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
             >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-amber-400 rounded-r-full shadow-xs"></span>
+              <div className="flex items-center gap-3 min-w-0">
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-amber-400 rounded-r-full shadow-xs"></span>
+                )}
+                <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-300'}`} />
+                <span className="truncate">{item.label}</span>
+              </div>
+
+              {hasObservationBadge && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 shadow-md animate-pulse shrink-0">
+                  {unreadObsCount} nova{unreadObsCount > 1 ? 's' : ''}
+                </span>
               )}
-              <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-300'}`} />
-              <span className="truncate">{item.label}</span>
             </button>
           );
         })}

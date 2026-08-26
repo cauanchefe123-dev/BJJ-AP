@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Check, Trash2, Target, Megaphone, BellRing, ShieldCheck, X, Sparkles, Volume2 } from 'lucide-react';
+import { Bell, Check, Trash2, Target, Megaphone, BellRing, ShieldCheck, X, Sparkles, Volume2, MessageSquareQuote } from 'lucide-react';
+import { resolveStudentForUser } from '../../constants/avatar';
 
 interface NotificationCenterProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
-export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
+export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose, onNavigateTab }) => {
   const {
     notifications,
+    students,
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
@@ -20,13 +23,41 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
   const { currentUser } = useAuth();
   const userId = currentUser?.id || 'guest';
+  const currentStudent = resolveStudentForUser(currentUser, students);
 
   if (!isOpen) return null;
 
-  const unreadCount = notifications.filter(n => !n.readBy.includes(userId)).length;
+  // Filtrar notificações para que notificações individuais apareçam APENAS para o aluno destinatário (ou gestores)
+  const visibleNotifications = notifications.filter(notif => {
+    if (!notif.targetStudentId) return true; // Notificação global
+    if (currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR') return true; // Professores/Admins podem ver auditoria
+    
+    // Aluno destinatário
+    const isRecipient =
+      (currentStudent && currentStudent.id === notif.targetStudentId) ||
+      currentUser?.id === notif.targetStudentId ||
+      currentUser?.studentId === notif.targetStudentId ||
+      (currentStudent?.email && currentStudent.email.trim().toLowerCase() === notif.targetStudentId.trim().toLowerCase()) ||
+      (currentUser?.email && currentUser.email.trim().toLowerCase() === notif.targetStudentId.trim().toLowerCase());
+
+    return isRecipient;
+  });
+
+  const unreadCount = visibleNotifications.filter(n => !n.readBy.includes(userId)).length;
 
   const handleTogglePush = async () => {
     await requestPushPermission();
+  };
+
+  const handleNotificationClick = (notif: typeof notifications[0]) => {
+    markNotificationAsRead(notif.id, userId);
+    if (notif.type === 'INDIVIDUAL_OBSERVATION' && onNavigateTab) {
+      onNavigateTab('observations');
+      onClose();
+    } else if (notif.type === 'WEEKLY_FOCUS' && onNavigateTab) {
+      onNavigateTab('weekly-focus');
+      onClose();
+    }
   };
 
   return (
@@ -54,7 +85,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
             title="Fechar Notificações"
           >
             <X className="w-5 h-5" />
@@ -83,7 +114,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
           ) : (
             <button
               onClick={handleTogglePush}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm transition-all shrink-0"
+              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm transition-all shrink-0 cursor-pointer"
             >
               Ativar Push
             </button>
@@ -92,11 +123,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
         {/* Actions Bar */}
         <div className="px-4 py-2 bg-slate-950/40 border-b border-slate-800/80 flex items-center justify-between text-xs">
-          <span className="text-[11px] text-slate-400">Total: {notifications.length} avisos</span>
+          <span className="text-[11px] text-slate-400">Total: {visibleNotifications.length} avisos</span>
           {unreadCount > 0 && (
             <button
               onClick={() => markAllNotificationsAsRead(userId)}
-              className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1 transition-all"
+              className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               Marcar todas como lidas
@@ -106,21 +137,21 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-          {notifications.length === 0 ? (
+          {visibleNotifications.length === 0 ? (
             <div className="text-center py-16 space-y-3">
               <Bell className="w-10 h-10 text-slate-600 mx-auto opacity-50" />
               <p className="text-xs text-slate-400 font-medium">Nenhuma notificação recebida no momento.</p>
             </div>
           ) : (
-            notifications.map(notif => {
+            visibleNotifications.map(notif => {
               const isRead = notif.readBy.includes(userId);
               return (
                 <div
                   key={notif.id}
-                  onClick={() => markNotificationAsRead(notif.id, userId)}
+                  onClick={() => handleNotificationClick(notif)}
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between space-y-2 ${
                     isRead
-                      ? 'bg-slate-950/60 border-slate-800/80 opacity-75'
+                      ? 'bg-slate-950/60 border-slate-800/80 opacity-75 hover:opacity-100'
                       : 'bg-slate-900 border-amber-500/40 shadow-lg ring-1 ring-amber-500/20'
                   }`}
                 >
@@ -130,11 +161,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-xl text-slate-950 shrink-0 font-bold ${
-                      notif.type === 'WEEKLY_FOCUS'
+                      notif.type === 'INDIVIDUAL_OBSERVATION'
+                        ? 'bg-amber-400 text-slate-950'
+                        : notif.type === 'WEEKLY_FOCUS'
                         ? 'bg-amber-400'
                         : 'bg-blue-400'
                     }`}>
-                      {notif.type === 'WEEKLY_FOCUS' ? (
+                      {notif.type === 'INDIVIDUAL_OBSERVATION' ? (
+                        <MessageSquareQuote className="w-4 h-4" />
+                      ) : notif.type === 'WEEKLY_FOCUS' ? (
                         <Target className="w-4 h-4" />
                       ) : (
                         <Megaphone className="w-4 h-4" />
@@ -142,10 +177,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                     </div>
 
                     <div className="space-y-1 flex-1 pr-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                          {notif.type === 'WEEKLY_FOCUS' ? 'Foco da Semana' : 'Aviso da Academia'}
+                          {notif.type === 'INDIVIDUAL_OBSERVATION'
+                            ? 'Observação Individual do Mestre'
+                            : notif.type === 'WEEKLY_FOCUS'
+                            ? 'Foco da Semana'
+                            : 'Aviso da Academia'}
                         </span>
+                        {notif.targetStudentName && (
+                          <span className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                            Para: {notif.targetStudentName}
+                          </span>
+                        )}
                         {notif.targetClassName && (
                           <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded-md truncate max-w-[140px]">
                             {notif.targetClassName}
@@ -174,7 +218,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                         e.stopPropagation();
                         deleteNotification(notif.id);
                       }}
-                      className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-all"
+                      className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-all cursor-pointer"
                       title="Excluir notificação"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

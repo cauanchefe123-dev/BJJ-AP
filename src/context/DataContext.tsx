@@ -167,6 +167,8 @@ interface DataContextType {
   addTeacherObservation: (obs: Omit<TeacherObservation, 'id' | 'date'>) => void;
   updateTeacherObservation: (id: string, updates: Partial<TeacherObservation>) => void;
   deleteTeacherObservation: (id: string) => void;
+  markTeacherObservationAsRead: (id: string, userId?: string) => void;
+  markAllTeacherObservationsAsRead: (studentId: string, userId?: string) => void;
 
   // Weekly Focus Positions Actions
   weeklyPositions: WeeklyPosition[];
@@ -442,17 +444,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setNotifications(prev => [newNotif, ...prev]);
-    setActiveToastNotif(newNotif);
     saveToFirestore('notifications', newNotif);
 
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification(newNotif.title, {
-          body: newNotif.message,
-          icon: '/favicon.ico',
-        });
-      } catch (e) {
-        console.warn('Could not display system push notification:', e);
+    // Verificar se a notificação deve ser entregue localmente (toast e push do navegador) para a sessão atual
+    let shouldDeliverLocally = true;
+    try {
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('bjjcron_auth_user') : null;
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (newNotif.targetStudentId) {
+          const isTargetStudent =
+            parsed.id === newNotif.targetStudentId ||
+            parsed.studentId === newNotif.targetStudentId ||
+            (parsed.email && parsed.email.trim().toLowerCase() === newNotif.targetStudentId.trim().toLowerCase());
+
+          // Se o usuário logado for um aluno diferente do destinatário, não dispara push nem toast para ele
+          if (parsed.role === 'ALUNO' && !isTargetStudent) {
+            shouldDeliverLocally = false;
+          }
+        }
+      }
+    } catch {
+      // Ignorar erros de parsing do localStorage
+    }
+
+    if (shouldDeliverLocally) {
+      setActiveToastNotif(newNotif);
+
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(newNotif.title, {
+            body: newNotif.message,
+            icon: '/favicon.ico',
+          });
+        } catch (e) {
+          console.warn('Could not display system push notification:', e);
+        }
       }
     }
 
@@ -1123,11 +1150,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addTeacherObservation = (obsData: Omit<TeacherObservation, 'id' | 'date'>) => {
     const newObs: TeacherObservation = {
       ...obsData,
-      id: `obs-${Date.now()}`,
+      id: `obs-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: getLocalDateStr(),
+      read: false,
+      readBy: [],
+      createdAt: new Date().toISOString(),
     };
     setTeacherObservations(prev => [newObs, ...prev]);
     saveToFirestore('teacherObservations', newObs);
+
+    // Enviar notificação individual direcionada estritamente para o aluno que recebeu a observação
+    const targetStudent = students.find(s => s.id === obsData.studentId || (obsData.studentName && s.name === obsData.studentName));
+    const targetName = targetStudent?.name || obsData.studentName || 'Atleta';
+
+    addNotification({
+      title: '🥋 Nova Observação do Mestre!',
+      message: `${obsData.teacherName || 'Seu Professor'} registrou um feedback técnico individual: "${obsData.title}".`,
+      type: 'INDIVIDUAL_OBSERVATION',
+      targetStudentId: obsData.studentId,
+      targetStudentName: targetName,
+      authorName: obsData.teacherName || 'Professor',
+      observationId: newObs.id,
+    });
   };
 
   const updateTeacherObservation = (id: string, updates: Partial<TeacherObservation>) => {
@@ -1147,6 +1191,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteTeacherObservation = (id: string) => {
     setTeacherObservations(prev => prev.filter(o => o.id !== id));
     removeFromFirestore('teacherObservations', id);
+  };
+
+  const markTeacherObservationAsRead = (id: string, userId?: string) => {
+    let updatedObs: TeacherObservation | null = null;
+    const nowIso = new Date().toISOString();
+    setTeacherObservations(prev =>
+      prev.map(o => {
+        if (o.id === id) {
+          const currentReadBy = Array.isArray(o.readBy) ? o.readBy : [];
+          const nextReadBy = userId && !currentReadBy.includes(userId) ? [...currentReadBy, userId] : currentReadBy;
+          updatedObs = { ...o, read: true, readAt: o.readAt || nowIso, readBy: nextReadBy };
+          return updatedObs;
+        }
+        return o;
+      })
+    );
+    if (updatedObs) saveToFirestore('teacherObservations', updatedObs);
+  };
+
+  const markAllTeacherObservationsAsRead = (studentId: string, userId?: string) => {
+    const nowIso = new Date().toISOString();
+    setTeacherObservations(prev =>
+      prev.map(o => {
+        const matchesStudent = o.studentId === studentId;
+        if (matchesStudent && (!o.read || (userId && (!o.readBy || !o.readBy.includes(userId))))) {
+          const currentReadBy = Array.isArray(o.readBy) ? o.readBy : [];
+          const nextReadBy = userId && !currentReadBy.includes(userId) ? [...currentReadBy, userId] : currentReadBy;
+          const updated = { ...o, read: true, readAt: o.readAt || nowIso, readBy: nextReadBy };
+          saveToFirestore('teacherObservations', updated);
+          return updated;
+        }
+        return o;
+      })
+    );
   };
 
   // Weekly Focus Positions
@@ -1906,6 +1984,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addTeacherObservation,
         updateTeacherObservation,
         deleteTeacherObservation,
+        markTeacherObservationAsRead,
+        markAllTeacherObservationsAsRead,
         weeklyPositions,
         addWeeklyPosition,
         updateWeeklyPosition,

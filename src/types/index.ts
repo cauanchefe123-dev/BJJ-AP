@@ -2,12 +2,15 @@ export interface AppNotification {
   id: string;
   title: string;
   message: string;
-  type: 'WEEKLY_FOCUS' | 'TEACHER_NOTICE' | 'ANNOUNCEMENT' | 'GENERAL';
+  type: 'WEEKLY_FOCUS' | 'TEACHER_NOTICE' | 'ANNOUNCEMENT' | 'GENERAL' | 'INDIVIDUAL_OBSERVATION';
   targetClassId?: string;
   targetClassName?: string;
+  targetStudentId?: string; // ID do aluno específico (notificação individual)
+  targetStudentName?: string;
   createdAt: string; // ISO string
   readBy: string[]; // array of student/user IDs who marked it as read
   authorName?: string;
+  observationId?: string;
 }
 
 export type UserRole = 'ADMIN' | 'PROFESSOR' | 'ALUNO';
@@ -202,6 +205,10 @@ export interface TeacherObservation {
   title: string;
   content: string;
   category: 'TÉCNICA' | 'EVOLUÇÃO' | 'COMPORTAMENTO' | 'GERAL';
+  read?: boolean; // Se a observação já foi visualizada pelo aluno destinatário
+  readAt?: string; // Data/hora em que foi visualizada
+  readBy?: string[]; // IDs dos usuários que já leram
+  createdAt?: string; // Timestamp ISO de criação
 }
 
 export interface GraduationCriteria {

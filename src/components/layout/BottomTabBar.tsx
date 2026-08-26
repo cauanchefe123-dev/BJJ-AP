@@ -25,7 +25,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   onOpenQuickScan,
 }) => {
   const { currentUser } = useAuth();
-  const { students } = useData();
+  const { students, teacherObservations } = useData();
 
   if (!currentUser) return null;
 
@@ -33,6 +33,15 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   const isPendingStudent = currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING');
 
   if (isPendingStudent) return null;
+
+  // Contagem de observações não lidas estritamente para o aluno atual
+  const unreadObsCount = currentUser.role === 'ALUNO' && currentStudent
+    ? teacherObservations.filter(obs =>
+        (obs.studentId === currentStudent.id || obs.studentId === currentUser.studentId || (obs.studentName && currentStudent.name && obs.studentName.toLowerCase() === currentStudent.name.toLowerCase())) &&
+        !obs.read &&
+        (!obs.readBy || !obs.readBy.includes(currentUser.id))
+      ).length
+    : 0;
 
   // Determine bottom navigation tabs per role
   let tabs: Array<{ id: string; label: string; icon: any; isAction?: boolean }> = [];
@@ -92,14 +101,21 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[54px] relative ${
               isActive
                 ? 'text-amber-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title={tab.label}
           >
-            <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'text-amber-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <div className="relative mb-0.5">
+              <Icon className={`w-5 h-5 ${isActive ? 'text-amber-400 stroke-[2.5]' : 'text-slate-400'}`} />
+              {tab.id === 'observations' && unreadObsCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce shadow-md">
+                  {unreadObsCount}
+                </span>
+              )}
+            </div>
             <span className={`text-[10px] tracking-tight truncate max-w-[62px] ${isActive ? 'text-amber-400 font-bold' : 'font-medium'}`}>
               {tab.label}
             </span>

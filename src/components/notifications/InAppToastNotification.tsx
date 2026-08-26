@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useData } from '../../context/DataContext';
-import { Target, Megaphone, X, BellRing, Sparkles } from 'lucide-react';
+import { Target, Megaphone, X, BellRing, Sparkles, MessageSquareQuote } from 'lucide-react';
 
 export const InAppToastNotification: React.FC = () => {
   const { activeToastNotif, dismissToastNotif } = useData();
@@ -24,7 +24,7 @@ export const InAppToastNotification: React.FC = () => {
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5" />
-            Novo Alerta do Tatame!
+            {activeToastNotif.type === 'INDIVIDUAL_OBSERVATION' ? 'Nova Observação Individual do Mestre!' : 'Novo Alerta do Tatame!'}
           </span>
           <button
             onClick={dismissToastNotif}
@@ -38,7 +38,9 @@ export const InAppToastNotification: React.FC = () => {
         {/* Content */}
         <div className="flex items-start gap-3">
           <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shrink-0 shadow-md">
-            {activeToastNotif.type === 'WEEKLY_FOCUS' ? (
+            {activeToastNotif.type === 'INDIVIDUAL_OBSERVATION' ? (
+              <MessageSquareQuote className="w-5 h-5" />
+            ) : activeToastNotif.type === 'WEEKLY_FOCUS' ? (
               <Target className="w-5 h-5" />
             ) : (
               <Megaphone className="w-5 h-5" />

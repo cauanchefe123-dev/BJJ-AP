@@ -13,6 +13,7 @@ interface NavbarProps {
   onOpenAuthModal?: () => void;
   isNotifOpen?: boolean;
   setIsNotifOpen?: (open: boolean) => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuthModal,
   isNotifOpen: externalIsNotifOpen,
   setIsNotifOpen: externalSetIsNotifOpen,
+  onNavigateTab,
 }) => {
   const { currentUser, logout } = useAuth();
   const { academyConfig, students, payments, notifications } = useData();
@@ -36,7 +38,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   const userAvatar = getUserAvatar(currentUser, currentStudent);
 
   const userId = currentUser?.id || 'guest';
-  const unreadNotifsCount = notifications.filter(n => !n.readBy.includes(userId)).length;
+
+  // Filtrar apenas notificações destinadas a este usuário / gerais
+  const visibleNotifications = notifications.filter(notif => {
+    if (!notif.targetStudentId) return true;
+    if (currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR') return true;
+    const isRecipient =
+      (currentStudent && currentStudent.id === notif.targetStudentId) ||
+      currentUser?.id === notif.targetStudentId ||
+      currentUser?.studentId === notif.targetStudentId ||
+      (currentStudent?.email && currentStudent.email.trim().toLowerCase() === notif.targetStudentId.trim().toLowerCase()) ||
+      (currentUser?.email && currentUser.email.trim().toLowerCase() === notif.targetStudentId.trim().toLowerCase());
+    return isRecipient;
+  });
+
+  const unreadNotifsCount = visibleNotifications.filter(n => !n.readBy.includes(userId)).length;
 
   const tabTitles: Record<string, string> = {
     dashboard: 'Painel Geral',
@@ -158,7 +174,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       </header>
 
       {/* Notification Center Modal */}
-      <NotificationCenter isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
+      <NotificationCenter
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+        onNavigateTab={onNavigateTab}
+      />
     </>
   );
 };
