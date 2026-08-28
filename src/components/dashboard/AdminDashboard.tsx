@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
 import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus, Camera } from 'lucide-react';
-import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getLocalDateStr, getAttendanceLocalDate } from '../../utils/dateUtils';
 
 interface AdminDashboardProps {
@@ -13,7 +13,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOpenCheckin, onOpenDailyAttendance }) => {
-  const { students, payments, attendances, academyConfig } = useData();
+  const { students, payments, attendances, graduations, academyConfig } = useData();
 
   const totalActiveStudents = students.filter(s => s.active).length;
   
@@ -25,7 +25,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
 
   // Students ready for promotion
   const studentsReadyForGraduation = students.filter(s =>
-    isStudentEligibleForGraduation(s, academyConfig)
+    isStudentEligibleForGraduation(s, academyConfig, attendances, graduations)
   );
 
   const todayStr = getLocalDateStr();
@@ -174,6 +174,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
             ) : (
               studentsReadyForGraduation.slice(0, 5).map(s => {
                 const target = getStudentGraduationTarget(s, academyConfig);
+                const classesSince = getStudentClassesSinceLastGraduation(s, attendances, graduations);
                 const hasCustom = typeof s.customGraduationTargetClasses === 'number' && s.customGraduationTargetClasses > 0;
                 return (
                   <div key={s.id} className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 flex items-center justify-between transition-all">
@@ -196,7 +197,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
 
                     <div className="text-right">
                       <span className="text-xs font-black text-emerald-400 block">
-                        {s.classesSinceLastGraduation} / {target} treinos
+                        {classesSince} / {target} treinos
                       </span>
                       <span className="text-[10px] text-slate-400 font-medium">Pronto para exame</span>
                     </div>

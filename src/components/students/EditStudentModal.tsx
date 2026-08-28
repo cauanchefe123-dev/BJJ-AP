@@ -72,6 +72,8 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
         startDate: student.startDate || getLocalDateStr(),
         initialMonthsTrained: student.initialMonthsTrained || 0,
         customGraduationTargetClasses: student.customGraduationTargetClasses,
+        classesSinceLastGraduation: student.classesSinceLastGraduation ?? 0,
+        totalClassesAttended: student.totalClassesAttended ?? 0,
         ageCategory: student.ageCategory,
         weightCategory: student.weightCategory,
         planName: student.planName,
@@ -335,6 +337,45 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
               </span>
             </div>
 
+            {/* Treinos Realizados no Grau Atual e Total */}
+            {!isStudentUser && (
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 shadow-inner">
+                <div className="space-y-1">
+                  <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
+                    <span>Treinos Realizados no Grau Atual (Pós-grau):</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.classesSinceLastGraduation ?? 0}
+                    onChange={e => setFormData({
+                      ...formData,
+                      classesSinceLastGraduation: Math.max(0, parseInt(e.target.value) || 0)
+                    })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-emerald-400 focus:ring-2 focus:ring-amber-500 outline-none text-xs font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400">Contador acumulado para o próximo grau.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
+                    <span>Total Geral de Treinos no Tatame:</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.totalClassesAttended ?? 0}
+                    onChange={e => setFormData({
+                      ...formData,
+                      totalClassesAttended: Math.max(0, parseInt(e.target.value) || 0)
+                    })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-amber-400 focus:ring-2 focus:ring-amber-500 outline-none text-xs font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400">Histórico total de presenças do atleta.</p>
+                </div>
+              </div>
+            )}
+
             {/* Meta Individual de Treinos para Graduação */}
             <div className="sm:col-span-2 bg-slate-950 border border-amber-500/40 rounded-xl p-3.5 space-y-1.5 shadow-inner">
               <div className="flex items-center justify-between">
@@ -360,11 +401,6 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
               />
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 Define quantos treinos este aluno específico precisa realizar após a última graduação para ficar apto ao próximo grau/faixa.
-                {student && (
-                  <span className="block mt-1 text-emerald-400 font-bold">
-                    Treinos realizados atualmente: {student.classesSinceLastGraduation} aula(s).
-                  </span>
-                )}
               </p>
             </div>
           </div>

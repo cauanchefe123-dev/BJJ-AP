@@ -80,12 +80,14 @@ export interface Teacher {
 export interface Graduation {
   id: string;
   studentId: string;
+  studentName?: string;
   belt: BeltType;
   stripes: number; // 0 to 4
   promotedBy: string; // Professor name
-  promotedAt: string; // ISO date
+  promotedAt: string; // ISO date or YYYY-MM-DD
   notes?: string;
   classesCountAtPromotion: number;
+  certificateNumber?: string;
 }
 
 export interface BeltChangeRequest {

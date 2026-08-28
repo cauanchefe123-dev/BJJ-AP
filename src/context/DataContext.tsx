@@ -52,6 +52,7 @@ import {
 } from '../lib/firebaseStore';
 import { isDeletedRecord, markAsDeleted } from '../lib/deletionTracker';
 import { getLocalDateStr, getAttendanceLocalDate } from '../utils/dateUtils';
+import { getStudentTotalClasses } from '../utils/ranking';
 
 const checkClassCheckinAvailability = (bjjClass?: BJJClass): { isAvailable: boolean; reason?: string } => {
   if (!bjjClass) return { isAvailable: true };
@@ -127,6 +128,9 @@ interface DataContextType {
   updateStudent: (id: string, updates: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
   promoteStudent: (studentId: string, newBelt: BeltType, newStripes: number, promotedBy: string, notes?: string, promotedAt?: string) => void;
+  addGraduationRecord: (graduation: Omit<Graduation, 'id'>) => Graduation;
+  updateGraduation: (id: string, updates: Partial<Graduation>) => void;
+  deleteGraduation: (id: string) => void;
   requestBeltChange: (studentId: string, requestedBelt: BeltType, requestedStripes: number, notes?: string) => { success: boolean; message: string };
   approveBeltChange: (requestId: string, reviewerName: string) => void;
   rejectBeltChange: (requestId: string, reviewerName: string) => void;
@@ -688,16 +692,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const realId = student.id;
     const graduationDate = promotedAt || getLocalDateStr();
+    const certNum = `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const totalClassesCount = getStudentTotalClasses(student, attendances);
 
     const newGraduation: Graduation = {
       id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       studentId: realId,
+      studentName: student.name,
       belt: newBelt,
       stripes: newStripes,
       promotedBy: promotedBy || academyConfig.headCoachName || 'Mestre / Professor',
       promotedAt: graduationDate,
-      notes: notes || 'Graduação outorgada por mérito.',
-      classesCountAtPromotion: student.totalClassesAttended,
+      notes: notes || 'Graduação outorgada por mérito e dedicação no tatame.',
+      classesCountAtPromotion: totalClassesCount,
+      certificateNumber: certNum,
     };
 
     setGraduations(prev => [newGraduation, ...prev]);
@@ -709,12 +718,53 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       belt: newBelt,
       stripes: newStripes,
       classesSinceLastGraduation: 0,
+      totalClassesAttended: totalClassesCount,
       lastGraduationDate: graduationDate,
       updatedAt: nowIso,
     };
 
     setStudents(prev => prev.map(s => (s.id === realId ? updatedStudentObj : s)));
     saveToFirestore('students', updatedStudentObj);
+
+    addNotification({
+      title: `🥋 Graduação: ${student.name} promovido(a)!`,
+      message: `Parabéns ao atleta ${student.name} pela conquista da ${newBelt} (${newStripes}º Grau)! Outorgado por ${newGraduation.promotedBy}.`,
+      type: 'GENERAL',
+      targetStudentId: student.id,
+      targetStudentName: student.name,
+    });
+  };
+
+  const addGraduationRecord = (graduationData: Omit<Graduation, 'id'>): Graduation => {
+    const certNum = graduationData.certificateNumber || `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const student = students.find(s => s.id === graduationData.studentId);
+    const newGraduation: Graduation = {
+      ...graduationData,
+      id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      studentName: graduationData.studentName || student?.name || 'Atleta',
+      certificateNumber: certNum,
+    };
+
+    setGraduations(prev => [newGraduation, ...prev]);
+    saveToFirestore('graduations', newGraduation);
+    return newGraduation;
+  };
+
+  const updateGraduation = (id: string, updates: Partial<Graduation>) => {
+    setGraduations(prev => prev.map(g => {
+      if (g.id === id) {
+        const updated = { ...g, ...updates };
+        saveToFirestore('graduations', updated);
+        return updated;
+      }
+      return g;
+    }));
+  };
+
+  const deleteGraduation = (id: string) => {
+    markAsDeleted(id);
+    setGraduations(prev => prev.filter(g => g.id !== id));
+    removeFromFirestore('graduations', id);
   };
 
   const requestBeltChange = (
@@ -1964,6 +2014,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateStudent,
         deleteStudent,
         promoteStudent,
+        addGraduationRecord,
+        updateGraduation,
+        deleteGraduation,
         requestBeltChange,
         approveBeltChange,
         rejectBeltChange,

@@ -42,6 +42,7 @@ import { AdminStudentDashboardView } from './components/dashboard/AdminStudentDa
 import { WeeklyFocusPositionsView } from './components/positions/WeeklyFocusPositionsView';
 import { RollChallengeBoard } from './components/challenges/RollChallengeBoard';
 import { TrainingGalleryView } from './components/gallery/TrainingGalleryView';
+import { GraduationHistoryView } from './components/graduations/GraduationHistoryView';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
@@ -241,6 +242,8 @@ function MainApp() {
                 )}
 
                 {activeTab === 'journal' && <StudentTrainingJournal />}
+
+                {activeTab === 'graduations' && <GraduationHistoryView />}
 
                 {activeTab === 'weekly-focus' && <WeeklyFocusPositionsView />}
 

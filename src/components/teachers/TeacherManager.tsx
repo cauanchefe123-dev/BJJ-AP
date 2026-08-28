@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { Teacher, BeltType } from '../../types';
 import { BeltBadge } from '../belts/BeltBadge';
 import { DEFAULT_BLACK_GI_AVATAR } from '../../constants/avatar';
+import { ConfirmModal } from '../common/ConfirmModal';
 import {
   UserCheck,
   Plus,
@@ -30,6 +31,7 @@ export const TeacherManager: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -331,12 +333,8 @@ export const TeacherManager: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => {
-                      if (confirm(`Remover o cadastro do professor ${teacher.name}?`)) {
-                        deleteTeacher(teacher.id);
-                      }
-                    }}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700"
+                    onClick={() => setDeletingTeacher(teacher)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 cursor-pointer"
                     title="Excluir Professor"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -519,6 +517,25 @@ export const TeacherManager: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Teacher Confirmation Modal */}
+      {deletingTeacher && (
+        <ConfirmModal
+          isOpen={!!deletingTeacher}
+          onClose={() => setDeletingTeacher(null)}
+          onConfirm={() => {
+            if (deletingTeacher) {
+              deleteTeacher(deletingTeacher.id);
+              setDeletingTeacher(null);
+            }
+          }}
+          title="Excluir Professor"
+          message={`Tem certeza que deseja remover o cadastro do professor "${deletingTeacher.name}"?`}
+          confirmText="Excluir Professor"
+          cancelText="Cancelar"
+          type="danger"
+        />
       )}
     </div>
   );

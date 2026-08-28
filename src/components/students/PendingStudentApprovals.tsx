@@ -5,11 +5,14 @@ import { BeltBadge } from '../belts/BeltBadge';
 import { Student } from '../../types';
 import { DEFAULT_BLACK_GI_AVATAR } from '../../constants/avatar';
 import { Users, UserCheck, UserX, CheckCircle2, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 export const PendingStudentApprovals: React.FC = () => {
   const { students, updateStudent, deleteStudent } = useData();
   const { approveUser, rejectUser, users } = useAuth();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [rejectingStudent, setRejectingStudent] = useState<{ id: string; name: string } | null>(null);
+  const [isApproveAllOpen, setIsApproveAllOpen] = useState(false);
 
   // Robust combination of pending students from DataContext and AuthContext
   const pendingStudents: Student[] = useMemo(() => {
@@ -79,30 +82,26 @@ export const PendingStudentApprovals: React.FC = () => {
   };
 
   const handleApproveAll = () => {
-    if (window.confirm(`Deseja aprovar todos os ${pendingStudents.length} atletas pendentes de uma vez?`)) {
-      pendingStudents.forEach(st => {
-        approveUser(st.id);
-        updateStudent(st.id, {
-          ...st,
-          approvalStatus: 'APPROVED',
-          active: true,
-          registrationNumber: (st.registrationNumber && st.registrationNumber !== 'SOLICITAÇÃO')
-            ? st.registrationNumber
-            : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-        });
+    pendingStudents.forEach(st => {
+      approveUser(st.id);
+      updateStudent(st.id, {
+        ...st,
+        approvalStatus: 'APPROVED',
+        active: true,
+        registrationNumber: (st.registrationNumber && st.registrationNumber !== 'SOLICITAÇÃO')
+          ? st.registrationNumber
+          : `BJJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
       });
-      setToastMsg(`✅ Todos os ${pendingStudents.length} atletas foram aprovados na equipe!`);
-      setTimeout(() => setToastMsg(null), 5000);
-    }
+    });
+    setToastMsg(`✅ Todos os ${pendingStudents.length} atletas foram aprovados na equipe!`);
+    setTimeout(() => setToastMsg(null), 5000);
   };
 
   const handleReject = (studentId: string, studentName: string) => {
-    if (window.confirm(`Deseja realmente recusar e remover a solicitação de ${studentName}?`)) {
-      rejectUser(studentId);
-      deleteStudent(studentId);
-      setToastMsg(`🚫 Solicitação de ${studentName} foi recusada e removida.`);
-      setTimeout(() => setToastMsg(null), 5000);
-    }
+    rejectUser(studentId);
+    deleteStudent(studentId);
+    setToastMsg(`🚫 Solicitação de ${studentName} foi recusada e removida.`);
+    setTimeout(() => setToastMsg(null), 5000);
   };
 
   return (
@@ -132,7 +131,7 @@ export const PendingStudentApprovals: React.FC = () => {
 
         {pendingStudents.length > 1 && (
           <button
-            onClick={handleApproveAll}
+            onClick={() => setIsApproveAllOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md transition-all cursor-pointer self-stretch sm:self-auto justify-center"
           >
             <Sparkles className="w-4 h-4" />
@@ -213,7 +212,7 @@ export const PendingStudentApprovals: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleReject(student.id, student.name)}
+                  onClick={() => setRejectingStudent({ id: student.id, name: student.name })}
                   className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <UserX className="w-4 h-4" />
@@ -223,6 +222,42 @@ export const PendingStudentApprovals: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Reject Single Confirmation Modal */}
+      {rejectingStudent && (
+        <ConfirmModal
+          isOpen={!!rejectingStudent}
+          onClose={() => setRejectingStudent(null)}
+          onConfirm={() => {
+            if (rejectingStudent) {
+              handleReject(rejectingStudent.id, rejectingStudent.name);
+              setRejectingStudent(null);
+            }
+          }}
+          title="Recusar Solicitação de Aluno"
+          message={`Tem certeza que deseja recusar e remover a solicitação de matrícula de "${rejectingStudent.name}"?`}
+          confirmText="Recusar Solicitação"
+          cancelText="Cancelar"
+          type="danger"
+        />
+      )}
+
+      {/* Approve All Confirmation Modal */}
+      {isApproveAllOpen && (
+        <ConfirmModal
+          isOpen={isApproveAllOpen}
+          onClose={() => setIsApproveAllOpen(false)}
+          onConfirm={() => {
+            handleApproveAll();
+            setIsApproveAllOpen(false);
+          }}
+          title="Aprovar Todos os Alunos"
+          message={`Deseja aprovar e efetivar a matrícula de todos os ${pendingStudents.length} atletas pendentes de uma só vez?`}
+          confirmText={`Aprovar ${pendingStudents.length} Atletas`}
+          cancelText="Cancelar"
+          type="warning"
+        />
       )}
     </div>
   );

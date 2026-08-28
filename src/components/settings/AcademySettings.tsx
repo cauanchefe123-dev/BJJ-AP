@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { saveAcademyToList } from '../academies/AcademyLinkView';
 import { BeltType } from '../../types';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { 
   Settings, Save, RefreshCw, Database, Shield, CheckCircle2, AlertCircle, 
   Upload, Image as ImageIcon, Sparkles, Users, UserCheck, UserX, Mail, 
@@ -132,6 +133,7 @@ export const AcademySettings: React.FC = () => {
   };
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [rejectingStudent, setRejectingStudent] = useState<{ id: string; name: string } | null>(null);
 
   const pendingStudents = students.filter(s => s.approvalStatus === 'PENDING');
 
@@ -143,12 +145,10 @@ export const AcademySettings: React.FC = () => {
   };
 
   const handleRejectStudent = (studentId: string, studentName: string) => {
-    if (confirm(`Deseja recusa e remover a solicitação de ${studentName}?`)) {
-      rejectUser(studentId);
-      updateStudent(studentId, { approvalStatus: 'REJECTED', active: false });
-      setToastMsg(`❌ Solicitação de ${studentName} foi recusada.`);
-      setTimeout(() => setToastMsg(null), 4000);
-    }
+    rejectUser(studentId);
+    updateStudent(studentId, { approvalStatus: 'REJECTED', active: false });
+    setToastMsg(`❌ Solicitação de ${studentName} foi recusada.`);
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -910,8 +910,8 @@ export const AcademySettings: React.FC = () => {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-800 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleRejectStudent(student.id, student.name)}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 font-bold text-xs transition-all"
+                      onClick={() => setRejectingStudent({ id: student.id, name: student.name })}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 font-bold text-xs transition-all cursor-pointer"
                     >
                       <UserX className="w-4 h-4" />
                       Recusar
@@ -919,7 +919,7 @@ export const AcademySettings: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleApproveStudent(student.id, student.name)}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
+                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] cursor-pointer"
                     >
                       <UserCheck className="w-4 h-4" />
                       Aceitar na Equipe
@@ -930,6 +930,25 @@ export const AcademySettings: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Reject Student Confirmation Modal */}
+      {rejectingStudent && (
+        <ConfirmModal
+          isOpen={!!rejectingStudent}
+          onClose={() => setRejectingStudent(null)}
+          onConfirm={() => {
+            if (rejectingStudent) {
+              handleRejectStudent(rejectingStudent.id, rejectingStudent.name);
+              setRejectingStudent(null);
+            }
+          }}
+          title="Recusar Solicitação de Aluno"
+          message={`Tem certeza que deseja recusar a solicitação de matrícula de "${rejectingStudent.name}"?`}
+          confirmText="Recusar Solicitação"
+          cancelText="Cancelar"
+          type="danger"
+        />
       )}
     </div>
   );

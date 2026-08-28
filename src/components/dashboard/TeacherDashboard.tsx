@@ -8,7 +8,7 @@ import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { EditAttendanceModal } from '../attendance/EditAttendanceModal';
 import { BJJClass, AttendanceRecord } from '../../types';
 import { uploadVideoFile } from '../../lib/videoUpload';
-import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime } from '../../utils/dateUtils';
 
 interface TeacherDashboardProps {
@@ -17,7 +17,7 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, onOpenCheckin }) => {
-  const { students, classes, attendances, addNotification, updateClass, academyConfig } = useData();
+  const { students, classes, attendances, graduations, addNotification, updateClass, academyConfig } = useData();
   const { currentUser } = useAuth();
 
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
@@ -265,7 +265,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       {/* Aptos a Graduar */}
       {(() => {
         const studentsReadyForGraduation = students.filter(s =>
-          isStudentEligibleForGraduation(s, academyConfig)
+          isStudentEligibleForGraduation(s, academyConfig, attendances, graduations)
         );
         return (
           <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
@@ -293,6 +293,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
               ) : (
                 studentsReadyForGraduation.map(s => {
                   const target = getStudentGraduationTarget(s, academyConfig);
+                  const classesSince = getStudentClassesSinceLastGraduation(s, attendances, graduations);
                   const hasCustom = typeof s.customGraduationTargetClasses === 'number' && s.customGraduationTargetClasses > 0;
                   return (
                     <div key={s.id} className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs">
@@ -315,7 +316,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
 
                       <div className="text-right">
                         <span className="text-xs font-black text-emerald-400 block font-mono">
-                          {s.classesSinceLastGraduation}/{target}
+                          {classesSince}/{target}
                         </span>
                         <span className="text-[9px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-black uppercase">
                           Apto

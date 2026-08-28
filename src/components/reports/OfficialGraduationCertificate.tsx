@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Student, AcademyConfig, BeltType } from '../../types';
-import { Award, Printer, Edit3, RotateCcw, Palette } from 'lucide-react';
+import { Award, Printer, Edit3, RotateCcw, Palette, X, Share2, Check } from 'lucide-react';
 
 interface OfficialGraduationCertificateProps {
   student: Student;
   academyConfig: AcademyConfig;
   belt?: BeltType;
   stripes?: number;
+  promotedBy?: string;
+  promotedAt?: string;
+  notes?: string;
+  onClose?: () => void;
+  isModal?: boolean;
 }
 
 // Convert all-caps or mixed string to clean Title Case ("PEDRO LORÊDO BORGES" -> "Pedro Lorêdo Borges")
@@ -261,6 +266,11 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
   academyConfig,
   belt = student.belt,
   stripes = student.stripes,
+  promotedBy,
+  promotedAt,
+  notes,
+  onClose,
+  isModal = false,
 }) => {
   // Format Default Belt Label in Upper Case (e.g. "LARANJA COM PRETO", "AZUL", "PRETA")
   const getDefaultBeltText = (b: BeltType, s?: number) => {
@@ -285,8 +295,9 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
 
   // Format Default Date String (e.g. "Goiânia, 21 de Dezembro de 2025")
   const getDefaultDateText = () => {
-    const d = student.lastGraduationDate
-      ? new Date(student.lastGraduationDate + 'T12:00:00')
+    const targetDateStr = promotedAt || student.lastGraduationDate;
+    const d = targetDateStr
+      ? new Date(targetDateStr.includes('T') ? targetDateStr : targetDateStr + 'T12:00:00')
       : new Date();
 
     const months = [
@@ -320,10 +331,11 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
   const [studentName, setStudentName] = useState(toTitleCase(student.name));
   const [beltTitle, setBeltTitle] = useState(getDefaultBeltText(belt, stripes));
   const [professorName, setProfessorName] = useState(
-    academyConfig.headCoachName || 'Rodolfo Ferreira de Souza'
+    promotedBy || academyConfig.headCoachName || 'Cauan Santos'
   );
   const [professorRole, setProfessorRole] = useState('Professor responsável');
   const [locationAndDate, setLocationAndDate] = useState(getDefaultDateText());
+  const [copied, setCopied] = useState(false);
 
   // Edit Panel State
   const [isEditing, setIsEditing] = useState(false);
@@ -333,19 +345,49 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
     setAcademyName(defaultAcademyTitle());
     setStudentName(toTitleCase(student.name));
     setBeltTitle(getDefaultBeltText(belt, stripes));
-    setProfessorName(academyConfig.headCoachName || 'Rodolfo Ferreira de Souza');
+    setProfessorName(promotedBy || academyConfig.headCoachName || 'Cauan Santos');
     setProfessorRole('Professor responsável');
     setLocationAndDate(getDefaultDateText());
-  }, [student.id, student.name, student.belt, student.stripes, student.lastGraduationDate, academyConfig.fantasyName, academyConfig.name, academyConfig.headCoachName]);
+  }, [student.id, student.name, belt, stripes, student.belt, student.stripes, student.lastGraduationDate, promotedBy, promotedAt, academyConfig.fantasyName, academyConfig.name, academyConfig.headCoachName]);
 
   const handleResetToDefault = () => {
     setAcademyName(defaultAcademyTitle());
     setStudentName(toTitleCase(student.name));
     setBeltTitle(getDefaultBeltText(belt, stripes));
-    setProfessorName(academyConfig.headCoachName || 'Rodolfo Ferreira de Souza');
+    setProfessorName(promotedBy || academyConfig.headCoachName || 'Cauan Santos');
     setProfessorRole('Professor responsável');
     setLocationAndDate(getDefaultDateText());
     setOrnamentTheme('black');
+  };
+
+  const handleShare = async () => {
+    const text = `🥋 *Certificado Oficial de Graduação - Brazilian Jiu-Jitsu*\n\n` +
+      `🏅 *Atleta:* ${studentName}\n` +
+      `🥋 *Graduação:* ${beltTitle}\n` +
+      `📅 *Data e Local:* ${locationAndDate}\n` +
+      `👨‍🏫 *Professor/Mestre:* ${professorName}\n` +
+      `🏛️ *Academia:* ${academyName}\n\n` +
+      `Oss! 🥋🔥`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Certificado de Graduação - ${studentName}`,
+          text: text,
+        });
+        return;
+      } catch {
+        // Fallback
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Fallback
+    }
   };
 
   return (
@@ -355,10 +397,10 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
         <div>
           <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
             <Award className="w-4 h-4 text-amber-400" />
-            Certificado Oficial de Graduação (Modelo Idêntico)
+            Certificado Oficial de Graduação (Modelo Branco Oficial)
           </h4>
           <p className="text-xs text-slate-400">
-            Proporções, fontes, arabescos de cantoneira e espaçamentos 100% fiéis ao diploma físico.
+            Design oficial de diploma com arabescos de cantoneira, selo da academia e assinatura.
           </p>
         </div>
 
@@ -406,6 +448,16 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
 
           <button
             type="button"
+            onClick={handleShare}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all cursor-pointer border border-slate-700"
+            title="Compartilhar"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-amber-400" />}
+            <span>{copied ? 'Copiado!' : 'Compartilhar'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsEditing(!isEditing)}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               isEditing
@@ -425,6 +477,17 @@ export const OfficialGraduationCertificate: React.FC<OfficialGraduationCertifica
             <Printer className="w-4 h-4" />
             <span>Imprimir Certificado</span>
           </button>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer border border-slate-700 ml-1"
+              title="Fechar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

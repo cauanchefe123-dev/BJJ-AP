@@ -71,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const trainingNav = [
     { id: 'gallery', label: 'Fotos dos Treinos', icon: Camera, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },
+    { id: 'graduations', label: 'Histórico & Graduações', icon: Award, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },
     { id: 'attendance', label: 'Controle de Frequência', icon: UserCheck, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'classes', label: 'Turmas & Horários', icon: CalendarDays, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'challenges', label: 'Desafios de Rola', icon: Swords, roles: ['ADMIN', 'PROFESSOR', 'ALUNO'] },

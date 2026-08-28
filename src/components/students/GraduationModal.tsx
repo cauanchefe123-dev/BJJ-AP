@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BeltType, Student } from '../../types';
 import { BeltBadge } from '../belts/BeltBadge';
 import { Award, X, Sparkles, CheckCircle2, Clock, Check, AlertCircle } from 'lucide-react';
-import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getStudentTotalClasses } from '../../utils/ranking';
 
 interface GraduationModalProps {
@@ -19,7 +19,7 @@ export const GraduationModal: React.FC<GraduationModalProps> = ({
   studentToGraduate,
 }) => {
   const { currentUser } = useAuth();
-  const { students, attendances, promoteStudent, academyConfig, beltRequests, approveBeltChange, rejectBeltChange } = useData();
+  const { students, attendances, graduations, promoteStudent, academyConfig, beltRequests, approveBeltChange, rejectBeltChange } = useData();
 
   const [activeTab, setActiveTab] = useState<'PROMOTE' | 'REQUESTS'>('PROMOTE');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -153,7 +153,8 @@ export const GraduationModal: React.FC<GraduationModalProps> = ({
 
             {currentStudent && (() => {
               const target = getStudentGraduationTarget(currentStudent, academyConfig);
-              const isEligible = isStudentEligibleForGraduation(currentStudent, academyConfig);
+              const classesSince = getStudentClassesSinceLastGraduation(currentStudent, attendances, graduations);
+              const isEligible = isStudentEligibleForGraduation(currentStudent, academyConfig, attendances, graduations);
               const hasCustom = typeof currentStudent.customGraduationTargetClasses === 'number' && currentStudent.customGraduationTargetClasses > 0;
               return (
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
@@ -164,7 +165,7 @@ export const GraduationModal: React.FC<GraduationModalProps> = ({
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-amber-400 font-semibold">
-                      {currentStudent.classesSinceLastGraduation} de {target} treinos {hasCustom ? '(Meta Indiv.)' : '(Meta Padrão)'}
+                      {classesSince} de {target} treinos {hasCustom ? '(Meta Indiv.)' : '(Meta Padrão)'}
                     </span>
                     {isEligible ? (
                       <span className="text-emerald-400 font-extrabold bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40">
@@ -172,7 +173,7 @@ export const GraduationModal: React.FC<GraduationModalProps> = ({
                       </span>
                     ) : (
                       <span className="text-slate-400 text-[10px]">
-                        Faltam {target - currentStudent.classesSinceLastGraduation} treino(s)
+                        Faltam {Math.max(0, target - classesSince)} treino(s)
                       </span>
                     )}
                   </div>

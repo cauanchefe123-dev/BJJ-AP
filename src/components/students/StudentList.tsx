@@ -5,10 +5,11 @@ import { BeltBadge } from '../belts/BeltBadge';
 import { Student, BeltType } from '../../types';
 import { DEFAULT_BLACK_GI_AVATAR, getStudentAvatar } from '../../constants/avatar';
 import { getTrainingTimeText } from '../../utils/trainingTime';
-import { getStudentGraduationTarget, isStudentEligibleForGraduation } from '../../utils/graduation';
+import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getStudentTotalClasses } from '../../utils/ranking';
 import { Search, UserPlus, Award, Filter, ShieldCheck, MoreVertical, Trash2, Edit3, Phone, Mail, IdCard, UserCheck, Check, X, AlertCircle, Clock } from 'lucide-react';
 import { SendEmailModal } from './SendEmailModal';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface StudentListProps {
   onOpenAddModal: () => void;
@@ -23,13 +24,14 @@ export const StudentList: React.FC<StudentListProps> = ({
   onOpenCardModal,
   onOpenEditModal,
 }) => {
-  const { students, attendances, deleteStudent, updateStudent, academyConfig } = useData();
+  const { students, attendances, graduations, deleteStudent, updateStudent, academyConfig } = useData();
   const { approveUser, rejectUser, currentUser, users } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [beltFilter, setBeltFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [emailStudent, setEmailStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
 
   // Consolidate students list including any ALUNO accounts from users
   const allStudentsCombined: Student[] = React.useMemo(() => {
@@ -330,13 +332,14 @@ export const StudentList: React.FC<StudentListProps> = ({
                       {(() => {
                         const totalClasses = getStudentTotalClasses(s, attendances);
                         const target = getStudentGraduationTarget(s, academyConfig);
-                        const isEligible = isStudentEligibleForGraduation(s, academyConfig);
+                        const classesSince = getStudentClassesSinceLastGraduation(s, attendances, graduations);
+                        const isEligible = isStudentEligibleForGraduation(s, academyConfig, attendances, graduations);
                         return (
                           <div>
                             <span>{totalClasses} treinos total</span>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className={`text-[10px] ${isEligible ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'}`}>
-                                {s.classesSinceLastGraduation}/{target} pós-grau
+                                {classesSince}/{target} pós-grau
                               </span>
                               {isEligible && (
                                 <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] px-1.5 py-0.2 rounded font-black uppercase">
@@ -405,11 +408,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
                         {canManage && (
                           <button
-                            onClick={() => {
-                              if (confirm(`Deseja remover a matrícula de ${s.name}?`)) {
-                                deleteStudent(s.id);
-                              }
-                            }}
+                            onClick={() => setDeletingStudent(s)}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 cursor-pointer"
                             title="Excluir Aluno"
                           >
@@ -431,6 +430,25 @@ export const StudentList: React.FC<StudentListProps> = ({
         <SendEmailModal
           student={emailStudent}
           onClose={() => setEmailStudent(null)}
+        />
+      )}
+
+      {/* Delete Student Confirmation Modal */}
+      {deletingStudent && (
+        <ConfirmModal
+          isOpen={!!deletingStudent}
+          onClose={() => setDeletingStudent(null)}
+          onConfirm={() => {
+            if (deletingStudent) {
+              deleteStudent(deletingStudent.id);
+              setDeletingStudent(null);
+            }
+          }}
+          title="Excluir Matrícula do Aluno"
+          message={`Tem certeza que deseja remover o cadastro e a matrícula de "${deletingStudent.name}"? Esta ação removerá os registros vinculados a este aluno.`}
+          confirmText="Excluir Aluno"
+          cancelText="Cancelar"
+          type="danger"
         />
       )}
     </div>

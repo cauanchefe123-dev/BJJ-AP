@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { uploadVideoFile } from '../../lib/videoUpload';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 const CATEGORY_LABELS: Record<string, { label: string; bg: string; text: string; border: string }> = {
   GUARDA: { label: 'Guarda', bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
@@ -75,6 +76,7 @@ export const WeeklyFocusPositionsView: React.FC = () => {
   // Form Modal State (Add/Edit Weekly Focus Position)
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<WeeklyPosition | null>(null);
+  const [deletingPosition, setDeletingPosition] = useState<WeeklyPosition | null>(null);
 
   // Student Learning Management Modal State (Professor View)
   const [studentModalPosition, setStudentModalPosition] = useState<WeeklyPosition | null>(null);
@@ -636,12 +638,8 @@ export const WeeklyFocusPositionsView: React.FC = () => {
                             <span>Editar</span>
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm(`Deseja remover a posição "${pos.title}" do registro do foco?`)) {
-                                deleteWeeklyPosition(pos.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all text-xs flex items-center gap-1"
+                            onClick={() => setDeletingPosition(pos)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all text-xs flex items-center gap-1 cursor-pointer"
                             title="Excluir Posição"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1001,6 +999,25 @@ export const WeeklyFocusPositionsView: React.FC = () => {
           title={activeVideo.title}
           focusText={activeVideo.focusText}
           videoUrl={activeVideo.videoUrl}
+        />
+      )}
+
+      {/* Delete Position Confirmation Modal */}
+      {deletingPosition && (
+        <ConfirmModal
+          isOpen={!!deletingPosition}
+          onClose={() => setDeletingPosition(null)}
+          onConfirm={() => {
+            if (deletingPosition) {
+              deleteWeeklyPosition(deletingPosition.id);
+              setDeletingPosition(null);
+            }
+          }}
+          title="Excluir Posição Técnica"
+          message={`Tem certeza que deseja remover permanentemente a posição "${deletingPosition.title}" do cronograma técnico?`}
+          confirmText="Excluir Posição"
+          cancelText="Cancelar"
+          type="danger"
         />
       )}
     </div>

@@ -4,12 +4,14 @@ import { BJJClass } from '../../types';
 import { CalendarDays, Clock, Plus, Users, Trash2, Edit3, Target, Sparkles, X, Video, Play, ExternalLink, Loader2 } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { uploadVideoFile } from '../../lib/videoUpload';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 export const ClassManager: React.FC = () => {
   const { classes, teachers, addClass, updateClass, deleteClass, academyConfig } = useData();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [deletingClass, setDeletingClass] = useState<BJJClass | null>(null);
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
 
@@ -237,12 +239,8 @@ export const ClassManager: React.FC = () => {
                   Editar
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(`Excluir a turma ${c.title}?`)) {
-                      deleteClass(c.id);
-                    }
-                  }}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all"
+                  onClick={() => setDeletingClass(c)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all cursor-pointer"
                   title="Excluir Turma"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -619,6 +617,25 @@ export const ClassManager: React.FC = () => {
         focusText={selectedVideoClass?.weeklyFocus}
         videoUrl={selectedVideoClass?.weeklyFocusVideoUrl}
       />
+
+      {/* Delete Class Confirmation Modal */}
+      {deletingClass && (
+        <ConfirmModal
+          isOpen={!!deletingClass}
+          onClose={() => setDeletingClass(null)}
+          onConfirm={() => {
+            if (deletingClass) {
+              deleteClass(deletingClass.id);
+              setDeletingClass(null);
+            }
+          }}
+          title="Excluir Turma"
+          message={`Tem certeza que deseja excluir permanentemente a turma "${deletingClass.title}"?`}
+          confirmText="Excluir Turma"
+          cancelText="Cancelar"
+          type="danger"
+        />
+      )}
     </div>
   );
 };

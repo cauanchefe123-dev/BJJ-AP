@@ -4,6 +4,7 @@ import { useData } from '../../context/DataContext';
 import { TrainingPhoto } from '../../types';
 import { formatDateBR, getLocalDateStr } from '../../utils/dateUtils';
 import { compressImage } from '../../utils/imageCompressor';
+import { ConfirmModal } from '../common/ConfirmModal';
 import {
   Camera,
   Download,
@@ -84,6 +85,7 @@ export const TrainingGalleryView: React.FC = () => {
   // Feedback State
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [downloadSuccessId, setDownloadSuccessId] = useState<string | null>(null);
+  const [deletingPhoto, setDeletingPhoto] = useState<TrainingPhoto | null>(null);
 
   // Filtered Photos List
   const filteredPhotos = trainingPhotos
@@ -655,11 +657,7 @@ export const TrainingGalleryView: React.FC = () => {
 
                     {isStaff && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Tem certeza que deseja apagar a foto "${photo.title}"?`)) {
-                            deleteTrainingPhoto(photo.id);
-                          }
-                        }}
+                        onClick={() => setDeletingPhoto(photo)}
                         className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
                         title="Excluir Foto"
                       >
@@ -1112,6 +1110,25 @@ export const TrainingGalleryView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Photo Confirmation Modal */}
+      {deletingPhoto && (
+        <ConfirmModal
+          isOpen={!!deletingPhoto}
+          onClose={() => setDeletingPhoto(null)}
+          onConfirm={() => {
+            if (deletingPhoto) {
+              deleteTrainingPhoto(deletingPhoto.id);
+              setDeletingPhoto(null);
+            }
+          }}
+          title="Excluir Foto do Mural"
+          message={`Tem certeza que deseja apagar permanentemente a foto "${deletingPhoto.title}"?`}
+          confirmText="Excluir Foto"
+          cancelText="Cancelar"
+          type="danger"
+        />
       )}
     </div>
   );
