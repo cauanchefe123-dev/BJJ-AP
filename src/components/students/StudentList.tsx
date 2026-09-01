@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { Student, BeltType } from '../../types';
 import { DEFAULT_BLACK_GI_AVATAR, getStudentAvatar } from '../../constants/avatar';
+import { isDeletedRecord } from '../../lib/deletionTracker';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getStudentTotalClasses } from '../../utils/ranking';
@@ -35,13 +36,16 @@ export const StudentList: React.FC<StudentListProps> = ({
 
   // Consolidate students list including any ALUNO accounts from users
   const allStudentsCombined: Student[] = React.useMemo(() => {
-    const list: Student[] = [...students];
-    const addedIds = new Set(students.map(s => s.id));
-    const addedEmails = new Set(students.map(s => s.email?.trim().toLowerCase()).filter(Boolean));
+    const list: Student[] = students.filter(s => !isDeletedRecord(s.id, s.email, s.registrationNumber));
+    const addedIds = new Set(list.map(s => s.id));
+    const addedEmails = new Set(list.map(s => s.email?.trim().toLowerCase()).filter(Boolean));
 
     users.forEach(u => {
       if (u.role === 'ALUNO') {
         const emailKey = u.email ? u.email.trim().toLowerCase() : '';
+        if (isDeletedRecord(u.id, u.studentId, u.email)) {
+          return;
+        }
         if ((u.studentId && addedIds.has(u.studentId)) || (emailKey && addedEmails.has(emailKey)) || addedIds.has(u.id)) {
           return;
         }
@@ -441,6 +445,10 @@ export const StudentList: React.FC<StudentListProps> = ({
           onConfirm={() => {
             if (deletingStudent) {
               deleteStudent(deletingStudent.id);
+              if (deletingStudent.email) {
+                rejectUser(deletingStudent.email);
+              }
+              rejectUser(deletingStudent.id);
               setDeletingStudent(null);
             }
           }}

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { Student } from '../../types';
 import { DEFAULT_BLACK_GI_AVATAR } from '../../constants/avatar';
+import { isDeletedRecord } from '../../lib/deletionTracker';
 import { Users, UserCheck, UserX, CheckCircle2, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
 import { ConfirmModal } from '../common/ConfirmModal';
 
@@ -21,7 +22,7 @@ export const PendingStudentApprovals: React.FC = () => {
 
     // 1. Check all students in students context
     students.forEach(s => {
-      if (s.approvalStatus === 'PENDING') {
+      if (s.approvalStatus === 'PENDING' && !isDeletedRecord(s.id, s.email, s.registrationNumber)) {
         list.push(s);
         addedIds.add(s.id);
         if (s.email) addedIds.add(s.email.trim().toLowerCase());
@@ -30,7 +31,7 @@ export const PendingStudentApprovals: React.FC = () => {
 
     // 2. Also check all users with role 'ALUNO' and approvalStatus 'PENDING' that might not be in students list
     users.forEach(u => {
-      if (u.role === 'ALUNO' && u.approvalStatus === 'PENDING') {
+      if (u.role === 'ALUNO' && u.approvalStatus === 'PENDING' && !isDeletedRecord(u.id, u.studentId, u.email)) {
         const emailKey = u.email ? u.email.trim().toLowerCase() : '';
         if ((u.studentId && addedIds.has(u.studentId)) || (emailKey && addedIds.has(emailKey)) || addedIds.has(u.id)) {
           return;

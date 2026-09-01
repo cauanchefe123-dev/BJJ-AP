@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, BeltType, AgeCategory, WeightCategory, Student } from '../types';
 import { INITIAL_USERS } from '../data/initialData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
-import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore } from '../lib/firebaseStore';
+import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore, deleteMatchingEntitiesFromFirestore } from '../lib/firebaseStore';
 import { markAsDeleted, isDeletedRecord } from '../lib/deletionTracker';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -173,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const unsubStudents = subscribeFirestoreCollection<Student>('students', (docs) => {
-      setStudents(docs);
+      setStudents(docs.filter(s => !isDeletedRecord(s.id, s.email, s.registrationNumber)));
     });
 
     return () => {
@@ -761,37 +761,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const rejectUser = (identifier: string) => {
     const cleanId = identifier.trim().toLowerCase();
-    markAsDeleted(identifier, cleanId);
 
-    // Remove from Firestore
-    users.forEach(u => {
-      if (
-        u.id === identifier || 
-        u.studentId === identifier || 
-        (u.email && u.email.trim().toLowerCase() === cleanId)
-      ) {
-        markAsDeleted(u.id, u.email, u.studentId);
-        removeFromFirestore('users', u.id);
-        if (u.studentId) removeFromFirestore('students', u.studentId);
-      }
-    });
+    // Find all matching users or students to gather every identifier
+    const matchedUsers = users.filter(u => 
+      u.id === identifier || 
+      u.studentId === identifier || 
+      (u.email && u.email.trim().toLowerCase() === cleanId)
+    );
 
-    removeFromFirestore('users', identifier);
-    removeFromFirestore('students', identifier);
-    if (cleanId) {
-      removeFromFirestore('users', cleanId);
-      removeFromFirestore('students', cleanId);
-    }
+    const identifiers = [
+      identifier,
+      cleanId,
+      ...matchedUsers.flatMap(u => [u.id, u.email, u.studentId])
+    ].filter(Boolean) as string[];
 
-    setUsers(prev => prev.filter(u => 
-      u.id !== identifier && 
-      u.studentId !== identifier && 
-      (!u.email || u.email.toLowerCase() !== cleanId)
-    ));
-    setStudents(prev => prev.filter(s => 
-      s.id !== identifier && 
-      (!s.email || s.email.toLowerCase() !== cleanId)
-    ));
+    markAsDeleted(...identifiers);
+
+    // Update in-memory states immediately
+    setUsers(prev => prev.filter(u => !isDeletedRecord(u.id, u.email, u.studentId)));
+    setStudents(prev => prev.filter(s => !isDeletedRecord(s.id, s.email, s.registrationNumber)));
+
+    // Thorough Firestore purge
+    deleteMatchingEntitiesFromFirestore('users', ...identifiers);
+    deleteMatchingEntitiesFromFirestore('students', ...identifiers);
   };
 
   const switchRole = (role: UserRole) => {

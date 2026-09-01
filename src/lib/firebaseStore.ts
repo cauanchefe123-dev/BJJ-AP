@@ -90,6 +90,47 @@ export async function removeFromFirestore(collectionName: string, id: string): P
   }
 }
 
+export async function deleteMatchingEntitiesFromFirestore(
+  collectionName: string, 
+  ...identifiers: (string | undefined | null)[]
+): Promise<void> {
+  if (checkQuotaExhausted()) return;
+  const validIds = identifiers.map(i => i ? String(i).trim() : '').filter(Boolean);
+  if (validIds.length === 0) return;
+
+  // 1. Direct document deletion attempts
+  for (const id of validIds) {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+    } catch {}
+    try {
+      await deleteDoc(doc(db, collectionName, id.toLowerCase()));
+    } catch {}
+  }
+
+  // 2. Scan and batch delete all matching docs in this collection
+  try {
+    const colRef = collection(db, collectionName);
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.docs.forEach(docSnap => {
+        const d = docSnap.data() as any;
+        if (isDeletedRecord(docSnap.id, d.id, d.email, d.studentId, d.registrationNumber)) {
+          batch.delete(docSnap.ref);
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, `remover correspondentes em ${collectionName}`);
+  }
+}
+
 export async function saveConfigToFirestore(configData: any): Promise<boolean> {
   if (checkQuotaExhausted()) return false;
   try {
@@ -110,7 +151,18 @@ export function subscribeFirestoreCollection<T>(
   try {
     const colRef = collection(db, collectionName);
     return onSnapshot(colRef, (snapshot) => {
-      const items: T[] = snapshot.docs.map(doc => doc.data() as T);
+      const items: T[] = snapshot.docs
+        .map(docSnap => {
+          const data = docSnap.data() as any;
+          return {
+            ...data,
+            id: data?.id || docSnap.id,
+          } as T;
+        })
+        .filter(item => {
+          const it = item as any;
+          return !isDeletedRecord(it.id, it.email, it.studentId, it.registrationNumber);
+        });
       callback(items);
     }, (error) => {
       handleFirestoreError(error, `escuta na coleção ${collectionName}`);

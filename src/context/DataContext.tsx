@@ -46,11 +46,12 @@ import {
   subscribeFirestoreConfig,
   saveToFirestore,
   removeFromFirestore,
+  deleteMatchingEntitiesFromFirestore,
   saveConfigToFirestore,
   clearAllFirestoreCollections,
   purgeAllLegacyLocalStorage,
 } from '../lib/firebaseStore';
-import { isDeletedRecord, markAsDeleted } from '../lib/deletionTracker';
+import { isDeletedRecord, markAsDeleted, unmarkAsDeleted } from '../lib/deletionTracker';
 import { getLocalDateStr, getAttendanceLocalDate } from '../utils/dateUtils';
 import { getStudentTotalClasses } from '../utils/ranking';
 
@@ -556,6 +557,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
 
+    unmarkAsDeleted(newStudent.id, newStudent.email, newStudent.registrationNumber);
     setStudents(prev => [newStudent, ...prev]);
     saveToFirestore('students', newStudent);
 
@@ -681,14 +683,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteStudent = (id: string) => {
-    const targetStudent = students.find(s => s.id === id);
-    markAsDeleted(id, targetStudent?.email, targetStudent?.registrationNumber);
+    const cleanId = String(id).trim().toLowerCase();
+    const targetStudent = students.find(s => 
+      s.id === id || 
+      (s.email && s.email.trim().toLowerCase() === cleanId) ||
+      (s.registrationNumber && s.registrationNumber.trim().toLowerCase() === cleanId)
+    );
 
-    setStudents(prev => prev.filter(s => s.id !== id && (s.email && targetStudent?.email ? s.email.trim().toLowerCase() !== targetStudent.email.trim().toLowerCase() : true)));
-    removeFromFirestore('students', id);
-    if (targetStudent && targetStudent.email) {
-      removeFromFirestore('students', targetStudent.email.trim().toLowerCase());
-    }
+    const identifiers = [
+      id,
+      cleanId,
+      targetStudent?.id,
+      targetStudent?.email,
+      targetStudent?.registrationNumber,
+    ].filter(Boolean) as string[];
+
+    markAsDeleted(...identifiers);
+
+    setStudents(prev => prev.filter(s => 
+      s.id !== id && 
+      !isDeletedRecord(s.id, s.email, s.registrationNumber)
+    ));
+
+    deleteMatchingEntitiesFromFirestore('students', ...identifiers);
+    deleteMatchingEntitiesFromFirestore('users', ...identifiers);
   };
 
   const promoteStudent = (
