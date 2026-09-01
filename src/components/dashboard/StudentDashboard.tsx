@@ -7,7 +7,8 @@ import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { getTrainingTimeText } from '../../utils/trainingTime';
 import { calculateRanking, getStudentTotalClasses } from '../../utils/ranking';
 import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, formatDateBR } from '../../utils/dateUtils';
-import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords, Camera, Download } from 'lucide-react';
+import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
+import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords, Camera, Download, ChevronRight } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { BJJClass } from '../../types';
 
@@ -21,7 +22,7 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, onOpenPixModal, onOpenEditModal, onOpenCheckin, selectedStudentId }) => {
   const { currentUser } = useAuth();
-  const { students, payments, attendances, academyConfig, classes, rollChallenges, trainingPhotos } = useData();
+  const { students, payments, attendances, graduations, academyConfig, classes, rollChallenges, trainingPhotos } = useData();
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
 
@@ -218,6 +219,94 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           <p className="text-[11px] text-slate-400 truncate">Jornada acumulada</p>
         </div>
       </div>
+
+      {/* Cartão de Evolução e Treinos Pós-Grau */}
+      {currentStudent && (() => {
+        const target = getStudentGraduationTarget(currentStudent, academyConfig);
+        const classesSince = getStudentClassesSinceLastGraduation(currentStudent, attendances, graduations);
+        const isEligible = isStudentEligibleForGraduation(currentStudent, academyConfig, attendances, graduations);
+        const progressPct = Math.min(100, Math.round((classesSince / Math.max(1, target)) * 100));
+
+        // Find last graduation date
+        const studentGrads = graduations.filter(g => 
+          g.studentId === currentStudent.id || 
+          (g.studentName && currentStudent.name && g.studentName.trim().toLowerCase() === currentStudent.name.trim().toLowerCase())
+        );
+        const lastGrad = studentGrads.length > 0 
+          ? [...studentGrads].sort((a, b) => new Date(b.promotedAt || 0).getTime() - new Date(a.promotedAt || 0).getTime())[0]
+          : null;
+        const lastGradDateFormatted = lastGrad?.promotedAt ? formatDateBR(lastGrad.promotedAt) : (currentStudent.lastGraduationDate ? formatDateBR(currentStudent.lastGraduationDate) : formatDateBR(currentStudent.startDate));
+
+        return (
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800/90 hover:border-amber-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+                    Evolução & Treinos Pós-Grau
+                    {isEligible && (
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                        ✓ Apto para Exame
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Contagem dinâmica a partir da sua última graduação ({lastGradDateFormatted})
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <BeltBadge belt={currentStudent.belt} stripes={currentStudent.stripes} size="sm" />
+                <button
+                  onClick={() => onNavigate('graduations')}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Ver Passaporte</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Progress Bar & Details */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-slate-300">
+                  Meta para Próximo Grau: <strong className="text-amber-400 font-mono">{classesSince} / {target} treinos</strong>
+                </span>
+                <span className={`font-mono ${isEligible ? 'text-emerald-400 font-black' : 'text-slate-400'}`}>
+                  {progressPct}% concluído
+                </span>
+              </div>
+
+              <div className="w-full h-3.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden p-0.5">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isEligible
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-sm shadow-emerald-500/30'
+                      : 'bg-gradient-to-r from-amber-600 to-amber-400'
+                  }`}
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                <span>
+                  {isEligible
+                    ? '🎉 Meta de frequência atingida! Você está apto para o próximo grau ou faixa.'
+                    : `Faltam ${Math.max(0, target - classesSince)} treino(s) bipado(s) para completar a meta.`}
+                </span>
+                <span className="text-slate-500 hidden sm:inline">
+                  Check-ins bipados a partir da data de graduação contam automaticamente.
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Foto Oficial do Treino do Dia / Mural */}
       {(() => {

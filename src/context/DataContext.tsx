@@ -131,6 +131,7 @@ interface DataContextType {
   addGraduationRecord: (graduation: Omit<Graduation, 'id'>) => Graduation;
   updateGraduation: (id: string, updates: Partial<Graduation>) => void;
   deleteGraduation: (id: string) => void;
+  cleanDuplicateGraduations: () => number;
   requestBeltChange: (studentId: string, requestedBelt: BeltType, requestedStripes: number, notes?: string) => { success: boolean; message: string };
   approveBeltChange: (requestId: string, reviewerName: string) => void;
   rejectBeltChange: (requestId: string, reviewerName: string) => void;
@@ -563,6 +564,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const initialGrad: Graduation = {
         id: `grad-${Date.now()}`,
         studentId: newId,
+        studentName: newStudent.name,
         belt: newStudent.belt,
         stripes: newStudent.stripes || 0,
         promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
@@ -645,20 +647,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         : [mergedStudent, ...prev];
     });
 
-    // Auto generate graduation record if belt or stripes changed
-    if (updates.belt !== undefined || updates.stripes !== undefined || updates.lastGraduationDate !== undefined) {
+    // Auto generate graduation record ONLY if belt or stripes actually changed
+    const beltChanged = existing && updates.belt !== undefined && updates.belt !== existing.belt;
+    const stripesChanged = existing && updates.stripes !== undefined && updates.stripes !== existing.stripes;
+    if (beltChanged || stripesChanged) {
       const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || getLocalDateStr();
+      const existingGrad = graduations.find(g => 
+        (g.studentId === mergedStudent.id || (mergedStudent.name && g.studentName === mergedStudent.name)) &&
+        g.belt === mergedStudent.belt &&
+        Number(g.stripes || 0) === Number(mergedStudent.stripes || 0)
+      );
+
       const gradRec: Graduation = {
-        id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: existingGrad ? existingGrad.id : `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         studentId: mergedStudent.id,
+        studentName: mergedStudent.name,
         belt: mergedStudent.belt,
         stripes: mergedStudent.stripes,
         promotedBy: academyConfig.headCoachName || 'Mestre / Professor',
         promotedAt: gradDate,
-        notes: updates.notes || 'Atualização de faixa/graduação do cadastro.',
-        classesCountAtPromotion: mergedStudent.totalClassesAttended,
+        notes: updates.notes || 'Atualização de graduação no cadastro.',
+        classesCountAtPromotion: mergedStudent.totalClassesAttended || 0,
+        certificateNumber: existingGrad?.certificateNumber || `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       };
-      setGraduations(gPrev => [gradRec, ...gPrev.filter(g => g.id !== gradRec.id)]);
+
+      if (existingGrad) {
+        setGraduations(gPrev => gPrev.map(g => (g.id === existingGrad.id ? gradRec : g)));
+      } else {
+        setGraduations(gPrev => [gradRec, ...gPrev]);
+      }
       saveToFirestore('graduations', gradRec);
     }
   };
@@ -696,8 +713,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const totalClassesCount = getStudentTotalClasses(student, attendances);
 
+    // Check if an existing graduation record exists for this athlete, belt and stripes
+    const existingGrad = graduations.find(g => 
+      (g.studentId === realId || (student.name && g.studentName === student.name)) &&
+      g.belt === newBelt &&
+      Number(g.stripes || 0) === Number(newStripes || 0)
+    );
+
+    const gradId = existingGrad ? existingGrad.id : `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const finalCert = existingGrad?.certificateNumber || certNum;
+
     const newGraduation: Graduation = {
-      id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: gradId,
       studentId: realId,
       studentName: student.name,
       belt: newBelt,
@@ -706,10 +733,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       promotedAt: graduationDate,
       notes: notes || 'Graduação outorgada por mérito e dedicação no tatame.',
       classesCountAtPromotion: totalClassesCount,
-      certificateNumber: certNum,
+      certificateNumber: finalCert,
     };
 
-    setGraduations(prev => [newGraduation, ...prev]);
+    if (existingGrad) {
+      setGraduations(prev => prev.map(g => (g.id === existingGrad.id ? newGraduation : g)));
+    } else {
+      setGraduations(prev => [newGraduation, ...prev]);
+    }
     saveToFirestore('graduations', newGraduation);
 
     const nowIso = new Date().toISOString();
@@ -738,10 +769,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addGraduationRecord = (graduationData: Omit<Graduation, 'id'>): Graduation => {
     const certNum = graduationData.certificateNumber || `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const student = students.find(s => s.id === graduationData.studentId);
+    const studentName = graduationData.studentName || student?.name || 'Atleta';
+
+    const existingGrad = graduations.find(g => 
+      (g.studentId === graduationData.studentId || (student && g.studentName === student.name)) &&
+      g.belt === graduationData.belt &&
+      Number(g.stripes || 0) === Number(graduationData.stripes || 0)
+    );
+
+    if (existingGrad) {
+      const updated: Graduation = {
+        ...existingGrad,
+        ...graduationData,
+        id: existingGrad.id,
+        studentName,
+        certificateNumber: existingGrad.certificateNumber || certNum,
+      };
+      setGraduations(prev => prev.map(g => (g.id === existingGrad.id ? updated : g)));
+      saveToFirestore('graduations', updated);
+      return updated;
+    }
+
     const newGraduation: Graduation = {
       ...graduationData,
       id: `grad-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      studentName: graduationData.studentName || student?.name || 'Atleta',
+      studentName,
       certificateNumber: certNum,
     };
 
@@ -765,6 +817,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     markAsDeleted(id);
     setGraduations(prev => prev.filter(g => g.id !== id));
     removeFromFirestore('graduations', id);
+  };
+
+  const cleanDuplicateGraduations = (): number => {
+    const seen = new Set<string>();
+    const toDeleteIds: string[] = [];
+
+    // Sort by date descending so we preserve the newest / most detailed
+    const sorted = [...graduations].sort((a, b) => {
+      return new Date(b.promotedAt || 0).getTime() - new Date(a.promotedAt || 0).getTime();
+    });
+
+    for (const g of sorted) {
+      const studentKey = (g.studentId || g.studentName || '').trim().toLowerCase();
+      const key = `${studentKey}_${g.belt}_${Number(g.stripes || 0)}`;
+      if (seen.has(key)) {
+        toDeleteIds.push(g.id);
+      } else {
+        seen.add(key);
+      }
+    }
+
+    if (toDeleteIds.length > 0) {
+      toDeleteIds.forEach(id => {
+        markAsDeleted(id);
+        removeFromFirestore('graduations', id);
+      });
+      setGraduations(prev => prev.filter(g => !toDeleteIds.includes(g.id)));
+    }
+
+    return toDeleteIds.length;
   };
 
   const requestBeltChange = (
@@ -2017,6 +2099,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addGraduationRecord,
         updateGraduation,
         deleteGraduation,
+        cleanDuplicateGraduations,
         requestBeltChange,
         approveBeltChange,
         rejectBeltChange,

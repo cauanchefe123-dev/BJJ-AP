@@ -198,24 +198,10 @@ export const AddEditGraduationModal: React.FC<AddEditGraduationModalProps> = ({
                 value={promotedAt}
                 onChange={(e) => setPromotedAt(e.target.value)}
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
               />
             </div>
 
-            <div>
-              <label className="text-slate-300 font-bold block mb-1">Aulas na Época:</label>
-              <input
-                type="number"
-                min="0"
-                value={classesCountAtPromotion}
-                onChange={(e) => setClassesCountAtPromotion(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                placeholder="Ex: 120"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-slate-300 font-bold block mb-1">Mestre / Outorgante:</label>
               <input
@@ -227,17 +213,17 @@ export const AddEditGraduationModal: React.FC<AddEditGraduationModalProps> = ({
                 placeholder="Nome do Professor"
               />
             </div>
+          </div>
 
-            <div>
-              <label className="text-slate-300 font-bold block mb-1">Código do Certificado:</label>
-              <input
-                type="text"
-                value={certificateNumber}
-                onChange={(e) => setCertificateNumber(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none font-mono"
-                placeholder="CERT-2026-XXXX"
-              />
-            </div>
+          <div>
+            <label className="text-slate-300 font-bold block mb-1">Código do Certificado:</label>
+            <input
+              type="text"
+              value={certificateNumber}
+              onChange={(e) => setCertificateNumber(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none font-mono"
+              placeholder="CERT-2026-XXXX"
+            />
           </div>
 
           <div>
