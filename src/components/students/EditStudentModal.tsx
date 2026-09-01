@@ -4,9 +4,11 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_BLACK_GI_AVATAR, getStudentAvatar, getGiAvatarForBelt } from '../../constants/avatar';
 import { compressImage } from '../../utils/imageCompressor';
-import { getLocalDateStr } from '../../utils/dateUtils';
+import { getLocalDateStr, formatDateBR } from '../../utils/dateUtils';
 import { BeltBadge } from '../belts/BeltBadge';
 import { getTrainingTimeText } from '../../utils/trainingTime';
+import { getStudentClassesSinceLastGraduation, getStudentGraduationTarget } from '../../utils/graduation';
+import { getStudentTotalClasses } from '../../utils/ranking';
 import {
   X,
   Save,
@@ -24,7 +26,8 @@ import {
   Check,
   AlertCircle,
   Send,
-  Building2
+  Building2,
+  Sparkles
 } from 'lucide-react';
 import { getStoredAcademiesList } from '../academies/AcademyLinkView';
 
@@ -40,7 +43,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   onClose,
 }) => {
   const { currentUser, updateUserProfile } = useAuth();
-  const { updateStudent, beltRequests, requestBeltChange, approveBeltChange, rejectBeltChange, academyConfig } = useData();
+  const { updateStudent, beltRequests, requestBeltChange, approveBeltChange, rejectBeltChange, academyConfig, attendances, graduations } = useData();
   const availableAcademies = getStoredAcademiesList(academyConfig);
 
   const [formData, setFormData] = useState<Partial<Student>>({});
@@ -337,44 +340,71 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
               </span>
             </div>
 
-            {/* Treinos Realizados no Grau Atual e Total */}
-            {!isStudentUser && (
-              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 shadow-inner">
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
-                    <span>Treinos Realizados no Grau Atual (Pós-grau):</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.classesSinceLastGraduation ?? 0}
-                    onChange={e => setFormData({
-                      ...formData,
-                      classesSinceLastGraduation: Math.max(0, parseInt(e.target.value) || 0)
-                    })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-emerald-400 focus:ring-2 focus:ring-amber-500 outline-none text-xs font-mono font-bold"
-                  />
-                  <p className="text-[10px] text-slate-400">Contador acumulado para o próximo grau.</p>
-                </div>
+            {/* Treinos Realizados no Grau Atual e Total - Cálculo 100% Automático */}
+            {student && (() => {
+              const currentPostGradClasses = getStudentClassesSinceLastGraduation(
+                { ...student, ...formData } as Student,
+                attendances,
+                graduations
+              );
+              const currentTotalClasses = getStudentTotalClasses(
+                { ...student, ...formData } as Student,
+                attendances
+              );
+              const gradDateDisplay = formData.lastGraduationDate 
+                ? formatDateBR(formData.lastGraduationDate) 
+                : (student.lastGraduationDate ? formatDateBR(student.lastGraduationDate) : formatDateBR(student.startDate));
 
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
-                    <span>Total Geral de Treinos no Tatame:</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.totalClassesAttended ?? 0}
-                    onChange={e => setFormData({
-                      ...formData,
-                      totalClassesAttended: Math.max(0, parseInt(e.target.value) || 0)
-                    })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-amber-400 focus:ring-2 focus:ring-amber-500 outline-none text-xs font-mono font-bold"
-                  />
-                  <p className="text-[10px] text-slate-400">Histórico total de presenças do atleta.</p>
+              return (
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 shadow-inner">
+                  <div className="space-y-1">
+                    <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-emerald-400 font-extrabold">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Treinos no Grau Atual (Pós-grau):
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        100% Automático
+                      </span>
+                    </label>
+                    <div className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between">
+                      <span className="text-base text-emerald-400 font-mono font-black">
+                        {currentPostGradClasses} treinos
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        desde {gradDateDisplay}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Calculado automaticamente a partir das presenças bipadas na data da graduação em diante.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-300 font-bold text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-amber-400 font-extrabold">
+                        <Award className="w-3.5 h-3.5" />
+                        Total Geral no Tatame:
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-bold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                        Vitalício
+                      </span>
+                    </label>
+                    <div className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between">
+                      <span className="text-base text-amber-400 font-mono font-black">
+                        {currentTotalClasses} treinos
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        histórico total
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Soma de todos os check-ins registrados pelo atleta desde o início.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Meta Individual de Treinos para Graduação */}
             <div className="sm:col-span-2 bg-slate-950 border border-amber-500/40 rounded-xl p-3.5 space-y-1.5 shadow-inner">
