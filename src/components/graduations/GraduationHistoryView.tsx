@@ -493,13 +493,19 @@ export const GraduationHistoryView: React.FC = () => {
                           <h3 className="font-black text-lg sm:text-xl text-slate-100">
                             {targetStudent.name}
                           </h3>
-                          {isEligible ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
-                              ✓ Apto para Exame ({classesSince}/{target})
-                            </span>
+                          {isTeacherOrAdmin ? (
+                            isEligible ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                                ✓ Apto para Exame ({classesSince}/{target})
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                                {classesSince}/{target} treinos pós-grau
+                              </span>
+                            )
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                              {classesSince}/{target} treinos pós-grau
+                              {classesSince} treinos no grau atual
                             </span>
                           )}
                         </div>

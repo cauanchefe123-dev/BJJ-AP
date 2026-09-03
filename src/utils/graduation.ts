@@ -1,6 +1,6 @@
 import { Student, AcademyConfig, AttendanceRecord, Graduation } from '../types';
 import { getStudentAttendances } from './ranking';
-import { getAttendanceLocalDate } from './dateUtils';
+import { getAttendanceLocalDate, normalizeDateToYYYYMMDD } from './dateUtils';
 
 /**
  * Retorna a meta de treinos necessária para o atleta ficar apto ao próximo grau ou faixa.
@@ -28,40 +28,71 @@ export function getStudentClassesSinceLastGraduation(
   if (!student) return 0;
 
   // 1. Determina a data mais recente de graduação do atleta
-  let lastGradDate = student.lastGraduationDate;
+  // Prioridade: data explicitamente definida no cadastro do aluno (student.lastGraduationDate)
+  let lastGradDateStr = student.lastGraduationDate;
 
-  if (graduations && graduations.length > 0) {
-    const studentGrads = graduations.filter(g => 
-      g.studentId === student.id || 
-      (g.studentName && student.name && g.studentName.trim().toLowerCase() === student.name.trim().toLowerCase())
-    );
+  if (!lastGradDateStr && graduations && graduations.length > 0) {
+    const cleanStudentId = student.id ? String(student.id).trim() : '';
+    const cleanName = student.name ? student.name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+    const studentSubId = (student as any).studentId ? String((student as any).studentId).trim() : '';
+    const studentUserId = (student as any).userId ? String((student as any).userId).trim() : '';
+
+    const studentGrads = graduations.filter(g => {
+      if (!g) return false;
+      if (g.studentId) {
+        const gId = String(g.studentId).trim();
+        if (
+          gId === cleanStudentId ||
+          (studentSubId && gId === studentSubId) ||
+          (studentUserId && gId === studentUserId) ||
+          gId === `std-${cleanStudentId}` ||
+          cleanStudentId === `std-${gId}` ||
+          gId === `user-${cleanStudentId}` ||
+          cleanStudentId === `user-${gId}`
+        ) {
+          return true;
+        }
+      }
+      if (cleanName && g.studentName) {
+        const gName = g.studentName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (gName === cleanName) return true;
+      }
+      return false;
+    });
+
     if (studentGrads.length > 0) {
-      const sortedGrads = [...studentGrads].sort((a, b) => 
-        new Date(b.promotedAt || 0).getTime() - new Date(a.promotedAt || 0).getTime()
-      );
+      const sortedGrads = [...studentGrads].sort((a, b) => {
+        const dateA = normalizeDateToYYYYMMDD(a.promotedAt || (a as any).createdAt || 0);
+        const dateB = normalizeDateToYYYYMMDD(b.promotedAt || (b as any).createdAt || 0);
+        return dateB.localeCompare(dateA);
+      });
       if (sortedGrads[0]?.promotedAt) {
-        lastGradDate = sortedGrads[0].promotedAt;
+        lastGradDateStr = sortedGrads[0].promotedAt;
       }
     }
   }
 
-  // 2. Se temos a lista de frequências, calcula com base estrita na data de graduação e nos treinos bipados
+  // 2. Normaliza a data da última graduação para formato padrão YYYY-MM-DD
+  const normalizedGradDate = normalizeDateToYYYYMMDD(lastGradDateStr || student.startDate);
+
+  // 3. Se temos a lista de frequências, calcula com base estrita nos check-ins/bipagens
   if (attendances && attendances.length > 0) {
     const studentRecords = getStudentAttendances(student, attendances, 'ALL');
 
-    if (lastGradDate) {
-      const cleanLastGradDate = lastGradDate.includes('T') ? lastGradDate.split('T')[0] : lastGradDate.trim();
-      
-      // Presenças realizadas na data da graduação ou posteriormente (ex: se graduou hoje e bipou amanhã)
-      const postGradAttendances = studentRecords.filter(a => {
-        const attDate = getAttendanceLocalDate(a);
-        return attDate >= cleanLastGradDate;
-      });
+    if (studentRecords.length > 0) {
+      if (normalizedGradDate) {
+        // Presenças realizadas na data da graduação em diante (>= data da graduação)
+        const postGradAttendances = studentRecords.filter(a => {
+          const attDate = normalizeDateToYYYYMMDD(getAttendanceLocalDate(a) || a.date || a.timestamp);
+          return attDate >= normalizedGradDate;
+        });
 
-      return postGradAttendances.length;
-    } else {
-      // Se não houver data formal de graduação registrada, todas as presenças do atleta contam
-      return studentRecords.length;
+        // Retorna exatamente a quantidade real de treinos computados a partir da data da graduação
+        return postGradAttendances.length;
+      } else {
+        // Se não houver data formal de graduação registrada, todas as presenças contam
+        return studentRecords.length;
+      }
     }
   }
 

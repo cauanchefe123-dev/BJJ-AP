@@ -19,31 +19,53 @@ export function getStudentAttendances(
 ): AttendanceRecord[] {
   if (!student || !attendances) return [];
 
+  const cleanId = student.id ? String(student.id).trim() : '';
   const cleanEmail = student.email ? student.email.trim().toLowerCase() : '';
   const cleanReg = student.registrationNumber ? student.registrationNumber.trim().toLowerCase() : '';
-  const cleanName = student.name ? student.name.trim().toLowerCase() : '';
+  const cleanName = student.name ? student.name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+  const studentSubId = (student as any).studentId ? String((student as any).studentId).trim() : '';
+  const studentUserId = (student as any).userId ? String((student as any).userId).trim() : '';
 
   const studentRecords = attendances.filter(a => {
     if (!a) return false;
+
+    // 1. Verificação por ID com suporte a prefixos std-, user-, u-, etc.
     if (a.studentId) {
+      const aId = String(a.studentId).trim();
       if (
-        a.studentId === student.id ||
-        a.studentId === `std-${student.id}` ||
-        student.id === `std-${a.studentId}` ||
-        (student.id.startsWith('user-') && a.studentId.includes(student.id.replace('user-', '')))
+        aId === cleanId ||
+        (studentSubId && aId === studentSubId) ||
+        (studentUserId && aId === studentUserId) ||
+        aId === `std-${cleanId}` ||
+        cleanId === `std-${aId}` ||
+        aId === `user-${cleanId}` ||
+        cleanId === `user-${aId}` ||
+        (cleanId.startsWith('user-') && aId === cleanId.replace('user-', '')) ||
+        (cleanId.startsWith('std-') && aId === cleanId.replace('std-', '')) ||
+        (studentSubId && (aId === `user-${studentSubId}` || studentSubId === `std-${aId}`))
       ) {
         return true;
       }
     }
-    if (cleanEmail && (a as any).studentEmail && (a as any).studentEmail.trim().toLowerCase() === cleanEmail) {
+
+    // 2. Verificação por e-mail
+    if (cleanEmail && (a as any).studentEmail && String((a as any).studentEmail).trim().toLowerCase() === cleanEmail) {
       return true;
     }
-    if (cleanReg && (a as any).registrationNumber && (a as any).registrationNumber.trim().toLowerCase() === cleanReg) {
+
+    // 3. Verificação por número de matrícula
+    if (cleanReg && (a as any).registrationNumber && String((a as any).registrationNumber).trim().toLowerCase() === cleanReg) {
       return true;
     }
-    if (cleanName && a.studentName && a.studentName.trim().toLowerCase() === cleanName) {
-      return true;
+
+    // 4. Verificação por nome insensível a acentuação e maiúsculas
+    if (cleanName && a.studentName) {
+      const aName = a.studentName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (aName === cleanName) {
+        return true;
+      }
     }
+
     return false;
   });
 

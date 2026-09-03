@@ -24,6 +24,84 @@ export function getLocalTimeStr(date: Date = new Date()): string {
 }
 
 /**
+ * Normaliza qualquer formato de data (DD/MM/YYYY, ISO, timestamp numérico, YYYY-MM-DD)
+ * para a representação canônica padronizada YYYY-MM-DD do calendário local.
+ */
+export function normalizeDateToYYYYMMDD(dateInput: string | Date | number | null | undefined): string {
+  if (!dateInput && dateInput !== 0) return '';
+  if (dateInput instanceof Date) {
+    return getLocalDateStr(dateInput);
+  }
+  if (typeof dateInput === 'number') {
+    return getLocalDateStr(new Date(dateInput));
+  }
+
+  const raw = String(dateInput).trim();
+  if (!raw) return '';
+
+  // Se for timestamp numérico em string (ex: '1725184800000')
+  if (/^\d{12,14}$/.test(raw)) {
+    const d = new Date(Number(raw));
+    if (!isNaN(d.getTime())) return getLocalDateStr(d);
+  }
+
+  // Se contiver 'T' (ISO format: 2026-09-01T12:00:00Z)
+  if (raw.includes('T')) {
+    try {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        return getLocalDateStr(d);
+      }
+    } catch {
+      return raw.split('T')[0];
+    }
+  }
+
+  // Se contiver barras '/' (ex: DD/MM/YYYY ou YYYY/MM/DD)
+  if (raw.includes('/')) {
+    const parts = raw.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY/MM/DD -> YYYY-MM-DD
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      // DD/MM/YYYY -> YYYY-MM-DD
+      const [d, m, y] = parts;
+      const cleanYear = y.length === 2 ? `20${y}` : y;
+      return `${cleanYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  // Se contiver hífens '-'
+  if (raw.includes('-')) {
+    const parts = raw.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 2 && parts[2].length === 4) {
+        // DD-MM-YYYY -> YYYY-MM-DD
+        const [d, m, y] = parts;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD -> YYYY-MM-DD
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // Fallback para conversão padrão por Date
+  try {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return getLocalDateStr(d);
+    }
+  } catch {
+    // continua
+  }
+
+  return raw;
+}
+
+/**
  * Extrai com máxima precisão a data local (YYYY-MM-DD) de um registro de presença.
  * Converte timestamps UTC (ex: 2026-08-21T00:30:00Z) para o dia real no fuso local (ex: 2026-08-20 às 21:30).
  */

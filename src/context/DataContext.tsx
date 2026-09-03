@@ -649,10 +649,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         : [mergedStudent, ...prev];
     });
 
-    // Auto generate graduation record ONLY if belt or stripes actually changed
+    // Auto generate or update graduation record when belt, stripes or lastGraduationDate changes
     const beltChanged = existing && updates.belt !== undefined && updates.belt !== existing.belt;
     const stripesChanged = existing && updates.stripes !== undefined && updates.stripes !== existing.stripes;
-    if (beltChanged || stripesChanged) {
+    const gradDateChanged = existing && updates.lastGraduationDate !== undefined && updates.lastGraduationDate !== existing.lastGraduationDate;
+
+    if (beltChanged || stripesChanged || gradDateChanged) {
       const gradDate = updates.lastGraduationDate || mergedStudent.lastGraduationDate || getLocalDateStr();
       const existingGrad = graduations.find(g => 
         (g.studentId === mergedStudent.id || (mergedStudent.name && g.studentName === mergedStudent.name)) &&

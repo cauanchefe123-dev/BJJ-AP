@@ -30,7 +30,23 @@ import {
   CheckSquare,
   Square,
   Loader2,
+  Eye,
 } from 'lucide-react';
+
+interface DayAlbum {
+  date: string;
+  formattedDate: string;
+  isToday: boolean;
+  isYesterday: boolean;
+  title: string;
+  className?: string;
+  professorName: string;
+  caption?: string;
+  photos: TrainingPhoto[];
+  coverPhoto: TrainingPhoto;
+  totalPhotos: number;
+  totalLikes: number;
+}
 
 interface PendingUploadPhoto {
   id: string;
@@ -87,6 +103,13 @@ export const TrainingGalleryView: React.FC = () => {
   const [downloadSuccessId, setDownloadSuccessId] = useState<string | null>(null);
   const [deletingPhoto, setDeletingPhoto] = useState<TrainingPhoto | null>(null);
 
+  // Grouping by Day / View Mode State: 'BY_DAY' (Default - Uma caixa por dia) or 'ALL_PHOTOS'
+  const [viewMode, setViewMode] = useState<'BY_DAY' | 'ALL_PHOTOS'>('BY_DAY');
+  // Selected Day Album (when clicked to see all photos of that day)
+  const [selectedDayAlbumDate, setSelectedDayAlbumDate] = useState<string | null>(null);
+  // Download in progress for whole day
+  const [downloadingDayDate, setDownloadingDayDate] = useState<string | null>(null);
+
   // Filtered Photos List
   const filteredPhotos = trainingPhotos
     .filter((photo) => {
@@ -103,6 +126,62 @@ export const TrainingGalleryView: React.FC = () => {
       return true;
     })
     .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+
+  // Group photos by day into albums (Uma caixa por dia)
+  const dayAlbums: DayAlbum[] = React.useMemo(() => {
+    const groups: { [date: string]: TrainingPhoto[] } = {};
+
+    filteredPhotos.forEach((photo) => {
+      const d = photo.date || 'sem-data';
+      if (!groups[d]) {
+        groups[d] = [];
+      }
+      groups[d].push(photo);
+    });
+
+    const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    return sortedDates.map((d) => {
+      const photos = [...groups[d]].sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+
+      const coverPhoto = photos[0];
+      // Clean base title by removing trailing (1/4), (2/3), etc.
+      let baseTitle = coverPhoto.title || '';
+      baseTitle = baseTitle.replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
+      if (!baseTitle) {
+        baseTitle = coverPhoto.className ? `Treino - ${coverPhoto.className}` : `Treino de ${formatDateBR(d)}`;
+      }
+
+      const totalLikes = photos.reduce((acc, p) => acc + (p.likesCount || 0), 0);
+
+      return {
+        date: d,
+        formattedDate: formatDateBR(d),
+        isToday: d === todayStr,
+        isYesterday: d === yesterdayStr,
+        title: baseTitle,
+        className: coverPhoto.className,
+        professorName: coverPhoto.professorName || 'Professor',
+        caption: photos.find((p) => p.caption)?.caption,
+        photos,
+        coverPhoto,
+        totalPhotos: photos.length,
+        totalLikes,
+      };
+    });
+  }, [filteredPhotos, todayStr]);
+
+  // Current active day album (when clicked to see all photos of that day)
+  const currentDayAlbum = React.useMemo(() => {
+    if (!selectedDayAlbumDate) return null;
+    return dayAlbums.find((a) => a.date === selectedDayAlbumDate) || null;
+  }, [dayAlbums, selectedDayAlbumDate]);
 
   // Today's or Most Recent Featured Photo
   const latestPhoto = filteredPhotos.length > 0 ? filteredPhotos[0] : null;
@@ -272,35 +351,65 @@ export const TrainingGalleryView: React.FC = () => {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  // Download All Photos of a Specific Day
+  const handleDownloadAllDayPhotos = async (photos: TrainingPhoto[], dateStr: string) => {
+    if (!photos || photos.length === 0) return;
+    setDownloadingDayDate(dateStr);
+
+    try {
+      for (let i = 0; i < photos.length; i++) {
+        handleDownload(photos[i]);
+        if (i < photos.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
+    } finally {
+      setTimeout(() => {
+        setDownloadingDayDate(null);
+      }, 2500);
+    }
+  };
+
   // Lightbox Navigation (Next / Prev)
+  // When inside a day album, navigates within that day; otherwise across all filtered photos
+  const activePhotosList = currentDayAlbum ? currentDayAlbum.photos : filteredPhotos;
+
   const currentLightboxIndex = lightboxPhoto
-    ? filteredPhotos.findIndex((p) => p.id === lightboxPhoto.id)
+    ? activePhotosList.findIndex((p) => p.id === lightboxPhoto.id)
     : -1;
 
   const handleNextPhoto = useCallback(() => {
-    if (currentLightboxIndex >= 0 && currentLightboxIndex < filteredPhotos.length - 1) {
-      setLightboxPhoto(filteredPhotos[currentLightboxIndex + 1]);
+    if (currentLightboxIndex >= 0 && currentLightboxIndex < activePhotosList.length - 1) {
+      setLightboxPhoto(activePhotosList[currentLightboxIndex + 1]);
     }
-  }, [currentLightboxIndex, filteredPhotos]);
+  }, [currentLightboxIndex, activePhotosList]);
 
   const handlePrevPhoto = useCallback(() => {
     if (currentLightboxIndex > 0) {
-      setLightboxPhoto(filteredPhotos[currentLightboxIndex - 1]);
+      setLightboxPhoto(activePhotosList[currentLightboxIndex - 1]);
     }
-  }, [currentLightboxIndex, filteredPhotos]);
+  }, [currentLightboxIndex, activePhotosList]);
 
-  // Keyboard navigation for Lightbox
+  // Keyboard navigation for Lightbox and Day Album
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!lightboxPhoto) return;
-      if (e.key === 'Escape') setLightboxPhoto(null);
-      if (e.key === 'ArrowRight') handleNextPhoto();
-      if (e.key === 'ArrowLeft') handlePrevPhoto();
+      if (e.key === 'Escape') {
+        if (lightboxPhoto) {
+          setLightboxPhoto(null);
+        } else if (selectedDayAlbumDate) {
+          setSelectedDayAlbumDate(null);
+        }
+        return;
+      }
+      if (lightboxPhoto) {
+        if (e.key === 'ArrowRight') handleNextPhoto();
+        if (e.key === 'ArrowLeft') handlePrevPhoto();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxPhoto, handleNextPhoto, handlePrevPhoto]);
+  }, [lightboxPhoto, selectedDayAlbumDate, handleNextPhoto, handlePrevPhoto]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -504,25 +613,63 @@ export const TrainingGalleryView: React.FC = () => {
 
       {/* Gallery Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <Layers className="w-4 h-4 text-amber-400" />
             <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-slate-200">
-              Galeria de Treinos ({filteredPhotos.length} {filteredPhotos.length === 1 ? 'Foto' : 'Fotos'})
+              Galeria de Treinos
             </h3>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700/80">
+              {viewMode === 'BY_DAY'
+                ? `${dayAlbums.length} ${dayAlbums.length === 1 ? 'Dia' : 'Dias'} • ${filteredPhotos.length} fotos`
+                : `${filteredPhotos.length} ${filteredPhotos.length === 1 ? 'Foto' : 'Fotos'}`}
+            </span>
           </div>
-          {(selectedDate || selectedClassId !== 'ALL' || searchTerm) && (
-            <button
-              onClick={() => {
-                setSelectedDate('');
-                setSelectedClassId('ALL');
-                setSearchTerm('');
-              }}
-              className="text-xs text-amber-400 hover:underline font-bold"
-            >
-              Limpar Filtros
-            </button>
-          )}
+
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {/* View Mode Toggle: Uma caixa por dia vs Todas as Fotos */}
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode('BY_DAY')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'BY_DAY'
+                    ? 'bg-amber-500 text-slate-950 shadow font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Visualizar organizado em caixas por dia"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Por Dia ({dayAlbums.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('ALL_PHOTOS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'ALL_PHOTOS'
+                    ? 'bg-amber-500 text-slate-950 shadow font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Visualizar todas as fotos individuais soltas"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Todas as Fotos ({filteredPhotos.length})</span>
+              </button>
+            </div>
+
+            {(selectedDate || selectedClassId !== 'ALL' || searchTerm) && (
+              <button
+                onClick={() => {
+                  setSelectedDate('');
+                  setSelectedClassId('ALL');
+                  setSearchTerm('');
+                }}
+                className="text-xs text-amber-400 hover:underline font-bold ml-1"
+              >
+                Limpar Filtros
+              </button>
+            )}
+          </div>
         </div>
 
         {filteredPhotos.length === 0 ? (
@@ -552,7 +699,139 @@ export const TrainingGalleryView: React.FC = () => {
               </button>
             )}
           </div>
+        ) : viewMode === 'BY_DAY' ? (
+          /* Grouped by Day: One Box per Day (Uma caixa por dia) */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {dayAlbums.map((album) => (
+              <div
+                key={album.date}
+                onClick={() => setSelectedDayAlbumDate(album.date)}
+                className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/60 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 flex flex-col group cursor-pointer"
+              >
+                {/* Album Cover Photo */}
+                <div className="relative aspect-16/10 bg-slate-950 overflow-hidden">
+                  <img
+                    src={album.coverPhoto.photoUrl}
+                    alt={album.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent opacity-75 group-hover:opacity-60 transition-opacity" />
+
+                  {/* Top Badges */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                    {album.isToday ? (
+                      <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 border border-amber-400 shadow-md flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+                        HOJE • {album.formattedDate}
+                      </span>
+                    ) : album.isYesterday ? (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-800/90 text-amber-300 border border-slate-700/90 backdrop-blur-md">
+                        ONTEM • {album.formattedDate}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-950/90 text-amber-300 border border-slate-800/90 backdrop-blur-md flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-amber-400" />
+                        {album.formattedDate}
+                      </span>
+                    )}
+
+                    {/* Total photos badge */}
+                    <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-slate-950/90 text-white border border-amber-500/40 backdrop-blur-md shadow-md flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-amber-400" />
+                      {album.totalPhotos} {album.totalPhotos === 1 ? 'Foto' : 'Fotos'}
+                    </span>
+                  </div>
+
+                  {/* Mini thumbnails preview on bottom of card if multiple photos */}
+                  {album.totalPhotos > 1 && (
+                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+                      <div className="flex items-center -space-x-2">
+                        {album.photos.slice(0, 4).map((p) => (
+                          <div
+                            key={p.id}
+                            className="w-7 h-7 rounded-lg border-2 border-slate-950 overflow-hidden shadow-md bg-slate-800 shrink-0"
+                          >
+                            <img src={p.photoUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                        {album.totalPhotos > 4 && (
+                          <div className="w-7 h-7 rounded-lg border-2 border-slate-950 bg-slate-800 text-amber-300 text-[10px] font-bold flex items-center justify-center shadow-md">
+                            +{album.totalPhotos - 4}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-300 bg-slate-950/80 px-2 py-0.5 rounded-md border border-slate-800 backdrop-blur-md flex items-center gap-1">
+                        Ver todas
+                        <ChevronRight className="w-3 h-3 text-amber-400" />
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Content & Action Bar */}
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-3.5">
+                  <div>
+                    <h4 className="font-black text-slate-100 text-base tracking-tight group-hover:text-amber-400 transition-colors">
+                      {album.title}
+                    </h4>
+
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1 font-medium text-slate-300">
+                        <User className="w-3 h-3 text-amber-400" />
+                        {album.professorName}
+                      </span>
+                      {album.className && (
+                        <>
+                          <span>•</span>
+                          <span className="text-slate-300">{album.className}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {album.caption && (
+                      <p className="text-xs text-slate-400 line-clamp-2 mt-2 leading-relaxed">
+                        "{album.caption}"
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="pt-3 border-t border-slate-800/80 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDayAlbumDate(album.date);
+                      }}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                      Ver Fotos do Dia ({album.totalPhotos})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadAllDayPhotos(album.photos, album.date);
+                      }}
+                      disabled={downloadingDayDate === album.date}
+                      className="py-2.5 px-3 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                      title="Baixar todas as fotos deste dia"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">
+                        {downloadingDayDate === album.date ? 'Baixando...' : 'Baixar'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
+          /* Flat list of all individual photos */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredPhotos.map((photo) => (
               <div
@@ -672,6 +951,177 @@ export const TrainingGalleryView: React.FC = () => {
         )}
       </div>
 
+      {/* Day Album Modal - Click to see ALL photos of that specific day */}
+      {currentDayAlbum && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col justify-start overflow-y-auto p-3 sm:p-6 animate-fade-in"
+          onClick={() => setSelectedDayAlbumDate(null)}
+        >
+          <div
+            className="max-w-7xl mx-auto w-full space-y-6 my-auto py-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Day Album Header */}
+            <div className="bg-slate-900/95 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-white shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedDayAlbumDate(null)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer border border-slate-700/80"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Voltar para Todos os Dias</span>
+                  </button>
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    {currentDayAlbum.formattedDate}
+                    {currentDayAlbum.isToday && ' (Hoje)'}
+                    {currentDayAlbum.isYesterday && ' (Ontem)'}
+                  </span>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-slate-100 font-display">
+                  {currentDayAlbum.title}
+                </h2>
+                <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-amber-400">{currentDayAlbum.totalPhotos} {currentDayAlbum.totalPhotos === 1 ? 'foto registrada' : 'fotos registradas'}</span>
+                  <span>•</span>
+                  <span>Professor: <strong className="text-slate-200">{currentDayAlbum.professorName}</strong></span>
+                  {currentDayAlbum.className && (
+                    <>
+                      <span>•</span>
+                      <span>Turma: <strong className="text-slate-200">{currentDayAlbum.className}</strong></span>
+                    </>
+                  )}
+                </p>
+                {currentDayAlbum.caption && (
+                  <p className="text-xs text-slate-300 italic pt-1">
+                    "{currentDayAlbum.caption}"
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  onClick={() => handleDownloadAllDayPhotos(currentDayAlbum.photos, currentDayAlbum.date)}
+                  disabled={downloadingDayDate === currentDayAlbum.date}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all active:scale-95"
+                >
+                  <Download className="w-4 h-4 stroke-[2.5]" />
+                  {downloadingDayDate === currentDayAlbum.date
+                    ? 'Baixando Fotos...'
+                    : `Baixar Todas (${currentDayAlbum.totalPhotos})`}
+                </button>
+
+                <button
+                  onClick={() => setSelectedDayAlbumDate(null)}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                  title="Fechar (Esc)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Grid of ALL photos of that specific day */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 max-h-[70vh] overflow-y-auto pr-1">
+              {currentDayAlbum.photos.map((photo, idx) => (
+                <div
+                  key={photo.id}
+                  className="bg-slate-900/95 border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-amber-500/50 transition-all flex flex-col group"
+                >
+                  {/* Thumbnail */}
+                  <div
+                    className="relative aspect-16/10 bg-slate-950 overflow-hidden cursor-pointer"
+                    onClick={() => setLightboxPhoto(photo)}
+                  >
+                    <img
+                      src={photo.photoUrl}
+                      alt={photo.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
+
+                    {/* Photo number badge & size */}
+                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-slate-950/90 text-amber-300 border border-slate-800">
+                        Foto {idx + 1} de {currentDayAlbum.totalPhotos}
+                      </span>
+                      {photo.fileSizeFormatted && (
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/80 text-slate-300 border border-slate-800">
+                          {photo.fileSizeFormatted}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Click to expand overlay */}
+                    <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-slate-950/80 text-white hover:text-amber-400 border border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+
+                  {/* Photo Card Content */}
+                  <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                    <div>
+                      <h4 className="font-bold text-slate-100 text-xs truncate">
+                        {photo.title}
+                      </h4>
+                      {photo.caption && (
+                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                          {photo.caption}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1.5">
+                      <button
+                        onClick={() => handleDownload(photo)}
+                        className="flex-1 py-1.5 px-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1 shadow cursor-pointer active:scale-95"
+                      >
+                        <Download className="w-3 h-3 stroke-[2.5]" />
+                        {downloadSuccessId === photo.id ? 'Baixado! ✓' : 'Baixar Original'}
+                      </button>
+
+                      <button
+                        onClick={() => toggleLikeTrainingPhoto(photo.id, currentUserId)}
+                        className={`p-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                          photo.likedBy?.includes(currentUserId)
+                            ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                            : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-rose-400'
+                        }`}
+                        title="Curtir"
+                      >
+                        <Heart className={`w-3 h-3 ${photo.likedBy?.includes(currentUserId) ? 'fill-rose-500 text-rose-500' : ''}`} />
+                        <span className="text-[10px]">{photo.likesCount || 0}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleShare(photo)}
+                        className="p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-amber-400 transition-all cursor-pointer"
+                        title="Compartilhar"
+                      >
+                        <Share2 className="w-3 h-3" />
+                      </button>
+
+                      {isStaff && (
+                        <button
+                          onClick={() => setDeletingPhoto(photo)}
+                          className="p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
+                          title="Excluir Foto"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox / Fullscreen Modal with Next/Prev Carousel */}
       {lightboxPhoto && (
         <div
@@ -689,9 +1139,9 @@ export const TrainingGalleryView: React.FC = () => {
               </h3>
               <p className="text-xs text-slate-400">
                 {formatDateBR(lightboxPhoto.date)} • {lightboxPhoto.professorName} {lightboxPhoto.className ? `• ${lightboxPhoto.className}` : ''}
-                {filteredPhotos.length > 1 && (
+                {activePhotosList.length > 1 && (
                   <span className="ml-2 px-2 py-0.5 rounded bg-slate-800 text-amber-400 font-bold">
-                    {currentLightboxIndex + 1} de {filteredPhotos.length}
+                    {currentLightboxIndex + 1} de {activePhotosList.length}
                   </span>
                 )}
               </p>
@@ -738,7 +1188,7 @@ export const TrainingGalleryView: React.FC = () => {
             />
 
             {/* Next Button */}
-            {currentLightboxIndex < filteredPhotos.length - 1 && (
+            {currentLightboxIndex < activePhotosList.length - 1 && (
               <button
                 onClick={handleNextPhoto}
                 className="absolute right-2 sm:right-4 z-20 p-3 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-white border border-slate-700/80 backdrop-blur-md shadow-2xl transition-all cursor-pointer active:scale-90"

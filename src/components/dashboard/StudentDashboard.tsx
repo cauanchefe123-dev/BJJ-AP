@@ -5,7 +5,7 @@ import { BeltBadge } from '../belts/BeltBadge';
 import { getStudentAvatar, resolveStudentForUser } from '../../constants/avatar';
 import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { getTrainingTimeText } from '../../utils/trainingTime';
-import { calculateRanking, getStudentTotalClasses } from '../../utils/ranking';
+import { calculateRanking, getStudentTotalClasses, getStudentAttendances } from '../../utils/ranking';
 import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, formatDateBR } from '../../utils/dateUtils';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords, Camera, Download, ChevronRight } from 'lucide-react';
@@ -25,13 +25,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
   const { students, payments, attendances, graduations, academyConfig, classes, rollChallenges, trainingPhotos } = useData();
 
   const [selectedVideoClass, setSelectedVideoClass] = useState<BJJClass | null>(null);
+  const isTeacherOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PROFESSOR';
 
   const resolved = resolveStudentForUser(currentUser, students);
   const currentStudent = selectedStudentId
     ? (students.find(s => s.id === selectedStudentId) || resolved)
     : resolved;
   const myPayments = payments.filter(p => p.studentId === currentStudent?.id);
-  const myAttendances = attendances.filter(a => a.studentId === currentStudent?.id);
+  const myAttendances = currentStudent ? getStudentAttendances(currentStudent, attendances, 'ALL') : [];
 
   const todayStr = getLocalDateStr();
   const todayAttendance = myAttendances.find(a => getAttendanceLocalDate(a) === todayStr);
@@ -246,8 +247,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-                    Evolução & Treinos Pós-Grau
-                    {isEligible && (
+                    {isTeacherOrAdmin ? 'Evolução & Treinos Pós-Grau' : 'Sua Graduação & Frequência'}
+                    {isTeacherOrAdmin && isEligible && (
                       <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
                         ✓ Apto para Exame
                       </span>
@@ -271,39 +272,54 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               </div>
             </div>
 
-            {/* Progress Bar & Details */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-slate-300">
-                  Meta para Próximo Grau: <strong className="text-amber-400 font-mono">{classesSince} / {target} treinos</strong>
-                </span>
-                <span className={`font-mono ${isEligible ? 'text-emerald-400 font-black' : 'text-slate-400'}`}>
-                  {progressPct}% concluído
-                </span>
-              </div>
+            {/* Visualização da Meta para Graduação: Exclusiva para Professores e Administradores */}
+            {isTeacherOrAdmin ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-300">
+                    Meta para Próximo Grau: <strong className="text-amber-400 font-mono">{classesSince} / {target} treinos</strong>
+                  </span>
+                  <span className={`font-mono ${isEligible ? 'text-emerald-400 font-black' : 'text-slate-400'}`}>
+                    {progressPct}% concluído
+                  </span>
+                </div>
 
-              <div className="w-full h-3.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    isEligible
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-sm shadow-emerald-500/30'
-                      : 'bg-gradient-to-r from-amber-600 to-amber-400'
-                  }`}
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
+                <div className="w-full h-3.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden p-0.5">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isEligible
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-sm shadow-emerald-500/30'
+                        : 'bg-gradient-to-r from-amber-600 to-amber-400'
+                    }`}
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-                <span>
-                  {isEligible
-                    ? '🎉 Meta de frequência atingida! Você está apto para o próximo grau ou faixa.'
-                    : `Faltam ${Math.max(0, target - classesSince)} treino(s) bipado(s) para completar a meta.`}
-                </span>
-                <span className="text-slate-500 hidden sm:inline">
-                  Check-ins bipados a partir da data de graduação contam automaticamente.
-                </span>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                  <span>
+                    {isEligible
+                      ? '🎉 Meta de frequência atingida! Aluno apto para avaliação de próximo grau ou faixa.'
+                      : `Faltam ${Math.max(0, target - classesSince)} treino(s) bipado(s) para completar a meta.`}
+                  </span>
+                  <span className="text-amber-500/80 text-[10px] font-semibold hidden sm:inline">
+                    🔒 Meta visível apenas para professores
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Visão do Aluno: Sem meta numérica ou barra, apenas treinos realizados no grau e constância */
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
+                <div className="flex items-center gap-3">
+                  <div className="px-4 py-2.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-baseline gap-2">
+                    <span className="text-2xl font-black font-mono text-emerald-400">{classesSince}</span>
+                    <span className="text-xs font-bold text-slate-300">treinos realizados no grau atual</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 italic max-w-md">
+                  A graduação é uma consequência natural da sua dedicação, evolução técnica e disciplina contínua no tatame. Oss!
+                </p>
+              </div>
+            )}
           </div>
         );
       })()}
