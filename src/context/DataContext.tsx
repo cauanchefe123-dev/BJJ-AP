@@ -323,7 +323,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .map(s => ({
           ...s,
           approvalStatus: s.approvalStatus || 'APPROVED',
-          active: s.approvalStatus === 'APPROVED' || s.active !== false,
+          active: s.active !== false && s.approvalStatus !== 'PENDING' && s.approvalStatus !== 'REJECTED',
           photoUrl: s.photoUrl || '',
         }));
       setStudents(valid);

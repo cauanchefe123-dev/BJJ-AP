@@ -23,6 +23,7 @@ import { OfficialReceiptDocument } from './OfficialReceiptDocument';
 import { OfficialGraduationCertificate } from './OfficialGraduationCertificate';
 import { DigitalMembershipCard } from '../card/DigitalMembershipCard';
 import { Student, PaymentRecord } from '../../types';
+import { getBeltDistribution } from '../../utils/beltDistribution';
 
 export const ReportsView: React.FC = () => {
   const { students, payments, attendances, graduations, academyConfig } = useData();
@@ -52,13 +53,7 @@ export const ReportsView: React.FC = () => {
     ? Math.round((paidPayments.length / payments.length) * 100)
     : 100;
 
-  const beltCounts: Record<string, number> = {
-    BRANCA: students.filter(s => s.belt === 'BRANCA').length,
-    AZUL: students.filter(s => s.belt === 'AZUL').length,
-    ROXA: students.filter(s => s.belt === 'ROXA').length,
-    MARROM: students.filter(s => s.belt === 'MARROM').length,
-    PRETA: students.filter(s => s.belt === 'PRETA').length,
-  };
+  const beltDistribution = React.useMemo(() => getBeltDistribution(students), [students]);
 
   return (
     <div className="space-y-6">
@@ -205,28 +200,26 @@ export const ReportsView: React.FC = () => {
                   <Award className="w-4 h-4 text-amber-400" />
                   Distribuição da Equipe por Faixa
                 </h4>
-                <span className="text-xs text-slate-400 font-mono">{students.length} Total</span>
+                <span className="text-xs text-slate-400 font-mono">{beltDistribution.totalActiveStudents} Atletas Ativos</span>
               </div>
 
               <div className="space-y-3">
-                {Object.entries(beltCounts).map(([belt, count]) => {
-                  const percent = students.length > 0 ? Math.round((count / students.length) * 100) : 0;
+                {beltDistribution.categories.map(item => {
                   return (
-                    <div key={belt} className="space-y-1">
+                    <div key={item.key} className="space-y-1">
                       <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-slate-300">Faixa {belt}</span>
-                        <span className="text-slate-400">{count} atleta(s) ({percent}%)</span>
+                        <span className={`text-slate-300 flex items-center gap-1.5`}>
+                          {item.isNoBelt && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                          <span>{item.label}</span>
+                        </span>
+                        <span className="text-slate-400 font-mono text-[11px]">
+                          {item.count} atleta(s) <span className="text-amber-400 font-bold">({item.percentage}%)</span>
+                        </span>
                       </div>
                       <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            belt === 'BRANCA' ? 'bg-slate-200' :
-                            belt === 'AZUL' ? 'bg-blue-500' :
-                            belt === 'ROXA' ? 'bg-purple-500' :
-                            belt === 'MARROM' ? 'bg-amber-800' :
-                            'bg-rose-500'
-                          }`}
-                          style={{ width: `${percent}%` }}
+                          className={`h-full rounded-full transition-all ${item.color}`}
+                          style={{ width: `${Math.max(item.percentage, item.count > 0 ? 3 : 0)}%` }}
                         />
                       </div>
                     </div>

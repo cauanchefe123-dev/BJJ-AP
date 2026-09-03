@@ -5,6 +5,7 @@ import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
 import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus, Camera } from 'lucide-react';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getLocalDateStr, getAttendanceLocalDate } from '../../utils/dateUtils';
+import { getBeltDistribution } from '../../utils/beltDistribution';
 
 interface AdminDashboardProps {
   onNavigate: (tab: string) => void;
@@ -15,13 +16,9 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOpenCheckin, onOpenDailyAttendance }) => {
   const { students, payments, attendances, graduations, academyConfig } = useData();
 
-  const totalActiveStudents = students.filter(s => s.active).length;
-  
-  // Belt distribution
-  const beltCounts = students.reduce((acc, s) => {
-    acc[s.belt] = (acc[s.belt] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Belt distribution and active students calculated canonically
+  const beltDistribution = React.useMemo(() => getBeltDistribution(students), [students]);
+  const { totalActiveStudents, categories } = beltDistribution;
 
   // Students ready for promotion
   const studentsReadyForGraduation = students.filter(s =>
@@ -218,25 +215,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
           </div>
 
           <div className="space-y-3.5 pt-1">
-            {[
-              { belt: 'BRANCA', label: 'Faixa Branca', color: 'bg-slate-200' },
-              { belt: 'AZUL', label: 'Faixa Azul', color: 'bg-blue-600' },
-              { belt: 'ROXA', label: 'Faixa Roxa', color: 'bg-purple-600' },
-              { belt: 'MARROM', label: 'Faixa Marrom', color: 'bg-amber-900' },
-              { belt: 'PRETA', label: 'Faixa Preta', color: 'bg-neutral-900 border border-amber-500/40' },
-            ].map(item => {
-              const count = beltCounts[item.belt] || 0;
-              const percentage = totalActiveStudents > 0 ? Math.round((count / totalActiveStudents) * 100) : 0;
+            {categories.map(item => {
               return (
-                <div key={item.belt} className="space-y-1.5">
+                <div key={item.key} className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold text-slate-300">
-                    <span>{item.label}</span>
-                    <span className="text-slate-400 font-mono text-[11px]">{count} atleta(s) <span className="text-amber-400 font-bold">({percentage}%)</span></span>
+                    <span className="flex items-center gap-1.5">
+                      {item.isNoBelt && <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                      <span>{item.label}</span>
+                      {item.isNoBelt && (
+                        <span className="text-[9px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-black uppercase">
+                          Ajustar
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-slate-400 font-mono text-[11px]">
+                      {item.count} atleta(s) <span className="text-amber-400 font-bold">({item.percentage}%)</span>
+                    </span>
                   </div>
                   <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                     <div
                       className={`h-full ${item.color} rounded-full transition-all duration-500`}
-                      style={{ width: `${Math.max(percentage, count > 0 ? 3 : 0)}%` }}
+                      style={{ width: `${Math.max(item.percentage, item.count > 0 ? 3 : 0)}%` }}
                     />
                   </div>
                 </div>
