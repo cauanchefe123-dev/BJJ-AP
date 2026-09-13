@@ -33,6 +33,7 @@ import { PixPaymentModal } from './components/financial/PixPaymentModal';
 import { DigitalMembershipCard } from './components/card/DigitalMembershipCard';
 import { RankingBoard } from './components/ranking/RankingBoard';
 import { MatTimer } from './components/timer/MatTimer';
+import { TvScoreboardView } from './components/timer/TvScoreboardView';
 import { StudentTrainingJournal } from './components/student/StudentTrainingJournal';
 import { TeacherObservationsView } from './components/observations/TeacherObservationsView';
 import { ReportsView } from './components/reports/ReportsView';
@@ -92,6 +93,32 @@ function MainApp() {
     setEditingStudent(student);
     setIsEditStudentOpen(true);
   };
+
+  // Modo Espelhamento na TV (Não requer login para projetar na Smart TV ou Monitor)
+  const [isTvMode, setIsTvMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tv') === 'true' || params.get('mode') === 'tv' || window.location.hash.includes('tv');
+  });
+
+  if (isTvMode) {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const tatameId = urlParams.get('tatame') || 'tatame_1';
+    return (
+      <TvScoreboardView
+        tatameId={tatameId}
+        onExitTvMode={() => {
+          setIsTvMode(false);
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('tv');
+            url.searchParams.delete('mode');
+            window.history.replaceState({}, '', url.toString());
+          }
+        }}
+      />
+    );
+  }
 
   if (!currentUser) {
     return <AuthModal isOpen={true} onClose={() => {}} />;

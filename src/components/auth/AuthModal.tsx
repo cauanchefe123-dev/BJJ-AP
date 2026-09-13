@@ -20,7 +20,8 @@ import {
   GraduationCap,
   Crown,
   Settings,
-  Send
+  Send,
+  Tv
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -1212,6 +1213,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         )}
+
+        {/* Atalho para Smart TV / Placar do Tatame sem login */}
+        <div className="pt-4 border-t border-slate-800 text-center">
+          <a
+            href="/?tv=true&tatame=tatame_1"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all w-full sm:w-auto"
+          >
+            <Tv className="w-4 h-4 text-cyan-400" />
+            <span>📺 Abrir Placar do Tatame na Smart TV (Sem Login)</span>
+          </a>
+        </div>
       </div>
     </div>
   );

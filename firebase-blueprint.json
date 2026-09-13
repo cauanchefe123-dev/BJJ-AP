@@ -68,6 +68,38 @@
         "id": { "type": "string" },
         "name": { "type": "string" }
       }
+    },
+    "timer_sync": {
+      "title": "Timer Sync",
+      "description": "Real-time tatame timer and scoreboard state for TV mirroring",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tatameId": { "type": "string" },
+        "tatameName": { "type": "string" },
+        "timerMode": { "type": "string" },
+        "status": { "type": "string" },
+        "timeRemaining": { "type": "number" },
+        "targetEndTime": { "type": "number" },
+        "totalDuration": { "type": "number" },
+        "currentRound": { "type": "number" },
+        "totalRounds": { "type": "number" },
+        "isResting": { "type": "boolean" },
+        "athlete1Name": { "type": "string" },
+        "athlete2Name": { "type": "string" },
+        "athlete1Belt": { "type": "string" },
+        "athlete2Belt": { "type": "string" },
+        "score1": { "type": "number" },
+        "score2": { "type": "number" },
+        "advantages1": { "type": "number" },
+        "advantages2": { "type": "number" },
+        "penalties1": { "type": "number" },
+        "penalties2": { "type": "number" },
+        "soundType": { "type": "string" },
+        "soundTimestamp": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "status"]
     }
   }
 }

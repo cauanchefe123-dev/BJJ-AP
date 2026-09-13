@@ -26,8 +26,14 @@ import {
   Check,
   Trophy,
   Flame,
-  Radio
+  Radio,
+  QrCode,
+  ExternalLink,
+  AlertTriangle
 } from 'lucide-react';
+import QRCode from 'qrcode';
+import { publishTimerSync, TimerSyncData } from '../../lib/timerSyncService';
+import { playTatameSound } from '../../lib/soundEffects';
 import { SpotifyTatamePlayer } from './SpotifyTatamePlayer';
 import { SpotifyService, SpotifyPlaybackState } from '../../lib/spotifyService';
 import { useAuth } from '../../context/AuthContext';
@@ -115,7 +121,34 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
   const [showCastModal, setShowCastModal] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
+  const [selectedTatameId, setSelectedTatameId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('tatame') || 'tatame_1';
+    }
+    return 'tatame_1';
+  });
+  const [tvQrCodeDataUrl, setTvQrCodeDataUrl] = useState<string>('');
   const [playback, setPlayback] = useState<SpotifyPlaybackState | null>(null);
+
+  const tvUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/?tv=true&tatame=${selectedTatameId}`
+    : '';
+
+  useEffect(() => {
+    if (tvUrl) {
+      QRCode.toDataURL(tvUrl, {
+        width: 320,
+        margin: 2,
+        color: {
+          dark: '#030712',
+          light: '#ffffff',
+        },
+      })
+        .then(url => setTvQrCodeDataUrl(url))
+        .catch(() => {});
+    }
+  }, [tvUrl, selectedTatameId]);
 
   // Modal Pickers & Finish Dialog
   const [pickingForAthlete, setPickingForAthlete] = useState<1 | 2 | null>(null);
@@ -164,79 +197,63 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
     setTimerMode('SCOREBOARD');
   };
 
-  // Web Audio Synth for Tatame Chimes
+  // Sincronização em tempo real com o placar da TV
+  const syncToTv = useCallback((overrides?: Partial<TimerSyncData>) => {
+    const targetEnd = isRunning ? Date.now() + timeLeft * 1000 : null;
+    publishTimerSync({
+      id: selectedTatameId,
+      tatameId: selectedTatameId,
+      tatameName: selectedTatameId === 'tv_7' ? 'TV 7 - Tatame 7' : selectedTatameId === 'tatame_2' ? 'Tatame 2' : 'Tatame 1 - Principal',
+      timerMode,
+      status: isRunning ? 'RUNNING' : timeLeft === 0 ? 'FINISHED' : 'PAUSED',
+      timeRemaining: timeLeft,
+      targetEndTime: targetEnd,
+      totalDuration: roundTimeMinutes * 60,
+      currentRound,
+      totalRounds,
+      isResting,
+      roundDuration: roundTimeMinutes * 60,
+      restDuration: restTimeSeconds,
+      athlete1Name,
+      athlete2Name,
+      athlete1Belt,
+      athlete2Belt,
+      score1,
+      score2,
+      advantages1,
+      advantages2,
+      penalties1,
+      penalties2,
+      ...overrides,
+    });
+  }, [
+    selectedTatameId,
+    isRunning, timeLeft, timerMode, roundTimeMinutes, currentRound, totalRounds,
+    isResting, restTimeSeconds, athlete1Name, athlete2Name, athlete1Belt, athlete2Belt,
+    score1, score2, advantages1, advantages2, penalties1, penalties2
+  ]);
+
+  // Sons de tatame com Web Audio sintetizado e sincronização de áudio para a TV
   const playSound = useCallback((type: 'START' | 'STOP' | 'WARNING' | 'FINISHED' | 'SCORE') => {
-    if (!soundEnabledRef.current) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      const now = ctx.currentTime;
-
-      if (type === 'START') {
-        // High energetic double whistle / start chime
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, now);
-        osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.15);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-        osc.start(now);
-        osc.stop(now + 0.5);
-      } else if (type === 'STOP') {
-        // Firm stop whistle tone
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(587.33, now);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-        osc.start(now);
-        osc.stop(now + 0.6);
-      } else if (type === 'WARNING') {
-        // 10 second warning pulse
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(659.25, now);
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-        osc.start(now);
-        osc.stop(now + 0.25);
-      } else if (type === 'FINISHED') {
-        // Loud Tatame Final Gong
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(220, now + 1.8);
-        gain.gain.setValueAtTime(0.45, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
-        osc.start(now);
-        osc.stop(now + 2.2);
-      } else if (type === 'SCORE') {
-        // Crisp point click
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1046.5, now);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-        osc.start(now);
-        osc.stop(now + 0.08);
-      }
-
-      setTimeout(() => {
-        try {
-          if (ctx.state !== 'closed') {
-            ctx.close();
-          }
-        } catch {
-          // ignore
-        }
-      }, 2500);
-    } catch {
-      // Audio context fallbacks ignored safely
+    if (soundEnabledRef.current) {
+      playTatameSound(type);
     }
-  }, []);
+    // Sincroniza som instantaneamente na TV conectada
+    publishTimerSync({
+      id: selectedTatameId,
+      soundType: type,
+      soundTimestamp: Date.now(),
+    });
+  }, [selectedTatameId]);
+
+  // Disparo de sincronização automática com TV em qualquer mudança de placar
+  useEffect(() => {
+    syncToTv();
+  }, [
+    timerMode, roundTimeMinutes, currentRound, totalRounds, isResting,
+    athlete1Name, athlete2Name, athlete1Belt, athlete2Belt,
+    score1, score2, advantages1, advantages2, penalties1, penalties2, isRunning
+  ]);
 
   // Timer Tick Interval
   useEffect(() => {
@@ -537,12 +554,34 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
   // Screencast TV Link
   const handleCopyDirectLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.origin);
+      await navigator.clipboard.writeText(tvUrl);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
     } catch {
       // ignore
     }
+  };
+
+  const handleOpenTvTab = () => {
+    if (typeof window !== 'undefined') {
+      window.open(tvUrl, '_blank');
+    }
+  };
+
+  const handlePresentationCast = async () => {
+    try {
+      const PresentationReq = (window as unknown as { PresentationRequest?: new (urls: string[]) => { start: () => Promise<unknown> } }).PresentationRequest;
+      if (PresentationReq) {
+        setIsScreenSharing(true);
+        const pr = new PresentationReq([tvUrl]);
+        await pr.start();
+        setIsScreenSharing(false);
+        return;
+      }
+    } catch {
+      setIsScreenSharing(false);
+    }
+    handleStartScreenShare();
   };
 
   const handleStartScreenShare = async () => {
@@ -557,7 +596,7 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
           setIsScreenSharing(false);
         };
       } else {
-        alert('Seu navegador não suporta compartilhamento de tela nativo.');
+        handleOpenTvTab();
       }
     } catch {
       setIsScreenSharing(false);
@@ -1635,68 +1674,212 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
             </div>
 
             <div className="p-5 sm:p-6 space-y-5">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-900 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                      Modo Rápido
+              {/* Seletor de Canal de TV / Tatame */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Tv className="w-3.5 h-3.5 text-cyan-400" />
+                      Canal do Tatame / TV Selecionada:
                     </span>
-                    <h4 className="text-sm font-bold text-white">Transmitir Aba / Tela Diretamente</h4>
+                    <p className="text-[11px] text-slate-400">Escolha para qual tela ou tatame este cronômetro vai transmitir</p>
                   </div>
-                  <p className="text-xs text-slate-300">
-                    Abre a janela de seleção do Chrome/Edge para transmitir esta tela para Chromecast, Smart TV ou monitor sem fio.
-                  </p>
+                  <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setSelectedTatameId('tatame_1')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedTatameId === 'tatame_1'
+                          ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Tatame 1
+                    </button>
+                    <button
+                      onClick={() => setSelectedTatameId('tv_7')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedTatameId === 'tv_7'
+                          ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+                          : 'text-amber-400 hover:bg-amber-400/10 border border-amber-400/30'
+                      }`}
+                    >
+                      📺 TV 7 (Tatame 7)
+                    </button>
+                    <button
+                      onClick={() => setSelectedTatameId('tatame_2')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedTatameId === 'tatame_2'
+                          ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Tatame 2
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={handleStartScreenShare}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-                >
-                  <Cast className="w-4 h-4" />
-                  <span>{isScreenSharing ? 'Compartilhando Tela...' : 'Iniciar Transmissão'}</span>
-                </button>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-bold text-emerald-300">
+                      Sincronizando em tempo real no canal: <span className="text-white uppercase font-mono">{selectedTatameId}</span>
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleOpenTvTab}
+                    className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm text-[11px]"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Abrir Tela da TV</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                    <Smartphone className="w-4 h-4" />
-                    <span>Celular Android</span>
+              {/* Card de Ajuda em Destaque: Por que a TV 7 / Samsung não aparece na busca */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 border border-amber-500/40 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                    <AlertTriangle className="w-4 h-4" />
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    1. Arraste o topo do celular para baixo.<br/>
-                    2. Toque em <strong>Smart View</strong> ou <strong>Transmitir</strong>.<br/>
-                    3. Selecione a TV do tatame.
+                  <div>
+                    <h4 className="text-xs font-black text-amber-300 uppercase tracking-wide">
+                      Sua TV não está aparecendo na lista? (Ex: Samsung TV 7 / LG)
+                    </h4>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      As TVs da <strong>Samsung (como a Crystal UHD Série 7, AU7000, CU7000, TU7000)</strong> não possuem Chromecast do Google integrado. Por isso, navegadores não conseguem listar a TV diretamente pelo botão de Cast. 
+                      <strong className="text-amber-200 block mt-0.5">Use uma destas opções garantidas:</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-amber-400/30 space-y-1.5">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold">
+                      <Laptop className="w-4 h-4" />
+                      <span>1. No PC/Notebook (Windows + K)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      No teclado do computador, aperte as teclas <strong>Windows + K</strong>. O menu de telas sem fio do Windows abrirá na lateral direita e a <strong>TV 7</strong> vai aparecer na hora!
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold">
+                      <Smartphone className="w-4 h-4" />
+                      <span>2. Pelo Celular (Smart View)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Arraste a barra superior do celular para baixo e toque no ícone <strong>Smart View</strong> (ou Transmitir). A <strong>TV 7</strong> aparece imediatamente.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <Tv className="w-4 h-4" />
+                      <span>3. No Controle da TV 7</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      No controle, aperte <strong>Home</strong> e abra o app <strong>"Internet"</strong> (globo azul). Digite o link ou aponte o QR Code. Funciona direto e sem login!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Opções de Conexão com a TV */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Opção 1: QR Code para Smart TV ou Celular */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center text-center space-y-3">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                    <QrCode className="w-4 h-4" />
+                    <span>Escanear QR Code com a TV 7</span>
+                  </div>
+                  {tvQrCodeDataUrl ? (
+                    <img
+                      src={tvQrCodeDataUrl}
+                      alt="QR Code TV Scoreboard"
+                      className="w-40 h-40 rounded-xl bg-white p-2 shadow-xl border border-slate-700"
+                    />
+                  ) : (
+                    <div className="w-40 h-40 rounded-xl bg-slate-800 flex items-center justify-center text-xs text-slate-500">
+                      Gerando QR Code...
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-400 max-w-xs">
+                    Aponte a câmera do celular ou abra o navegador da TV 7 para exibir o placar oficial sem login.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs">
-                    <Share2 className="w-4 h-4" />
+                {/* Opção 2: Transmitir / Espelhar Direto */}
+                <div className="flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-900 border border-cyan-500/30 space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        Busca de Dispositivos sem Fio
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Chromecast / Google Cast / AirPlay</h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Se sua TV possui Chromecast (Android TV, Google TV, TCL, Philips), clique abaixo para abrir a busca nativa de telas sem fio.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <button
+                      onClick={handlePresentationCast}
+                      className="w-full px-4 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Cast className="w-4 h-4" />
+                      <span>{isScreenSharing ? 'Buscando Telas...' : 'Buscar Minha TV na Rede (Cast)'}</span>
+                    </button>
+
+                    <button
+                      onClick={handleOpenTvTab}
+                      className="w-full px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4 text-cyan-400" />
+                      <span>Abrir em Nova Aba (Para HDMI / Projetor)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dicas Rápidas por Dispositivo */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs">
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Smart View (Samsung)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Arraste a central de notificações do celular e toque em <strong>Smart View</strong>.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-indigo-400 font-bold text-xs">
+                    <Share2 className="w-3.5 h-3.5" />
                     <span>iPhone / AirPlay</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    1. Abra a Central de Controle.<br/>
-                    2. Toque em <strong>Espelhar a Tela</strong>.<br/>
-                    3. Escolha a sua TV ou Apple TV.
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Na Central de Controle, toque em <strong>Espelhar a Tela</strong> e escolha sua TV 7.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                    <Laptop className="w-4 h-4" />
-                    <span>PC / Cabo HDMI</span>
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                    <Laptop className="w-3.5 h-3.5" />
+                    <span>Cabo HDMI / Notebook</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    1. Conecte o cabo HDMI do notebook à TV.<br/>
-                    2. Pressione tecla <strong>F</strong> para tela cheia.<br/>
-                    3. Placar fica gigante e perfeito na TV!
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Ligue o cabo HDMI na TV 7, abra a tela e aperte <strong>F</strong> (Tela Cheia).
                   </p>
                 </div>
               </div>
 
+              {/* Link direto para a Smart TV */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">Link direto para abrir no navegador da TV:</span>
+                  <span className="text-xs font-bold text-slate-400">Link direto para o navegador da Smart TV (Sem necessidade de login):</span>
                   {copiedLink && (
                     <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Link copiado!
@@ -1707,15 +1890,15 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
                   <input
                     type="text"
                     readOnly
-                    value={window.location.origin}
-                    className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none"
+                    value={tvUrl}
+                    className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none select-all"
                   />
                   <button
                     onClick={handleCopyDirectLink}
                     className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copiar</span>
+                    <span>Copiar Link</span>
                   </button>
                 </div>
               </div>
