@@ -27,6 +27,7 @@ import {
   Trophy,
   Flame,
   Radio,
+  Music,
   QrCode,
   ExternalLink,
   AlertTriangle
@@ -117,7 +118,40 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [showSpotifyPanel, setShowSpotifyPanel] = useState<boolean>(false);
+  const [showSpotifyPanel, setShowSpotifyPanel] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bjjcron_spotify_panel_open');
+      if (saved !== null) return saved === 'true';
+      return Boolean(SpotifyService.getStoredToken());
+    }
+    return false;
+  });
+  const [isSpotifyConnected, setIsSpotifyConnected] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(SpotifyService.getStoredToken());
+    }
+    return false;
+  });
+
+  const toggleSpotifyPanel = useCallback(() => {
+    setShowSpotifyPanel(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bjjcron_spotify_panel_open', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  // Monitora se o token do Spotify está ativo
+  useEffect(() => {
+    const checkToken = () => {
+      setIsSpotifyConnected(Boolean(SpotifyService.getStoredToken()));
+    };
+    checkToken();
+    const interval = setInterval(checkToken, 3000);
+    return () => clearInterval(interval);
+  }, []);
   const [showCastModal, setShowCastModal] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
@@ -644,6 +678,29 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
 
         {/* Quick Utilities */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Spotify Tatame Button */}
+          <button
+            onClick={toggleSpotifyPanel}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+              showSpotifyPanel
+                ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/25'
+                : isSpotifyConnected
+                ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/40 shadow-sm'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border-slate-700 hover:border-emerald-500/40'
+            }`}
+            title="Configurar Som do Tatame com Spotify"
+          >
+            <Music className={`w-4 h-4 ${showSpotifyPanel ? 'text-slate-950' : 'text-emerald-400'}`} />
+            <span className="hidden sm:inline">Spotify</span>
+            {isSpotifyConnected ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Spotify Conectado" />
+            ) : (
+              <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono hidden md:inline">
+                OFF
+              </span>
+            )}
+          </button>
+
           {/* Audio toggle */}
           <button
             onClick={() => setSoundEnabled(prev => !prev)}
@@ -1361,15 +1418,60 @@ export const MatTimer: React.FC<MatTimerProps> = ({ initialChallenge }) => {
               </div>
             </div>
           </div>
+          {/* Quick Spotify Access inside Rounds View */}
+          <div className="z-10 mt-5 w-full max-w-2xl flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/30">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <Music className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-white uppercase tracking-wide">
+                    Música no Tatame (Spotify)
+                  </span>
+                  {isSpotifyConnected && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                      Conectado
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isSpotifyConnected
+                    ? 'Controle de volume, playlists e pausa automática no descanso'
+                    : 'Conecte sua conta do Spotify para tocar direto no rola'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={toggleSpotifyPanel}
+              className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 ${
+                showSpotifyPanel
+                  ? 'bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20'
+                  : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+              }`}
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span>{showSpotifyPanel ? 'Ocultar Controles' : 'Abrir Controles do Spotify'}</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Spotify Tatame Player */}
       {showSpotifyPanel && (
-        <SpotifyTatamePlayer
-          isTimerRunning={isRunning}
-          isResting={isResting}
-        />
+        <div className="mt-4">
+          <SpotifyTatamePlayer
+            isTimerRunning={isRunning}
+            isResting={isResting}
+            onClose={() => {
+              setShowSpotifyPanel(false);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('bjjcron_spotify_panel_open', 'false');
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* ========================================================================= */}

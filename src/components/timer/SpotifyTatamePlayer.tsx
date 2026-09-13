@@ -19,7 +19,8 @@ import {
   Laptop,
   Smartphone,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 import { 
   SpotifyService, 
@@ -37,11 +38,13 @@ import {
 interface SpotifyTatamePlayerProps {
   isTimerRunning?: boolean;
   isResting?: boolean;
+  onClose?: () => void;
 }
 
 export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
   isTimerRunning = false,
-  isResting = false
+  isResting = false,
+  onClose
 }) => {
   // Authentication State
   const [user, setUser] = useState<SpotifyUser | null>(null);
@@ -477,6 +480,16 @@ export const SpotifyTatamePlayer: React.FC<SpotifyTatamePlayerProps> = ({
               title="Configurações de Conexão Spotify"
             >
               <Sliders className="w-4 h-4" />
+            </button>
+          )}
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all cursor-pointer ml-1"
+              title="Fechar painel do Spotify"
+            >
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
