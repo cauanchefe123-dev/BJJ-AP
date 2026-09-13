@@ -69,6 +69,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     observations: 'Observações do Professor',
     ranking: 'Ranking da Academia',
     timer: 'Cronômetro do Tatame',
+    gallery: 'Fotos dos Treinos',
+    graduations: 'Histórico & Graduações',
+    financial: 'Financeiro & Mensalidades',
     reports: 'Relatórios & Métricas',
     settings: 'Configurações',
   };

@@ -32,6 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const {
     loginWithPassword,
     loginWithGoogle,
+    isAuthRedirectProcessing,
     firstAccessActivate,
     registerStudentSelfService,
     registerTeacherSelfService,
@@ -354,6 +355,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <X className="w-4 h-4 text-rose-400" />
               Excluir Conta & Recadastrar
             </button>
+          </div>
+        )}
+
+        {/* Processamento de Retorno do Google Mobile */}
+        {isAuthRedirectProcessing && (
+          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 shadow-lg">
+            <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto shadow-md" />
+            <div>
+              <p className="text-sm font-bold text-amber-300">Conectando Conta Google...</p>
+              <p className="text-xs text-slate-300 mt-1">
+                Finalizando autenticação móvel e sincronizando seu acesso.
+              </p>
+            </div>
           </div>
         )}
 

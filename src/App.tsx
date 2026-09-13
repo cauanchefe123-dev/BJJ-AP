@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider, useData } from './context/DataContext';
 
@@ -46,9 +46,10 @@ import { GraduationHistoryView } from './components/graduations/GraduationHistor
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
-import { PaymentRecord, Student } from './types';
+import { PaymentRecord, Student, RollChallenge } from './types';
 import { AuthModal } from './components/auth/AuthModal';
 import { resolveStudentForUser, DEFAULT_BLACK_GI_AVATAR } from './constants/avatar';
+import { NavigationMenuModal, MenuCategoryTab } from './components/layout/NavigationMenuModal';
 import { InAppToastNotification } from './components/notifications/InAppToastNotification';
 import { PWAUpdateManager } from './components/pwa/PWAUpdateManager';
 
@@ -71,6 +72,21 @@ function MainApp() {
   const [studentForGraduation, setStudentForGraduation] = useState<Student | null>(null);
   const [selectedStudentCard, setSelectedStudentCard] = useState<Student | null>(null);
   const [pixModalPayment, setPixModalPayment] = useState<PaymentRecord | null>(null);
+  const [activeTimerChallenge, setActiveTimerChallenge] = useState<RollChallenge | null>(null);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState<boolean>(false);
+  const [menuInitialCategory, setMenuInitialCategory] = useState<MenuCategoryTab>('training');
+
+  // Guard: Restringir cronômetro e ferramentas exclusivas para professores
+  useEffect(() => {
+    if (currentUser?.role === 'ALUNO' && activeTab === 'timer') {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser?.role, activeTab]);
+
+  const handleOpenMenuModal = (category: MenuCategoryTab = 'training') => {
+    setMenuInitialCategory(category);
+    setIsMenuModalOpen(true);
+  };
 
   const handleOpenEditStudent = (student: Student) => {
     setEditingStudent(student);
@@ -96,7 +112,7 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <Sidebar
@@ -147,7 +163,7 @@ function MainApp() {
           />
 
           {/* Page Content */}
-          <main className="flex-1 p-3 sm:p-6 md:p-8 pb-24 sm:pb-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-5 sm:space-y-6">
+          <main className="flex-1 p-3 sm:p-6 md:p-8 pb-24 sm:pb-8 overflow-y-auto w-full max-w-[1700px] mx-auto space-y-5 sm:space-y-6">
             {currentUser.role === 'ALUNO' && (currentUser.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING') ? (
               <PendingApprovalScreen onOpenAuthModal={() => setIsAuthModalOpen(true)} />
             ) : (
@@ -227,7 +243,12 @@ function MainApp() {
 
                 {activeTab === 'challenges' && (
                   <RollChallengeBoard
-                    onNavigateToTimer={() => setActiveTab('timer')}
+                    onNavigateToTimer={(challenge) => {
+                      if (currentUser?.role !== 'ALUNO') {
+                        setActiveTimerChallenge(challenge || null);
+                        setActiveTab('timer');
+                      }
+                    }}
                   />
                 )}
 
@@ -251,8 +272,12 @@ function MainApp() {
 
                 {activeTab === 'ranking' && <RankingBoard />}
 
-                {activeTab === 'timer' && (currentUser.role === 'ADMIN' || currentUser.role === 'PROFESSOR') && (
-                  <MatTimer />
+                {activeTab === 'timer' && currentUser?.role !== 'ALUNO' && (
+                  <MatTimer initialChallenge={activeTimerChallenge} />
+                )}
+
+                {activeTab === 'financial' && (
+                  <PaymentManager onOpenPixModal={(p) => setPixModalPayment(p)} />
                 )}
 
                 {activeTab === 'reports' && <ReportsView />}
@@ -264,6 +289,44 @@ function MainApp() {
           </main>
         </div>
       </div>
+
+      {/* Navigation Menu Modal with Tabs and Options */}
+      <NavigationMenuModal
+        isOpen={isMenuModalOpen}
+        onClose={() => setIsMenuModalOpen(false)}
+        activeTab={activeTab}
+        onNavigate={setActiveTab}
+        initialCategory={menuInitialCategory}
+        onOpenEditProfile={() => {
+          const st = currentStudent || (currentUser ? {
+            id: currentUser.studentId || currentUser.id,
+            registrationNumber: 'STAFF',
+            name: currentUser.name,
+            email: currentUser.email,
+            phone: currentUser.phone || '',
+            birthDate: '1990-01-01',
+            photoUrl: currentUser.avatarUrl || DEFAULT_BLACK_GI_AVATAR,
+            belt: (currentUser.role === 'ADMIN' || currentUser.role === 'PROFESSOR') ? 'PRETA' : 'BRANCA',
+            stripes: 0,
+            startDate: new Date().toISOString().split('T')[0],
+            totalClassesAttended: 0,
+            monthlyFee: 0,
+            paymentStatus: 'PAGO',
+            active: true,
+            role: currentUser.role,
+            approvalStatus: 'APPROVED',
+            weightCategory: 'MÉDIO',
+            ageCategory: 'ADULTO',
+            paymentDueDateDay: 10,
+            qrCodeToken: `BJJCRON-${currentUser.id}`,
+            classesSinceLastGraduation: 0,
+            planName: 'Staff',
+            planPrice: 0,
+          } as unknown as Student : null);
+          if (st) handleOpenEditStudent(st);
+        }}
+        onOpenQuickScan={() => setIsQuickCheckinOpen(true)}
+      />
 
       {/* Global Interactive Modals */}
       <AuthModal
@@ -316,6 +379,7 @@ function MainApp() {
         setActiveTab={setActiveTab}
         onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenQuickScan={() => setIsQuickCheckinOpen(true)}
+        onOpenMenuModal={handleOpenMenuModal}
       />
 
       {/* PWA & Mobile Auto-Updater */}

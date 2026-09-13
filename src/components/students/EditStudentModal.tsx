@@ -79,6 +79,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
         totalClassesAttended: student.totalClassesAttended ?? 0,
         ageCategory: student.ageCategory,
         weightCategory: student.weightCategory,
+        billingType: student.billingType || 'MENSALIDADE',
         planName: student.planName,
         planPrice: student.planPrice,
         paymentDueDateDay: student.paymentDueDateDay,
@@ -633,39 +634,70 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
             </div>
           </div>
 
-          {/* Plan & Payment Details (Admin/Professor only) */}
+          {/* Plan & Payment Details (Admin/Professor only - Oculto para o Aluno) */}
           {!isStudentUser && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800">
-              <div>
-                <label className="text-slate-300 font-bold block mb-1">Plano da Academia</label>
-                <input
-                  type="text"
-                  value={formData.planName || ''}
-                  onChange={e => setFormData({ ...formData, planName: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                />
+            <div className="pt-3 border-t border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Condições Financeiras
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                  🔒 Invisível para o Aluno
+                </span>
               </div>
 
-              <div>
-                <label className="text-slate-300 font-bold block mb-1">Valor da Mensalidade (R$)</label>
-                <input
-                  type="number"
-                  value={formData.planPrice ?? 150}
-                  onChange={e => setFormData({ ...formData, planPrice: Number(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 text-xs">Modalidade</label>
+                  <select
+                    value={formData.billingType || 'MENSALIDADE'}
+                    onChange={e => {
+                      const newType = e.target.value as 'MENSALIDADE' | 'PERSONAL' | 'BOLSISTA';
+                      setFormData(prev => ({
+                        ...prev,
+                        billingType: newType,
+                        planPrice: newType === 'BOLSISTA' ? 0 : (prev.planPrice || 150),
+                      }));
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 font-semibold focus:ring-2 focus:ring-amber-500 outline-none"
+                  >
+                    <option value="MENSALIDADE">🥋 Mensalidade Padrão</option>
+                    <option value="PERSONAL">⭐ Personal Trainer</option>
+                    <option value="BOLSISTA">🎖️ Bolsista (Isento)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="text-slate-300 font-bold block mb-1">Dia do Vencimento</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={28}
-                  value={formData.paymentDueDateDay ?? 10}
-                  onChange={e => setFormData({ ...formData, paymentDueDateDay: Number(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                />
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 text-xs">Plano da Academia</label>
+                  <input
+                    type="text"
+                    value={formData.planName || ''}
+                    onChange={e => setFormData({ ...formData, planName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 text-xs">Valor (R$)</label>
+                  <input
+                    type="number"
+                    value={formData.planPrice ?? 0}
+                    onChange={e => setFormData({ ...formData, planPrice: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 text-xs">Dia do Vencimento</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={formData.paymentDueDateDay ?? 10}
+                    onChange={e => setFormData({ ...formData, paymentDueDateDay: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}

@@ -31,6 +31,56 @@ export function getRoundLabel(roundNumber: number, totalRounds: number, isThirdP
 }
 
 /**
+ * Calculates the standard tournament seeding bracket positions (e.g. 1 vs 8, 4 vs 5, 3 vs 6, 2 vs 7).
+ * Follows the official IBJJF / Olympic single-elimination tournament standard where top seeds (1 & 2)
+ * are placed in opposite bracket halves, and BYEs are awarded to the highest seeds.
+ */
+export function getStandardBracketSeedPositions(bracketSize: number): number[] {
+  if (bracketSize <= 2) return [1, 2];
+  let list = [1, 2];
+  while (list.length < bracketSize) {
+    const nextList: number[] = [];
+    const sum = list.length * 2 + 1;
+    for (let i = 0; i < list.length; i += 2) {
+      nextList.push(list[i]);
+      nextList.push(sum - list[i]);
+      if (i + 1 < list.length) {
+        nextList.push(sum - list[i + 1]);
+        nextList.push(list[i + 1]);
+      }
+    }
+    list = nextList;
+  }
+  return list;
+}
+
+/**
+ * Detects whether a tournament bracket has corrupted / empty round 1 matches
+ * (e.g. both competitor1 and competitor2 undefined in round 1, which happened in old generator).
+ */
+export function isBracketCorrupted(matches?: TournamentMatch[]): boolean {
+  if (!matches || matches.length === 0) return false;
+  const round1 = matches.filter(m => m.round === 1 && !m.isThirdPlaceMatch);
+  return round1.some(m => !m.competitor1 && !m.competitor2);
+}
+
+/**
+ * Checks if a category needs repair or regeneration to official championship standards.
+ */
+export function repairCategoryBracket(category: TournamentCategory): TournamentCategory {
+  if (!isBracketCorrupted(category.matches)) {
+    return category;
+  }
+  const newMatches = generateSingleEliminationBracket(category.id, category.competitors, true);
+  return {
+    ...category,
+    matches: newMatches,
+    podium: undefined,
+    status: 'BRACKET_READY',
+  };
+}
+
+/**
  * Generates single-elimination tournament bracket matches from a list of competitors.
  */
 export function generateSingleEliminationBracket(
@@ -84,22 +134,30 @@ export function generateSingleEliminationBracket(
     });
   }
 
-  // Populate Round 1 with competitors (with seeds or default ordering)
+  // Populate Round 1 with competitors using official tournament seeding
   const round1Matches = roundMatchesMap[1];
+  const seedPositions = getStandardBracketSeedPositions(bracketSize);
+
   for (let i = 0; i < round1Matches.length; i++) {
     const match = round1Matches[i];
-    const c1 = competitors[2 * i];
-    const c2 = competitors[2 * i + 1];
+    const s1 = seedPositions[2 * i];
+    const s2 = seedPositions[2 * i + 1];
+
+    const c1 = s1 <= competitors.length ? competitors[s1 - 1] : undefined;
+    const c2 = s2 <= competitors.length ? competitors[s2 - 1] : undefined;
 
     match.competitor1 = c1;
     match.competitor2 = c2;
+    match.competitor1Seed = s1;
+    match.competitor2Seed = s2;
 
-    // Handle BYE / W.O. if competitor 2 doesn't exist
+    // Handle BYE / W.O. if one of the spots is a BYE (Awarded to top seeds per championship standard)
     if (c1 && !c2) {
       match.status = 'COMPLETED';
       match.winnerId = c1.id;
       match.winnerName = c1.name;
-      match.notes = 'Avançou por W.O. / BYE (Chave Aberta)';
+      match.notes = 'Avançou por W.O. / BYE (Cabeça de Chave)';
+      match.outcomeType = 'POINTS';
       
       // Advance to next match immediately
       if (match.nextMatchId) {
@@ -113,7 +171,8 @@ export function generateSingleEliminationBracket(
       match.status = 'COMPLETED';
       match.winnerId = c2.id;
       match.winnerName = c2.name;
-      match.notes = 'Avançou por W.O. / BYE (Chave Aberta)';
+      match.notes = 'Avançou por W.O. / BYE (Cabeça de Chave)';
+      match.outcomeType = 'POINTS';
       
       if (match.nextMatchId) {
         const nextMatch = roundMatchesMap[2]?.find(m => m.id === match.nextMatchId);
@@ -122,6 +181,8 @@ export function generateSingleEliminationBracket(
           if (match.nextMatchSlot === 2) nextMatch.competitor2 = c2;
         }
       }
+    } else if (c1 && c2) {
+      match.status = 'SCHEDULED';
     }
   }
 

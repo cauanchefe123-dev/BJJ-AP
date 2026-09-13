@@ -18,7 +18,3 @@ export const db = getFirestore(app, firebaseConfigJson.firestoreDatabaseId || '(
 export const storage = getStorage(app);
 export const auth = getAuth(app);
 
-// Authenticate anonymously so Firebase Storage accepts uploads with request.auth != null
-signInAnonymously(auth).catch((err) => {
-  console.warn('[Firebase Auth] Anonymous auth initialization:', err);
-});

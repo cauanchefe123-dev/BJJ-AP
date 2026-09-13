@@ -35,6 +35,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
     planPrice: 240,
     paymentDueDateDay: 10,
     paymentStatus: 'PENDENTE' as const,
+    billingType: 'MENSALIDADE' as 'MENSALIDADE' | 'PERSONAL' | 'BOLSISTA',
     notes: '',
   });
 
@@ -60,6 +61,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
       planPrice: 240,
       paymentDueDateDay: 10,
       paymentStatus: 'PENDENTE' as const,
+      billingType: 'MENSALIDADE' as 'MENSALIDADE' | 'PERSONAL' | 'BOLSISTA',
       notes: '',
     });
     setErrorMsg(null);
@@ -295,6 +297,29 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
                 <option value="MASTER_1">Master 1 (30-35 anos)</option>
                 <option value="MASTER_2">Master 2 (36-40 anos)</option>
                 <option value="MASTER_3+">Master 3+ (40+ anos)</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-slate-300 font-bold block text-xs">Modalidade</label>
+                <span className="text-[9px] text-amber-400 font-semibold">🔒 Oculto p/ Aluno</span>
+              </div>
+              <select
+                value={formData.billingType}
+                onChange={e => {
+                  const newType = e.target.value as 'MENSALIDADE' | 'PERSONAL' | 'BOLSISTA';
+                  setFormData(prev => ({
+                    ...prev,
+                    billingType: newType,
+                    planPrice: newType === 'BOLSISTA' ? 0 : (prev.planPrice || 240),
+                  }));
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 font-semibold focus:ring-2 focus:ring-amber-500 outline-none"
+              >
+                <option value="MENSALIDADE">🥋 Mensalidade Padrão</option>
+                <option value="PERSONAL">⭐ Personal Trainer</option>
+                <option value="BOLSISTA">🎖️ Bolsista (Isento)</option>
               </select>
             </div>
 

@@ -158,7 +158,7 @@ export const DigitalMembershipCard: React.FC<DigitalMembershipCardProps> = ({ st
               {student.qrCodeToken}
             </p>
             <p className="text-[9px] text-slate-500">
-              Válido para todas as aulas do plano {student.planName}
+              Válido para todas as aulas e treinos da academia
             </p>
           </div>
 

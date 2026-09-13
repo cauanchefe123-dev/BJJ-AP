@@ -9,23 +9,29 @@ import {
   IdCard,
   Trophy,
   Timer,
+  Menu,
+  Sparkles,
   MessageSquareQuote,
 } from 'lucide-react';
+import { MenuCategoryTab } from './NavigationMenuModal';
 
 interface BottomTabBarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenSidebar?: () => void;
   onOpenQuickScan?: () => void;
+  onOpenMenuModal?: (initialCategory?: MenuCategoryTab) => void;
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   setActiveTab,
+  onOpenSidebar,
   onOpenQuickScan,
+  onOpenMenuModal,
 }) => {
   const { currentUser } = useAuth();
-  const { students, teacherObservations } = useData();
+  const { students, teacherObservations, payments } = useData();
 
   if (!currentUser) return null;
 
@@ -34,7 +40,9 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
   if (isPendingStudent) return null;
 
-  // Contagem de observações não lidas estritamente para o aluno atual
+  // Total alert badges
+  const pendingStudentsCount = currentUser.role === 'ADMIN' ? students.filter(s => s.approvalStatus === 'PENDING').length : 0;
+  const overduePaymentsCount = currentUser.role === 'ADMIN' ? payments.filter(p => p.status === 'ATRASADO').length : 0;
   const unreadObsCount = currentUser.role === 'ALUNO' && currentStudent
     ? teacherObservations.filter(obs =>
         (obs.studentId === currentStudent.id || obs.studentId === currentUser.studentId || (obs.studentName && currentStudent.name && obs.studentName.toLowerCase() === currentStudent.name.toLowerCase())) &&
@@ -43,8 +51,17 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       ).length
     : 0;
 
+  const totalMenuBadges = pendingStudentsCount + overduePaymentsCount + unreadObsCount;
+
   // Determine bottom navigation tabs per role
-  let tabs: Array<{ id: string; label: string; icon: any; isAction?: boolean }> = [];
+  let tabs: Array<{
+    id: string;
+    label: string;
+    icon: any;
+    isAction?: boolean;
+    isMenuTrigger?: boolean;
+    defaultCategory?: MenuCategoryTab;
+  }> = [];
 
   if (currentUser.role === 'ALUNO') {
     tabs = [
@@ -52,7 +69,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       { id: 'card', label: 'Carteirinha', icon: IdCard },
       { id: 'scan-action', label: 'Presença', icon: UserCheck, isAction: true },
       { id: 'ranking', label: 'Ranking', icon: Trophy },
-      { id: 'observations', label: 'Observações', icon: MessageSquareQuote },
+      { id: 'observations', label: 'Obs Professor', icon: MessageSquareQuote },
     ];
   } else if (currentUser.role === 'PROFESSOR') {
     tabs = [
@@ -60,7 +77,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       { id: 'attendance', label: 'Presenças', icon: UserCheck },
       { id: 'scan-action', label: 'Check-in', icon: UserCheck, isAction: true },
       { id: 'timer', label: 'Tatame', icon: Timer },
-      { id: 'observations', label: 'Observações', icon: MessageSquareQuote },
+      { id: 'observations', label: 'Obs Alunos', icon: MessageSquareQuote },
     ];
   } else {
     // ADMIN
@@ -69,9 +86,22 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       { id: 'students', label: 'Alunos', icon: Users },
       { id: 'attendance', label: 'Frequência', icon: UserCheck },
       { id: 'ranking', label: 'Ranking', icon: Trophy },
-      { id: 'observations', label: 'Observações', icon: MessageSquareQuote },
+      { id: 'observations', label: 'Obs do Mestre', icon: MessageSquareQuote },
     ];
   }
+
+  const handleTabClick = (tab: typeof tabs[0]) => {
+    if (tab.isMenuTrigger) {
+      if (onOpenMenuModal) {
+        onOpenMenuModal(tab.defaultCategory || 'training');
+      } else if (onOpenSidebar) {
+        onOpenSidebar();
+      }
+      return;
+    }
+
+    setActiveTab(tab.id);
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-2 py-1.5 flex items-center justify-around lg:hidden print:hidden shadow-2xl safe-area-inset-bottom">
@@ -79,7 +109,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
 
-        if (tab.id === 'scan-action') {
+        if (tab.isAction) {
           return (
             <button
               key={tab.id}
@@ -100,7 +130,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         return (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabClick(tab)}
             className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[54px] relative ${
               isActive
                 ? 'text-amber-400 font-bold'
@@ -110,13 +140,29 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           >
             <div className="relative mb-0.5">
               <Icon className={`w-5 h-5 ${isActive ? 'text-amber-400 stroke-[2.5]' : 'text-slate-400'}`} />
-              {tab.id === 'observations' && unreadObsCount > 0 && (
+
+              {/* Menu Badge */}
+              {tab.isMenuTrigger && totalMenuBadges > 0 && (
                 <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce shadow-md">
+                  {totalMenuBadges}
+                </span>
+              )}
+
+              {/* Observations Badge */}
+              {tab.id === 'observations' && unreadObsCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce shadow-md">
                   {unreadObsCount}
                 </span>
               )}
+
+              {/* Students Badge on Alunos Tab */}
+              {tab.id === 'students' && pendingStudentsCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 shadow-md">
+                  {pendingStudentsCount}
+                </span>
+              )}
             </div>
-            <span className={`text-[10px] tracking-tight truncate max-w-[62px] ${isActive ? 'text-amber-400 font-bold' : 'font-medium'}`}>
+            <span className={`text-[10px] tracking-tight truncate max-w-[70px] ${isActive ? 'text-amber-400 font-bold' : 'font-medium'}`}>
               {tab.label}
             </span>
           </button>
@@ -125,3 +171,4 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
     </nav>
   );
 };
+

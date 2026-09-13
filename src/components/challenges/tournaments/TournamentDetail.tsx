@@ -394,6 +394,20 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
                   </>
                 )}
 
+                {activeCategory.matches && activeCategory.matches.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const nextMatch = activeCategory.matches?.find(m => m.status !== 'COMPLETED' && m.competitor1 && m.competitor2) || activeCategory.matches?.[0];
+                      if (nextMatch) setActiveMatchForScore(nextMatch);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                    title="Abrir Placar Oficial da Luta"
+                  >
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Placar da Luta 📊</span>
+                  </button>
+                )}
+
                 {canManage && (
                   <button
                     onClick={() => handleGenerateBracket(activeCategory)}
@@ -501,12 +515,26 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
               <PodiumCard podium={activeCategory.podium} categoryName={activeCategory.name} />
             )}
 
-            {/* Interactive Tournament Bracket Visualizer (List mode + Tree diagram mode with zoom) */}
+            {/* Interactive Tournament Bracket Visualizer (Official Tree diagram + Sequential List mode) */}
             <BracketViewer
               category={activeCategory}
               onSelectMatch={(match) => setActiveMatchForScore(match)}
               onQuickSelectWinner={handleQuickSelectWinner}
               onNavigateToTimer={onNavigateToTimer}
+              onRegenerateBracket={() => {
+                setConfirmDialog({
+                  isOpen: true,
+                  title: 'Alinhar Chaveamento de Campeonato',
+                  description: 'Deseja sortear e alinhar o chaveamento oficial da categoria? As regras oficiais da CBJJ/IBJJF serão aplicadas (cabeças de chave e BYEs distribuídos corretamente).',
+                  confirmText: 'Sim, Alinhar Chave',
+                  cancelText: 'Cancelar',
+                  confirmStyle: 'warning',
+                  onConfirm: () => {
+                    generateCategoryBracket(tournament.id, activeCategory.id, true);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                  },
+                });
+              }}
               canManage={canManage}
             />
           </div>
@@ -530,6 +558,8 @@ export const TournamentDetail: React.FC<TournamentDetailProps> = ({
         <TournamentMatchModal
           match={activeMatchForScore}
           matchDurationMinutes={activeCategory.matchDurationMinutes}
+          categoryName={activeCategory.name}
+          tournamentTitle={tournament.title}
           onClose={() => setActiveMatchForScore(null)}
           onSaveResult={(result) => {
             updateTournamentMatch(tournament.id, activeCategory.id, activeMatchForScore.id, result);

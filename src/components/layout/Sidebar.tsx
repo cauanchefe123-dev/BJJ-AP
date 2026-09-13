@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { DEFAULT_BLACK_GI_AVATAR, getUserAvatar, resolveStudentForUser } from '../../constants/avatar';
@@ -25,6 +25,8 @@ import {
   Sparkles,
   Swords,
   Camera,
+  CreditCard,
+  ChevronDown,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -44,6 +46,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentUser, logout } = useAuth();
   const { academyConfig, students, teacherObservations } = useData();
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    main: true,
+    training: true,
+    student: true,
+    management: true,
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
 
   if (!currentUser) return null;
 
@@ -87,57 +103,96 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const adminNav = [
-    { id: 'students', label: 'Alunos & Graduações', icon: Users, roles: ['ADMIN', 'PROFESSOR'] },
+    { id: 'students', label: 'Alunos & Matrículas', icon: Users, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'teachers', label: 'Professores & Staff', icon: UserCheck, roles: ['ADMIN', 'PROFESSOR'] },
+    { id: 'financial', label: 'Financeiro & Mensalidades', icon: CreditCard, roles: ['ADMIN'] },
     { id: 'reports', label: 'Relatórios & Métricas', icon: FileBarChart2, roles: ['ADMIN', 'PROFESSOR'] },
     { id: 'settings', label: 'Configurações', icon: Settings, roles: ['ADMIN'] },
   ];
 
-  const renderNavGroup = (title: string, items: typeof mainNav) => {
+  const renderNavGroup = (
+    key: string,
+    title: string,
+    icon: React.ElementType,
+    items: typeof mainNav
+  ) => {
     if (isPendingStudent) {
       return null;
     }
     const visible = items.filter(item => item.roles.includes(role));
     if (visible.length === 0) return null;
 
-    return (
-      <div className="space-y-1">
-        <p className="px-3 text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5 mt-4 first:mt-1">
-          {title}
-        </p>
-        {visible.map(item => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          const hasObservationBadge = item.id === 'observations' && unreadObsCount > 0;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 relative cursor-pointer group ${
-                isActive
-                  ? 'bg-slate-800/90 text-white font-bold border border-slate-700/80 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-amber-400 rounded-r-full shadow-xs"></span>
-                )}
-                <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-300'}`} />
-                <span className="truncate">{item.label}</span>
-              </div>
+    const isGroupOpen = openSections[key] ?? true;
+    const hasActiveChild = visible.some(item => item.id === activeTab);
+    const GroupIcon = icon;
 
-              {hasObservationBadge && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 shadow-md animate-pulse shrink-0">
-                  {unreadObsCount} nova{unreadObsCount > 1 ? 's' : ''}
-                </span>
-              )}
-            </button>
-          );
-        })}
+    return (
+      <div key={key} className="mb-2">
+        {/* Accordion Header */}
+        <button
+          type="button"
+          onClick={() => toggleSection(key)}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer select-none ${
+            hasActiveChild
+              ? 'text-white bg-slate-800/80 border border-slate-700/70'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <GroupIcon className={`w-4 h-4 shrink-0 ${hasActiveChild ? 'text-blue-400' : 'text-slate-400'}`} />
+            <span className="truncate uppercase tracking-wider text-[11px] font-bold">{title}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] text-slate-500 font-semibold px-1.5 py-0.5 rounded bg-slate-950/60 border border-slate-800">
+              {visible.length}
+            </span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                isGroupOpen ? 'rotate-180 text-blue-400' : ''
+              }`}
+            />
+          </div>
+        </button>
+
+        {/* Sub-items (Desce as opções quando aberto) */}
+        {isGroupOpen && (
+          <div className="mt-1 ml-3.5 pl-3 border-l-2 border-slate-800/80 space-y-1 py-1">
+            {visible.map(item => {
+              const ItemIcon = item.icon;
+              const isActive = activeTab === item.id;
+              const hasObservationBadge = item.id === 'observations' && unreadObsCount > 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer group ${
+                    isActive
+                      ? 'bg-[#0d213f] text-white font-semibold border border-blue-500/50 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <ItemIcon
+                      className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                        isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'
+                      }`}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+
+                  {hasObservationBadge && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 shadow-md animate-pulse shrink-0">
+                      {unreadObsCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -215,12 +270,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Navigation Groups */}
-          <nav className="space-y-0.5">
-            {renderNavGroup('Principal', mainNav)}
-            {renderNavGroup('Treino & Tatame', trainingNav)}
-            {renderNavGroup('Área do Atleta', studentSpecificNav)}
-            {renderNavGroup('Gestão & Configurações', adminNav)}
+          {/* Navigation Accordion Groups */}
+          <nav className="space-y-1">
+            {renderNavGroup('main', 'Dashboards & Início', LayoutDashboard, mainNav)}
+            {renderNavGroup('training', 'Treino & Tatame', Swords, trainingNav)}
+            {renderNavGroup('student', 'Área do Atleta', IdCard, studentSpecificNav)}
+            {renderNavGroup('management', 'Gestão & Administração', Shield, adminNav)}
           </nav>
         </div>
 
@@ -240,16 +295,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               } catch(e) {}
               window.location.reload();
             }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800 transition-all active:scale-98 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors cursor-pointer"
             title="Atualizar aplicativo para a versão mais recente"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
             <span>Atualizar App</span>
           </button>
 
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 transition-all active:scale-98 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-transparent hover:bg-rose-500/10 border border-rose-500/30 transition-colors cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sair do Sistema</span>

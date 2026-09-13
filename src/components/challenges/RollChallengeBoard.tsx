@@ -60,13 +60,13 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
 
   const [activeViewTab, setActiveViewTab] = useState<'BOARD' | 'TOURNAMENTS' | 'MY_CHALLENGES' | 'HISTORY' | 'STATS'>('BOARD');
 
-  // Guard: If student is on TOURNAMENTS tab but there are no tournaments with brackets, switch back to BOARD
+  // Guard: If student is on TOURNAMENTS tab, switch back to BOARD (exclusive to professors and admins)
   React.useEffect(() => {
-    if (!isProfessorOrAdmin && activeViewTab === 'TOURNAMENTS' && tournamentsWithBrackets.length === 0) {
+    if (!isProfessorOrAdmin && activeViewTab === 'TOURNAMENTS') {
       setActiveViewTab('BOARD');
       setSelectedTournament(null);
     }
-  }, [isProfessorOrAdmin, activeViewTab, tournamentsWithBrackets.length]);
+  }, [isProfessorOrAdmin, activeViewTab]);
 
   const [selectedTournament, setSelectedTournament] = useState<InternalTournament | null>(null);
   const [modalityFilter, setModalityFilter] = useState<'ALL' | 'GI' | 'NO_GI'>('ALL');
@@ -287,9 +287,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
           {[
             { id: 'BOARD', label: 'Mural do Tatame', icon: Swords, count: stats.activeChallengesCount },
             ...(isProfessorOrAdmin
-              ? [{ id: 'TOURNAMENTS', label: 'Campeonato & Chaves 🏆 (Professor)', icon: Trophy, count: tournaments.length }]
-              : tournamentsWithBrackets.length > 0
-              ? [{ id: 'TOURNAMENTS', label: 'Chaves do Campeonato 🏆', icon: Trophy, count: tournamentsWithBrackets.length }]
+              ? [{ id: 'TOURNAMENTS', label: 'Chaves de Campeonato 🏆', icon: Trophy, count: tournaments.length }]
               : []),
             { id: 'MY_CHALLENGES', label: 'Meus Desafios', icon: Users, count: myChallenges.length, alertCount: myPendingReceived.length },
             { id: 'HISTORY', label: 'Histórico de Rolas', icon: CheckCircle, count: stats.totalRolls },
@@ -369,7 +367,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
       </div>
 
       {/* Main Tab Views */}
-      {activeViewTab === 'TOURNAMENTS' ? (
+      {activeViewTab === 'TOURNAMENTS' && isProfessorOrAdmin ? (
         selectedTournament ? (
           // Find fresh tournament record from tournaments state to stay reactive to updates
           <TournamentDetail
@@ -583,7 +581,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
                   onAccept={handleAcceptChallenge}
                   onDecline={handleDeclineChallenge}
                   onOpenResultModal={(c) => setSelectedChallengeForResult(c)}
-                  onOpenTimerWithChallenge={onNavigateToTimer}
+                  onOpenTimerWithChallenge={isProfessorOrAdmin ? onNavigateToTimer : undefined}
                   onCancel={handleCancelChallenge}
                 />
               ))}

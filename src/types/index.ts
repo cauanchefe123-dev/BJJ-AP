@@ -105,6 +105,8 @@ export interface BeltChangeRequest {
   reviewedAt?: string;
 }
 
+export type BillingType = 'MENSALIDADE' | 'PERSONAL' | 'BOLSISTA';
+
 export interface Student {
   id: string;
   registrationNumber: string; // e.g. BJJ-2026-001
@@ -130,6 +132,7 @@ export interface Student {
   planPrice: number;
   paymentDueDateDay: number; // 1-28
   paymentStatus: PaymentStatus;
+  billingType?: BillingType; // Modalidade financeira: MENSALIDADE, PERSONAL, BOLSISTA (oculto para o aluno)
   lastPaymentDate?: string;
   lastGraduationDate?: string; // YYYY-MM-DD
   updatedAt?: string; // ISO string or timestamp of last change for cloud conflict resolution
@@ -177,6 +180,8 @@ export interface PaymentRecord {
   status: PaymentStatus;
   paymentMethod?: PaymentMethod;
   referenceMonth: string; // e.g. "07/2026"
+  billingType?: BillingType; // Modalidade: MENSALIDADE, PERSONAL, BOLSISTA (oculto para o aluno)
+  notes?: string;
   receiptUrl?: string;
   pixCode?: string;
 }
@@ -338,6 +343,8 @@ export interface TournamentMatch {
   bracketPosition: number; // Index in the round (0, 1, 2...)
   competitor1?: TournamentCompetitor;
   competitor2?: TournamentCompetitor;
+  competitor1Seed?: number;
+  competitor2Seed?: number;
   winnerId?: string;
   winnerName?: string;
   outcomeType?: RollOutcomeType;
@@ -413,5 +420,24 @@ export interface TrainingPhoto {
   fileSizeFormatted?: string; // Ex: "3.4 MB"
   dimensions?: string; // Ex: "4032 x 3024"
   uploadedBy?: string; // Nome do autor do upload
+}
+
+// Log de Auditoria Administrativa (Inativação, Reativação, Exclusão de Alunos)
+export type AuditAction = 'INACTIVATE_STUDENT' | 'REACTIVATE_STUDENT' | 'DELETE_STUDENT';
+
+export interface AuditLog {
+  id: string;
+  action: AuditAction;
+  studentId: string;
+  studentName: string;
+  studentRegistrationNumber?: string;
+  performedBy: {
+    id: string;
+    name: string;
+    role: string;
+    email?: string;
+  };
+  timestamp: string; // ISO String
+  details?: string;
 }
 

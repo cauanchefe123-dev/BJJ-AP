@@ -328,11 +328,11 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
                   Registrar Desfecho / Resultado 📝
                 </button>
 
-                {onOpenTimerWithChallenge && (
+                {onOpenTimerWithChallenge && isStaff && (
                   <button
                     onClick={() => onOpenTimerWithChallenge(challenge)}
                     className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
-                    title="Iniciar cronômetro com este confronto"
+                    title="Iniciar cronômetro com este confronto (Exclusivo Professor)"
                   >
                     <Timer className="w-4 h-4" />
                     Tatame Timer ⏱️

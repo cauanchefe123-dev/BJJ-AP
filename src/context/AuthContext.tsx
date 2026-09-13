@@ -4,8 +4,15 @@ import { INITIAL_USERS } from '../data/initialData';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import { subscribeFirestoreCollection, saveToFirestore, removeFromFirestore, deleteMatchingEntitiesFromFirestore } from '../lib/firebaseStore';
 import { markAsDeleted, isDeletedRecord } from '../lib/deletionTracker';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 
 export interface LoginResult {
   success: boolean;
@@ -17,6 +24,7 @@ export interface LoginResult {
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
+  isAuthRedirectProcessing: boolean;
   loginWithPassword: (email: string, password?: string, rememberMe?: boolean) => Promise<LoginResult> | LoginResult;
   loginWithGoogle: (rememberMe?: boolean) => Promise<LoginResult>;
   firstAccessActivate: (email: string, newPassword?: string) => { success: boolean; message: string };
@@ -107,11 +115,36 @@ const getPersistedAuthId = (): { uid: string | null; email: string | null } => {
   }
 };
 
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.innerWidth <= 820;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+  return isMobileUA || isTouch || isStandalone;
+};
+
+export const isInIframe = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true;
+  }
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [students, setStudents] = useState<Student[]>([]);
+  const [isAuthRedirectProcessing, setIsAuthRedirectProcessing] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && localStorage.getItem('bjjcron_auth_redirect_pending') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
@@ -181,6 +214,183 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubStudents();
     };
   }, []);
+
+  const handleGoogleUserSuccess = async (
+    googleUser: FirebaseUser | { email: string | null; displayName: string | null; photoURL?: string | null; uid: string },
+    rememberMe: boolean = true
+  ): Promise<LoginResult> => {
+    if (!googleUser || !googleUser.email) {
+      return {
+        success: false,
+        reason: 'INVALID_CREDENTIALS',
+        message: 'Não foi possível obter o e-mail da Conta Google selecionada.'
+      };
+    }
+
+    const cleanEmail = googleUser.email.trim().toLowerCase();
+    const googleDisplayName = googleUser.displayName || cleanEmail.split('@')[0];
+    const googlePhoto = googleUser.photoURL || undefined;
+    const googleUid = googleUser.uid;
+
+    // 1. Check if user already exists in `users` state
+    let found = users.find(u => u.email && u.email.trim().toLowerCase() === cleanEmail);
+
+    // If not found in memory, also verify Firestore directly in case snapshots are syncing
+    if (!found) {
+      try {
+        const snap = await getDoc(doc(db, 'users', `user-google-${googleUid}`));
+        if (snap.exists()) {
+          found = snap.data() as User;
+        }
+      } catch (e) {}
+    }
+
+    // 2. If not found in users state, check Firestore students collection
+    if (!found) {
+      const studentObj = students.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
+      if (studentObj) {
+        const newUser: User = {
+          id: `user-${studentObj.id}`,
+          name: studentObj.name || googleDisplayName,
+          email: cleanEmail,
+          role: 'ALUNO',
+          studentId: studentObj.id,
+          phone: studentObj.phone || '',
+          password: studentObj.password || '123',
+          approvalStatus: studentObj.approvalStatus || 'APPROVED',
+          isActivated: true,
+          authProvider: 'google',
+          googleUid: googleUid,
+          avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com'))
+            ? studentObj.photoUrl
+            : (googlePhoto || DEFAULT_BLACK_GI_AVATAR)
+        };
+        found = newUser;
+        setUsers(prev => [newUser, ...prev.filter(u => u.id !== newUser.id)]);
+        await saveToFirestore('users', newUser);
+      }
+    }
+
+    // 3. If still not found anywhere, auto-create a self-service Student account with Google
+    if (!found) {
+      const newStudentId = `std-google-${Date.now()}`;
+      const newUserId = `user-google-${Date.now()}`;
+
+      const newUser: User = {
+        id: newUserId,
+        name: googleDisplayName,
+        email: cleanEmail,
+        role: 'ALUNO',
+        studentId: newStudentId,
+        phone: '',
+        approvalStatus: 'PENDING',
+        isActivated: true,
+        authProvider: 'google',
+        googleUid: googleUid,
+        avatarUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR
+      };
+
+      const newStudentObj: Student = {
+        id: newStudentId,
+        registrationNumber: `BJJ-${new Date().getFullYear()}-${String(students.length + 1).padStart(3, '0')}`,
+        name: googleDisplayName,
+        email: cleanEmail,
+        phone: '',
+        birthDate: '2000-01-01',
+        photoUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR,
+        belt: 'BRANCA',
+        stripes: 0,
+        startDate: new Date().toISOString().split('T')[0],
+        totalClassesAttended: 0,
+        classesSinceLastGraduation: 0,
+        weightCategory: 'MÉDIO',
+        ageCategory: 'ADULTO',
+        active: true,
+        planName: 'Plano Mensal Padrão',
+        planPrice: 240,
+        paymentDueDateDay: 10,
+        paymentStatus: 'PENDENTE',
+        qrCodeToken: `BJJCRON-${newStudentId}`,
+        approvalStatus: 'PENDING',
+        notes: 'Cadastro criado via Autenticação Google',
+        hasActivatedAccount: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      const notifObj = {
+        id: `notif-google-${Date.now()}`,
+        title: 'Novo Aluno cadastrado via Google',
+        message: `${googleDisplayName} (${cleanEmail}) conectou-se com a Conta Google e aguarda aprovação.`,
+        date: new Date().toISOString(),
+        read: false,
+        type: 'INFO'
+      };
+
+      await saveToFirestore('users', newUser);
+      await saveToFirestore('students', newStudentObj);
+      await saveToFirestore('notifications', notifObj);
+
+      setUsers(prev => [newUser, ...prev.filter(u => u.id !== newUser.id)]);
+      found = newUser;
+    } else {
+      // Correlate existing account: update provider, UID and photo without overwriting customized photos
+      const updatedUser: User = {
+        ...found,
+        authProvider: 'google',
+        googleUid: googleUid,
+        isActivated: true,
+        avatarUrl: (found.avatarUrl && !found.avatarUrl.includes('unsplash.com') && found.avatarUrl !== DEFAULT_BLACK_GI_AVATAR)
+          ? found.avatarUrl
+          : (googlePhoto || found.avatarUrl || DEFAULT_BLACK_GI_AVATAR)
+      };
+      found = updatedUser;
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      await saveToFirestore('users', updatedUser);
+    }
+
+    persistUserSession(found, rememberMe);
+    setCurrentUser(found);
+
+    return {
+      success: true,
+      user: found,
+      message: `Autenticado com sucesso via Google como ${found.name}!`
+    };
+  };
+
+  // 2. Listener para retorno de redirecionamento do Google (especialmente celulares e PWAs)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isInIframe()) {
+      setIsAuthRedirectProcessing(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!isMounted) return;
+        if (result && result.user) {
+          console.log('[Google Auth] Sucesso no retorno do redirecionamento móvel:', result.user.email);
+          const isRemembered = localStorage.getItem('bjjcron_remember_me') !== 'false';
+          await handleGoogleUserSuccess(result.user, isRemembered);
+        }
+      })
+      .catch((err: any) => {
+        console.error('[Google Auth Redirect Error]', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          localStorage.removeItem('bjjcron_auth_redirect_pending');
+          setIsAuthRedirectProcessing(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [users, students]);
 
   const refreshUsersFromStorage = () => {
     // Pure cloud mode: real-time listeners are active automatically
@@ -256,139 +466,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      
-      const result = await signInWithPopup(auth, provider);
-      const googleUser = result.user;
 
-      if (!googleUser || !googleUser.email) {
-        return {
-          success: false,
-          reason: 'INVALID_CREDENTIALS',
-          message: 'Não foi possível obter o e-mail da Conta Google selecionada.'
-        };
-      }
+      const inIframe = isInIframe();
+      const mobile = isMobileDevice();
 
-      const cleanEmail = googleUser.email.trim().toLowerCase();
-      const googleDisplayName = googleUser.displayName || cleanEmail.split('@')[0];
-      const googlePhoto = googleUser.photoURL || undefined;
-      const googleUid = googleUser.uid;
-
-      // 1. Check if user already exists in `users` state
-      let found = users.find(u => u.email && u.email.trim().toLowerCase() === cleanEmail);
-
-      // 2. If not found in users state, check Firestore students collection
-      if (!found) {
-        const studentObj = students.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
-        if (studentObj) {
-          const newUser: User = {
-            id: `user-${studentObj.id}`,
-            name: studentObj.name || googleDisplayName,
-            email: cleanEmail,
-            role: 'ALUNO',
-            studentId: studentObj.id,
-            phone: studentObj.phone || '',
-            password: studentObj.password || '123',
-            approvalStatus: studentObj.approvalStatus || 'APPROVED',
-            isActivated: true,
-            authProvider: 'google',
-            googleUid: googleUid,
-            avatarUrl: (studentObj.photoUrl && !studentObj.photoUrl.includes('unsplash.com'))
-              ? studentObj.photoUrl
-              : (googlePhoto || DEFAULT_BLACK_GI_AVATAR)
+      // No celular (e fora do iframe de preview), o signInWithRedirect é a solução 100% nativa e à prova de falhas
+      // contra restrições de pop-up e bloqueios de ITP em iOS Safari, Android Chrome e PWA
+      if (mobile && !inIframe) {
+        try {
+          localStorage.setItem('bjjcron_auth_redirect_pending', 'true');
+          localStorage.setItem('bjjcron_remember_me', rememberMe ? 'true' : 'false');
+          setIsAuthRedirectProcessing(true);
+          await signInWithRedirect(auth, provider);
+          return {
+            success: true,
+            message: 'Redirecionando para login seguro com o Google...'
           };
-          found = newUser;
-          setUsers(prev => [newUser, ...prev]);
-          saveToFirestore('users', newUser);
+        } catch (redirectErr: any) {
+          console.warn('[Google Auth] Redirecionamento não pôde ser iniciado, tentando popup como alternativa:', redirectErr);
+          setIsAuthRedirectProcessing(false);
+          localStorage.removeItem('bjjcron_auth_redirect_pending');
         }
       }
 
-      // 3. If still not found anywhere, auto-create a self-service Student account with Google
-      if (!found) {
-        const newStudentId = `std-google-${Date.now()}`;
-        const newUserId = `user-google-${Date.now()}`;
-
-        const newUser: User = {
-          id: newUserId,
-          name: googleDisplayName,
-          email: cleanEmail,
-          role: 'ALUNO',
-          studentId: newStudentId,
-          phone: '',
-          approvalStatus: 'PENDING',
-          isActivated: true,
-          authProvider: 'google',
-          googleUid: googleUid,
-          avatarUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR
-        };
-
-        const newStudentObj: Student = {
-          id: newStudentId,
-          registrationNumber: `BJJ-${new Date().getFullYear()}-${String(students.length + 1).padStart(3, '0')}`,
-          name: googleDisplayName,
-          email: cleanEmail,
-          phone: '',
-          birthDate: '2000-01-01',
-          photoUrl: googlePhoto || DEFAULT_BLACK_GI_AVATAR,
-          belt: 'BRANCA',
-          stripes: 0,
-          startDate: new Date().toISOString().split('T')[0],
-          totalClassesAttended: 0,
-          classesSinceLastGraduation: 0,
-          weightCategory: 'MÉDIO',
-          ageCategory: 'ADULTO',
-          active: true,
-          planName: 'Plano Mensal Padrão',
-          planPrice: 240,
-          paymentDueDateDay: 10,
-          paymentStatus: 'PENDENTE',
-          qrCodeToken: `BJJCRON-${newStudentId}`,
-          approvalStatus: 'PENDING',
-          notes: 'Cadastro criado via Autenticação Google',
-          hasActivatedAccount: true,
-          updatedAt: new Date().toISOString()
-        };
-
-        const notifObj = {
-          id: `notif-google-${Date.now()}`,
-          title: 'Novo Aluno cadastrado via Google',
-          message: `${googleDisplayName} (${cleanEmail}) conectou-se com a Conta Google e aguarda aprovação.`,
-          date: new Date().toISOString(),
-          read: false,
-          type: 'INFO'
-        };
-
-        saveToFirestore('users', newUser);
-        saveToFirestore('students', newStudentObj);
-        saveToFirestore('notifications', notifObj);
-
-        setUsers(prev => [newUser, ...prev]);
-        found = newUser;
-      } else {
-        // Correlate existing account: update provider, UID and photo without overwriting customized photos
-        const updatedUser: User = {
-          ...found,
-          authProvider: 'google',
-          googleUid: googleUid,
-          isActivated: true,
-          avatarUrl: (found.avatarUrl && !found.avatarUrl.includes('unsplash.com') && found.avatarUrl !== DEFAULT_BLACK_GI_AVATAR)
-            ? found.avatarUrl
-            : (googlePhoto || found.avatarUrl || DEFAULT_BLACK_GI_AVATAR)
-        };
-        found = updatedUser;
-        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-        saveToFirestore('users', updatedUser);
+      // No Desktop ou dentro do iframe, utiliza signInWithPopup
+      let result;
+      try {
+        result = await signInWithPopup(auth, provider);
+      } catch (popupErr: any) {
+        // Se o popup for bloqueado no navegador (ex: bloqueador ativo no celular ou desktop fora de iframe)
+        if (
+          !inIframe &&
+          (popupErr.code === 'auth/popup-blocked' ||
+           popupErr.code === 'auth/cancelled-popup-request' ||
+           popupErr.code === 'auth/operation-not-supported-in-this-environment')
+        ) {
+          console.log('[Google Auth] Popup bloqueado, redirecionando para login seguro...');
+          localStorage.setItem('bjjcron_auth_redirect_pending', 'true');
+          localStorage.setItem('bjjcron_remember_me', rememberMe ? 'true' : 'false');
+          setIsAuthRedirectProcessing(true);
+          await signInWithRedirect(auth, provider);
+          return {
+            success: true,
+            message: 'Redirecionando para login seguro com o Google...'
+          };
+        }
+        throw popupErr;
       }
 
-      persistUserSession(found, rememberMe);
-      setCurrentUser(found);
-
-      return {
-        success: true,
-        user: found,
-        message: `Autenticado com sucesso via Google como ${found.name}!`
-      };
+      const googleUser = result.user;
+      return await handleGoogleUserSuccess(googleUser, rememberMe);
     } catch (err: any) {
       console.error('[Google Auth Error]', err);
+      setIsAuthRedirectProcessing(false);
+      localStorage.removeItem('bjjcron_auth_redirect_pending');
+
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
         return {
           success: false,
@@ -400,13 +532,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return {
           success: false,
           reason: 'INVALID_CREDENTIALS',
-          message: 'A janela pop-up do Google foi bloqueada pelo navegador. Permita pop-ups para fazer login.'
+          message: 'A janela pop-up do Google foi bloqueada pelo navegador do celular. Permita pop-ups ou tente novamente.'
+        };
+      }
+      if (err.code === 'auth/unauthorized-domain') {
+        return {
+          success: false,
+          reason: 'INVALID_CREDENTIALS',
+          message: 'Domínio da aplicação não autorizado no console do Firebase.'
         };
       }
       return {
         success: false,
         reason: 'INVALID_CREDENTIALS',
-        message: err.message || 'Falha ao autenticar com a Conta Google.'
+        message: err.message || 'Falha ao autenticar com a Conta Google no celular.'
       };
     }
   };
@@ -966,6 +1105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       currentUser,
       users,
+      isAuthRedirectProcessing,
       loginWithPassword,
       loginWithGoogle,
       firstAccessActivate,

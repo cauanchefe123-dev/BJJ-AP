@@ -48,16 +48,16 @@ export const BeltBadge: React.FC<BeltBadgeProps> = ({
   const beltName = BELT_NAMES[belt] || BELT_NAMES.BRANCA;
 
   const sizeClasses = {
-    sm: { height: 'h-6', width: 'w-24', barWidth: 'w-7', label: 'text-[11px] font-bold', stripe: 'w-1 h-3.5' },
+    sm: { height: 'h-6', width: 'w-22', barWidth: 'w-7', label: 'text-[11px] font-bold', stripe: 'w-0.5 h-3.5' },
     md: { height: 'h-7', width: 'w-32', barWidth: 'w-9', label: 'text-xs font-bold', stripe: 'w-1.5 h-4' },
     lg: { height: 'h-9', width: 'w-44', barWidth: 'w-12', label: 'text-sm font-extrabold', stripe: 'w-2 h-5' },
     xl: { height: 'h-11', width: 'w-56', barWidth: 'w-16', label: 'text-base font-extrabold', stripe: 'w-2.5 h-6' },
   }[size];
 
   return (
-    <div className="inline-flex items-center gap-1.5 shrink-0">
+    <div className="inline-flex items-center gap-2 shrink-0">
       <div
-        className={`relative flex items-center justify-between rounded-lg overflow-hidden shadow-xs border ${config.bg} ${config.border} ${sizeClasses.height} ${sizeClasses.width} shrink-0`}
+        className={`relative flex items-center justify-between rounded-md overflow-hidden shadow-xs border ${config.bg} ${config.border} ${sizeClasses.height} ${sizeClasses.width} shrink-0`}
         title={`${beltName} - ${stripes} grau(s)`}
       >
         {/* Main Belt Strap Texture / Seam details */}
@@ -75,7 +75,7 @@ export const BeltBadge: React.FC<BeltBadgeProps> = ({
           {Array.from({ length: Math.min(stripes, 4) }).map((_, i) => (
             <div
               key={i}
-              className={`bg-stone-100 rounded-xs shadow-xs ${sizeClasses.stripe}`}
+              className={`bg-white rounded-xs shadow-xs ${sizeClasses.stripe}`}
               title={`Grau ${i + 1}`}
             />
           ))}
@@ -83,7 +83,7 @@ export const BeltBadge: React.FC<BeltBadgeProps> = ({
       </div>
 
       {showLabel && (
-        <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-800/90 text-slate-300 border border-slate-700/80 tracking-tight shrink-0">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-200 tracking-tight shrink-0">
           {stripes === 0 ? 'Sem grau' : `${stripes}º Grau`}
         </span>
       )}

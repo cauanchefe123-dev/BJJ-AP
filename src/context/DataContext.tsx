@@ -23,6 +23,7 @@ import {
   TournamentCategoryStatus,
   RollOutcomeType,
   TrainingPhoto,
+  AuditLog,
 } from '../types';
 import {
   INITIAL_ACADEMY_CONFIG,
@@ -39,7 +40,12 @@ import {
   INITIAL_TOURNAMENTS,
   INITIAL_TRAINING_PHOTOS,
 } from '../data/initialData';
-import { generateSingleEliminationBracket, advanceTournamentBracket } from '../utils/bracketUtils';
+import { 
+  generateSingleEliminationBracket, 
+  advanceTournamentBracket, 
+  isBracketCorrupted, 
+  repairCategoryBracket 
+} from '../utils/bracketUtils';
 import { DEFAULT_BLACK_GI_AVATAR } from '../constants/avatar';
 import {
   subscribeFirestoreCollection,
@@ -125,6 +131,8 @@ interface DataContextType {
   dismissToastNotif: () => void;
 
   // Student Actions
+  auditLogs: AuditLog[];
+  addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>) => AuditLog;
   addStudent: (student: Omit<Student, 'id' | 'registrationNumber' | 'qrCodeToken' | 'totalClassesAttended' | 'classesSinceLastGraduation'>) => Student;
   updateStudent: (id: string, updates: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
@@ -162,6 +170,8 @@ interface DataContextType {
 
   // Payment Actions
   addPayment: (payment: Omit<PaymentRecord, 'id'>) => void;
+  updatePayment: (id: string, updates: Partial<PaymentRecord>) => void;
+  deletePayment: (paymentId: string) => void;
   markPaymentAsPaid: (paymentId: string, method: 'PIX' | 'CARTAO' | 'DINHEIRO' | 'BOLETO') => void;
   
   // Training Log Actions
@@ -293,6 +303,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tournaments, setTournaments] = useState<InternalTournament[]>([]);
   const [trainingPhotos, setTrainingPhotos] = useState<TrainingPhoto[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [academyConfig, setAcademyConfig] = useState<AcademyConfig>(INITIAL_ACADEMY_CONFIG);
 
   const [activeToastNotif, setActiveToastNotif] = useState<AppNotification | null>(null);
@@ -386,7 +397,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsubTournaments = subscribeFirestoreCollection<InternalTournament>('tournaments', (docs) => {
       const valid = docs.filter(t => !isDeletedRecord(t.id));
-      setTournaments(valid);
+      const checked = valid.map(t => {
+        let hasChanges = false;
+        const newCategories = (t.categories || []).map(cat => {
+          if (isBracketCorrupted(cat.matches)) {
+            const hasCompleted = (cat.matches || []).some(m => m.status === 'COMPLETED' && m.winnerId && m.competitor1 && m.competitor2);
+            if (!hasCompleted && cat.competitors && cat.competitors.length >= 2) {
+              hasChanges = true;
+              return repairCategoryBracket(cat);
+            }
+          }
+          return cat;
+        });
+        if (hasChanges) {
+          const updatedTournament = { ...t, categories: newCategories };
+          saveToFirestore('tournaments', updatedTournament);
+          return updatedTournament;
+        }
+        return t;
+      });
+      setTournaments(checked);
     });
 
     const unsubTrainingPhotos = subscribeFirestoreCollection<TrainingPhoto>('trainingPhotos', (docs) => {
@@ -397,6 +427,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubNotifications = subscribeFirestoreCollection<AppNotification>('notifications', (docs) => {
       const valid = docs.filter(n => !isDeletedRecord(n.id));
       setNotifications(valid);
+    });
+
+    const unsubAuditLogs = subscribeFirestoreCollection<AuditLog>('auditLogs', (docs) => {
+      const sorted = [...docs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setAuditLogs(sorted);
     });
 
     const unsubConfig = subscribeFirestoreConfig((cfg) => {
@@ -423,6 +458,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTournaments();
       unsubTrainingPhotos();
       unsubNotifications();
+      unsubAuditLogs();
       unsubConfig();
     };
   }, []);
@@ -709,6 +745,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     deleteMatchingEntitiesFromFirestore('students', ...identifiers);
     deleteMatchingEntitiesFromFirestore('users', ...identifiers);
+  };
+
+  const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp'>): AuditLog => {
+    const newLog: AuditLog = {
+      ...log,
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+    saveToFirestore('auditLogs', newLog);
+    return newLog;
   };
 
   const promoteStudent = (
@@ -1232,6 +1279,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setPayments(prev => [newPayment, ...prev]);
     saveToFirestore('payments', newPayment);
+  };
+
+  const updatePayment = (id: string, updates: Partial<PaymentRecord>) => {
+    setPayments(prev =>
+      prev.map(p => {
+        if (p.id === id) {
+          const updated = { ...p, ...updates };
+          saveToFirestore('payments', updated);
+          return updated;
+        }
+        return p;
+      })
+    );
+  };
+
+  const deletePayment = (paymentId: string) => {
+    markAsDeleted(paymentId);
+    setPayments(prev => prev.filter(p => p.id !== paymentId));
+    removeFromFirestore('payments', paymentId);
   };
 
   const markPaymentAsPaid = (paymentId: string, method: 'PIX' | 'CARTAO' | 'DINHEIRO' | 'BOLETO') => {
@@ -2112,6 +2178,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteNotification,
         requestPushPermission,
         dismissToastNotif,
+        auditLogs,
+        addAuditLog,
         addStudent,
         updateStudent,
         deleteStudent,
@@ -2133,6 +2201,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateAttendance,
         removeAttendance,
         addPayment,
+        updatePayment,
+        deletePayment,
         markPaymentAsPaid,
         addTrainingLog,
         updateTrainingLog,
