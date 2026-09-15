@@ -99,10 +99,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950"></span>
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-extrabold text-slate-100 tracking-tight truncate">
+              <h2 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight truncate font-display">
                 {tabTitles[activeTab] || 'BJJCRON'}
               </h2>
-              <p className="text-[11px] text-slate-400 hidden sm:block truncate font-medium">
+              <p className="text-[11px] text-slate-400 hidden sm:block truncate font-normal">
                 {academyConfig.fantasyName || academyConfig.name}
               </p>
             </div>
@@ -110,12 +110,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right: Quick Actions & Profile */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* Daily Attendance Modal Button for Teachers/Admins */}
           {(currentUser?.role === 'PROFESSOR' || currentUser?.role === 'ADMIN') && onOpenDailyAttendance && (
             <button
               onClick={onOpenDailyAttendance}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-xs border border-slate-800 hover:border-slate-700 transition-all active:scale-95 cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-medium text-xs border border-slate-800 hover:border-slate-700 transition-all active:scale-95 cursor-pointer shadow-xs"
               title="Ver Presenças do Dia"
             >
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -127,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenQuickScan && !(currentUser?.role === 'ALUNO' && (currentUser?.approvalStatus === 'PENDING' || currentStudent?.approvalStatus === 'PENDING')) && (
             <button
               onClick={onOpenQuickScan}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-sm shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
               title={currentUser?.role === 'ALUNO' ? 'Bater Frequência' : 'Registrar Presença'}
             >
               <UserCheck className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Bell className="w-4 h-4" />
             {unreadNotifsCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold flex items-center justify-center shadow-md">
                 {unreadNotifsCount}
               </span>
             )}
@@ -158,11 +158,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Gerenciar ou Trocar de Conta"
           >
             <div className="text-right hidden md:block">
-              <span className="text-xs font-bold text-slate-200 block truncate max-w-[130px] group-hover:text-white transition-colors">
+              <span className="text-xs font-semibold text-slate-200 block truncate max-w-[130px] group-hover:text-white transition-colors">
                 {currentUser?.name || 'Entrar'}
               </span>
-              <span className="text-[10px] text-amber-400 font-semibold flex items-center justify-end gap-1">
-                <LogIn className="w-2.5 h-2.5" />
+              <span className="text-[10px] text-slate-400 font-medium flex items-center justify-end gap-1">
+                <LogIn className="w-2.5 h-2.5 text-amber-400" />
                 {currentUser?.role === 'ADMIN' ? 'Administrador' : currentUser?.role === 'PROFESSOR' ? 'Professor' : 'Atleta'}
               </span>
             </div>
@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img
               src={userAvatar}
               alt="Avatar"
-              className="w-8 h-8 rounded-xl object-cover ring-1 ring-slate-700 group-hover:ring-amber-500/50 bg-slate-900 transition-all shadow-xs"
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-slate-700 group-hover:ring-slate-500 bg-slate-900 transition-all shadow-xs"
             />
           </button>
         </div>

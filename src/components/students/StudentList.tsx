@@ -506,7 +506,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             <thead className="bg-[#070b14] text-slate-400 font-bold uppercase text-[11px] tracking-wider border-b border-slate-800/80">
               <tr>
                 <th className="py-3.5 px-4">ATLETA & CONTATO</th>
-                <th className="py-3.5 px-3">MATRÍCULA</th>
                 <th className="py-3.5 px-3">FAIXA & GRAUS</th>
                 <th className="py-3.5 px-3">TREINOS</th>
                 <th className="py-3.5 px-3">SITUAÇÃO</th>
@@ -516,7 +515,7 @@ export const StudentList: React.FC<StudentListProps> = ({
             <tbody className="divide-y divide-slate-800/60">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-500">
+                  <td colSpan={5} className="py-10 text-center text-slate-500">
                     Nenhum atleta encontrado com os filtros aplicados.
                   </td>
                 </tr>
@@ -565,13 +564,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                           </div>
                         </div>
                       </div>
-                    </td>
-
-                    {/* Matrícula */}
-                    <td className="py-4 px-3 font-mono font-bold text-amber-400 text-xs whitespace-nowrap">
-                      <span className="px-2 py-1 rounded bg-[#070b14] border border-slate-800">
-                        {s.registrationNumber}
-                      </span>
                     </td>
 
                     {/* Faixa & Graus & Tempo de Treino */}

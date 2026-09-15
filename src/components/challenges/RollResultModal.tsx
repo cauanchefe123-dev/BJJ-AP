@@ -60,7 +60,41 @@ export const RollResultModal: React.FC<RollResultModalProps> = ({
   const [technicalNotes, setTechnicalNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
+  React.useEffect(() => {
+    if (challenge && isOpen) {
+      if (challenge.result) {
+        setOutcomeType(challenge.result.outcomeType || 'SUBMISSION');
+        setWinnerId(challenge.result.winnerId || '');
+        if (challenge.result.submissionTechnique) {
+          if (COMMON_BJJ_SUBMISSIONS.includes(challenge.result.submissionTechnique)) {
+            setSubmissionTechnique(challenge.result.submissionTechnique);
+            setCustomTechnique('');
+          } else {
+            setSubmissionTechnique('Outra Técnica');
+            setCustomTechnique(challenge.result.submissionTechnique);
+          }
+        }
+        setSubmissionMinute(challenge.result.submissionMinute ?? 3);
+        setScoreChallenger(challenge.result.scoreChallenger ?? 0);
+        setScoreChallenged(challenge.result.scoreChallenged ?? 0);
+        setTechnicalNotes(challenge.result.technicalNotes || '');
+      } else {
+        setOutcomeType('SUBMISSION');
+        setWinnerId('');
+        setSubmissionTechnique('Armlock da Guarda');
+        setCustomTechnique('');
+        setSubmissionMinute(3);
+        setScoreChallenger(0);
+        setScoreChallenged(0);
+        setTechnicalNotes('');
+      }
+      setErrorMsg('');
+    }
+  }, [challenge, isOpen]);
+
   if (!isOpen || !challenge) return null;
+
+  const isEditingOutcome = Boolean(challenge.result);
 
   const challengerStudent = students.find(s => s.id === challenge.challengerId);
   const challengedStudent = students.find(s => s.id === challenge.challengedId);
@@ -94,7 +128,7 @@ export const RollResultModal: React.FC<RollResultModalProps> = ({
       scoreChallenger: outcomeType === 'POINTS' ? Number(scoreChallenger) || 0 : undefined,
       scoreChallenged: outcomeType === 'POINTS' ? Number(scoreChallenged) || 0 : undefined,
       technicalNotes: technicalNotes.trim() || undefined,
-      registeredBy: currentUser?.name || 'Tatame Staff',
+      registeredBy: challenge.result?.registeredBy || currentUser?.name || 'Tatame Staff',
       registeredAt: new Date().toISOString(),
     };
 
@@ -113,7 +147,7 @@ export const RollResultModal: React.FC<RollResultModalProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-black text-slate-100 tracking-tight font-display">
-                Registrar Resultado do Rola 📝
+                {isEditingOutcome ? 'Atualizar Desfecho do Rola 📝' : 'Registrar Desfecho do Rola 📝'}
               </h3>
               <p className="text-xs text-slate-400 font-medium">
                 {challenge.challengerName} vs {challenge.challengedName || 'Adversário'}
@@ -130,6 +164,14 @@ export const RollResultModal: React.FC<RollResultModalProps> = ({
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs sm:text-sm">
+          {/* 3 Days Spotlight Notice */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs text-amber-300">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="leading-snug">
+              <strong>Destaque de 3 Dias:</strong> O desfecho deste rola ficará em exibição no <strong>Painel Geral</strong> por 3 dias para todos os atletas e professores da academia acompanharem!
+            </p>
+          </div>
+
           {errorMsg && (
             <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
@@ -349,7 +391,7 @@ export const RollResultModal: React.FC<RollResultModalProps> = ({
               className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center gap-2"
             >
               <Award className="w-4 h-4 stroke-[2.5]" />
-              Salvar Resultado 🥋
+              {isEditingOutcome ? 'Atualizar Desfecho 🥋' : 'Salvar Desfecho 🥋'}
             </button>
           </div>
         </form>

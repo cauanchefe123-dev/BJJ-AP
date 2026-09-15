@@ -2,6 +2,7 @@ import React from 'react';
 import { useData } from '../../context/DataContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
+import { RecentRollOutcomesSection } from '../challenges/RecentRollOutcomesSection';
 import { Users, Award, QrCode, TrendingUp, AlertCircle, CheckCircle, Calendar, ArrowUpRight, UserCheck, Sparkles, Shield, UserPlus, Camera } from 'lucide-react';
 import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { getLocalDateStr, getAttendanceLocalDate } from '../../utils/dateUtils';
@@ -34,12 +35,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
       <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-5 sm:p-6 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-lg relative overflow-hidden">
         <div className="space-y-1.5 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               Visão Geral do Tatame
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">
             {academyConfig.name}
           </h2>
           <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
@@ -50,7 +51,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         <div className="flex items-center gap-2.5 z-10 w-full sm:w-auto flex-wrap sm:flex-nowrap">
           <button
             onClick={() => onNavigate('gallery')}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <Camera className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Fotos do Treino</span>
@@ -121,20 +122,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
         {/* Aptos para Graduação */}
         <div 
           onClick={() => onNavigate('students')}
-          className="bg-[#0c121e] border border-slate-800/80 hover:border-amber-500/40 rounded-2xl p-5 sm:p-6 text-white space-y-3 cursor-pointer transition-all hover:scale-[1.01] shadow-md group"
+          className="bg-[#0c121e] border border-slate-800/80 hover:border-slate-700 rounded-2xl p-5 sm:p-6 text-white space-y-3 cursor-pointer transition-all hover:scale-[1.01] shadow-md group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 group-hover:text-amber-300 transition-colors">Aptos para Exame</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/25 flex items-center justify-center shadow-xs">
+            <span className="text-xs font-bold text-slate-400 group-hover:text-slate-200 transition-colors">Aptos para Exame</span>
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-amber-400 border border-slate-800 flex items-center justify-center shadow-xs">
               <Award className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight">{studentsReadyForGraduation.length}</span>
+            <span className="text-3xl sm:text-4xl font-black text-slate-100 tracking-tight">{studentsReadyForGraduation.length}</span>
             <span className="text-xs font-semibold text-slate-400">atletas qualificados</span>
           </div>
-          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-amber-400/90 font-bold">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="pt-1 flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Atingiram a meta de aulas</span>
           </div>
         </div>
@@ -142,6 +143,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, onOp
 
       {/* Student Approvals Interface */}
       <PendingStudentApprovals />
+
+      {/* Desfechos de Rolas Recentes (Destaque de 3 Dias) */}
+      <RecentRollOutcomesSection onNavigate={onNavigate} />
 
       {/* Main Grid: Belt Distribution & Graduation Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

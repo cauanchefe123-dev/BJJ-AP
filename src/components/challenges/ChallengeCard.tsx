@@ -16,7 +16,9 @@ import {
   FileText,
   UserPlus,
   AlertCircle,
-  Play
+  Play,
+  Edit3,
+  Settings2
 } from 'lucide-react';
 import { formatDateBR } from '../../utils/dateUtils';
 
@@ -32,6 +34,7 @@ interface ChallengeCardProps {
   onAccept: (challengeId: string) => void;
   onDecline: (challengeId: string) => void;
   onOpenResultModal: (challenge: RollChallenge) => void;
+  onEditChallenge?: (challenge: RollChallenge) => void;
   onOpenTimerWithChallenge?: (challenge: RollChallenge) => void;
   onCancel: (challengeId: string) => void;
 }
@@ -48,6 +51,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
   onAccept,
   onDecline,
   onOpenResultModal,
+  onEditChallenge,
   onOpenTimerWithChallenge,
   onCancel,
 }) => {
@@ -65,35 +69,31 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
 
   // Rule labels
   const rulesLabels: Record<string, { label: string; bg: string; text: string }> = {
-    ESTUDO_LEVE: { label: 'Rola de Estudo / Solto', bg: 'bg-emerald-500/15 border-emerald-500/30', text: 'text-emerald-400' },
-    SUBMISSION_ONLY: { label: 'Submission Only (Finalização)', bg: 'bg-red-500/15 border-red-500/30', text: 'text-red-400' },
-    PONTOS_IBJJF: { label: 'Regras IBJJF (Pontos)', bg: 'bg-amber-500/15 border-amber-500/30', text: 'text-amber-400' },
-    TEMPO_LIVRE: { label: 'Treino Livre', bg: 'bg-blue-500/15 border-blue-500/30', text: 'text-blue-400' },
+    ESTUDO_LEVE: { label: 'Rola de Estudo', bg: 'bg-slate-900 border-slate-800', text: 'text-slate-300' },
+    SUBMISSION_ONLY: { label: 'Submission Only', bg: 'bg-slate-900 border-slate-800', text: 'text-slate-200' },
+    PONTOS_IBJJF: { label: 'Regras IBJJF', bg: 'bg-slate-900 border-slate-800', text: 'text-slate-200' },
+    TEMPO_LIVRE: { label: 'Treino Livre', bg: 'bg-slate-900 border-slate-800', text: 'text-slate-300' },
   };
 
   const currentRule = rulesLabels[challenge.rulesType] || rulesLabels.ESTUDO_LEVE;
 
   return (
-    <div className={`relative overflow-hidden rounded-3xl border transition-all duration-200 ${
+    <div className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${
       isCompleted 
-        ? 'bg-slate-900/90 border-slate-800/80 shadow-md' 
+        ? 'bg-[#0a0f19] border-slate-800/80 shadow-md' 
         : isAccepted
-        ? 'bg-slate-900/95 border-amber-500/40 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/20'
+        ? 'bg-[#0c121e] border-slate-700 shadow-lg shadow-black/20'
         : isOpenChallenge
-        ? 'bg-slate-900/90 border-blue-500/40 shadow-lg shadow-blue-500/5'
-        : 'bg-slate-900/80 border-slate-800 shadow-md'
+        ? 'bg-[#0c121e] border-slate-800 hover:border-slate-700 shadow-md'
+        : 'bg-[#0a0f19] border-slate-800 shadow-md'
     }`}>
       {/* Top Banner Status */}
       <div className="px-5 py-3 border-b border-slate-800/80 flex items-center justify-between gap-3 flex-wrap bg-slate-950/40">
         <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-            challenge.modality === 'NO_GI'
-              ? 'bg-purple-500/15 border-purple-500/30 text-purple-300'
-              : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
-          }`}>
-            {challenge.modality === 'NO_GI' ? '🥋 No-Gi (Sem Kimono)' : '🥋 Gi (Com Kimono)'}
+          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800/90 border border-slate-700/80 text-slate-200">
+            {challenge.modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'}
           </span>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${currentRule.bg} ${currentRule.text}`}>
+          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-medium border ${currentRule.bg} ${currentRule.text}`}>
             {currentRule.label}
           </span>
         </div>
@@ -105,27 +105,28 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
           </span>
 
           {isPending && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 border border-amber-500/30 text-amber-400 animate-pulse">
+            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 border border-slate-800 text-amber-400/90 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               {isOpenChallenge ? 'Mural Aberto' : 'Pendente'}
             </span>
           )}
 
           {isAccepted && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
+            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 border border-slate-800 text-emerald-400/90 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               Casado no Tatame
             </span>
           )}
 
           {isCompleted && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-800 border border-slate-700 text-slate-300 flex items-center gap-1">
-              <Award className="w-3 h-3 text-amber-400" />
+            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-1.5">
+              <Award className="w-3 h-3 text-slate-400" />
               Finalizado
             </span>
           )}
 
           {isDeclined && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 border border-rose-500/30 text-rose-400">
+            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 border border-slate-800 text-slate-400">
               Recusado
             </span>
           )}
@@ -246,29 +247,35 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
 
         {/* Completed Match Outcome Result Banner */}
         {isCompleted && challenge.result && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 space-y-2">
+          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-400 shrink-0" />
-                <p className="text-sm font-extrabold text-white">
+                <Award className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="text-xs font-bold text-slate-100">
                   {challenge.result.winnerName ? (
-                    <>Vencedor: <span className="text-amber-400">{challenge.result.winnerName}</span></>
+                    <>Vencedor: <span className="text-white font-black">{challenge.result.winnerName}</span></>
                   ) : (
-                    <span className="text-emerald-400">Rola de Estudo / Empate Técnico</span>
+                    <span className="text-slate-200">Rola de Estudo / Empate Técnico</span>
                   )}
                 </p>
               </div>
 
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700">
-                {challenge.result.outcomeType === 'SUBMISSION' && `🥋 Finalização (${challenge.result.submissionTechnique || 'Finalização'}) aos ${challenge.result.submissionMinute || 0} min`}
-                {challenge.result.outcomeType === 'POINTS' && `⏱️ Vitória por Pontos (${challenge.result.scoreChallenger ?? 0} x ${challenge.result.scoreChallenged ?? 0})`}
-                {challenge.result.outcomeType === 'STUDY_ROUND' && `🤝 Treino de Estudo Técnico`}
-                {challenge.result.outcomeType === 'TECHNICAL_DRAW' && `🤝 Empate Técnico`}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 border border-slate-800 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  Destaque no Painel (3 dias)
+                </span>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-slate-900 text-slate-200 border border-slate-800">
+                  {challenge.result.outcomeType === 'SUBMISSION' && `Finalização (${challenge.result.submissionTechnique || 'Finalização'}) aos ${challenge.result.submissionMinute || 0} min`}
+                  {challenge.result.outcomeType === 'POINTS' && `Pontos (${challenge.result.scoreChallenger ?? 0} x ${challenge.result.scoreChallenged ?? 0})`}
+                  {challenge.result.outcomeType === 'STUDY_ROUND' && `Treino de Estudo Técnico`}
+                  {challenge.result.outcomeType === 'TECHNICAL_DRAW' && `Empate Técnico`}
+                </span>
+              </div>
             </div>
 
             {challenge.result.technicalNotes && (
-              <p className="text-xs text-slate-400 pl-7 italic">
+              <p className="text-xs text-slate-400 pl-6 italic">
                 Feedback: "{challenge.result.technicalNotes}"
               </p>
             )}
@@ -339,6 +346,30 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
                   </button>
                 )}
               </>
+            )}
+
+            {/* Completed roll outcome actions */}
+            {isCompleted && (isChallenger || isChallenged || isStaff) && (
+              <button
+                onClick={() => onOpenResultModal(challenge)}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer shadow-xs"
+                title="Editar ou atualizar o desfecho deste rola"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Atualizar Desfecho 📝
+              </button>
+            )}
+
+            {/* Edit challenge details */}
+            {onEditChallenge && (isChallenger || isStaff) && !isDeclined && !isCancelled && (
+              <button
+                onClick={() => onEditChallenge(challenge)}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-xs border border-slate-800 transition-all active:scale-95 cursor-pointer"
+                title="Atualizar detalhes do desafio (data, horário, regras, observações)"
+              >
+                <Settings2 className="w-3.5 h-3.5 text-slate-400" />
+                Atualizar Desafio
+              </button>
             )}
           </div>
 

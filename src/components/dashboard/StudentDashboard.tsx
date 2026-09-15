@@ -10,6 +10,7 @@ import { getLocalDateStr, getAttendanceLocalDate, getAttendanceLocalTime, format
 import { getStudentGraduationTarget, isStudentEligibleForGraduation, getStudentClassesSinceLastGraduation } from '../../utils/graduation';
 import { Award, QrCode, CreditCard, BookOpen, Clock, Calendar, CheckCircle, AlertTriangle, ArrowRight, Flame, Sparkles, Edit3, Shield, Target, Video, Play, Trophy, UserCheck, Swords, Camera, Download, ChevronRight } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
+import { RecentRollOutcomesSection } from '../challenges/RecentRollOutcomesSection';
 import { BJJClass } from '../../types';
 
 interface StudentDashboardProps {
@@ -74,7 +75,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
       )}
 
       {/* Student Profile Header */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-7 text-white space-y-5 shadow-lg">
+      <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-5 shadow-md">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div className="flex items-center gap-4 w-full md:w-auto">
             <img
@@ -84,15 +85,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight truncate font-display">{currentStudent.name}</h2>
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800/90 text-slate-300 border border-slate-700/80 shrink-0 font-mono">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight truncate font-display">{currentStudent.name}</h2>
+                <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 font-mono">
                   Matrícula {currentStudent.registrationNumber}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate mt-0.5 font-medium">{academyConfig.name}</p>
+              <p className="text-xs sm:text-sm text-slate-400 truncate mt-0.5 font-normal">{academyConfig.name}</p>
               <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                 <BeltBadge belt={currentStudent.belt} stripes={currentStudent.stripes} size="md" />
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-xl bg-slate-950/90 text-slate-300 border border-slate-800 flex items-center gap-1.5 shrink-0">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-950/90 text-slate-300 border border-slate-800 flex items-center gap-1.5 shrink-0">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                   {getTrainingTimeText(currentStudent.startDate, currentStudent.initialMonthsTrained)}
                 </span>
@@ -103,22 +104,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => onNavigate('card')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 shadow-xs transition-all active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700/80 shadow-xs transition-all active:scale-95 cursor-pointer"
             >
-              <QrCode className="w-4 h-4 shrink-0" />
+              <QrCode className="w-4 h-4 shrink-0 text-slate-400" />
               <span>Carteirinha</span>
             </button>
             <button
               onClick={() => onNavigate('journal')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700/80 transition-all active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700/80 transition-all active:scale-95 cursor-pointer"
             >
-              <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+              <BookOpen className="w-4 h-4 text-slate-400 shrink-0" />
               <span>Diário</span>
             </button>
             {onOpenEditModal && currentStudent && (
               <button
                 onClick={() => onOpenEditModal(currentStudent)}
-                className="p-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/80 transition-all active:scale-95 cursor-pointer shrink-0"
+                className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/80 transition-all active:scale-95 cursor-pointer shrink-0"
                 title="Editar Cadastro"
               >
                 <Edit3 className="w-4 h-4" />
@@ -128,25 +129,27 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
         </div>
 
         {/* Status de Frequência do Dia (Check-in do Atleta) */}
-        <div className="bg-slate-950/80 rounded-2xl p-4 sm:p-5 border border-slate-800/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-inner">
+        <div className="bg-slate-950/80 rounded-xl p-4 sm:p-4.5 border border-slate-800/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3.5">
-            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-base shrink-0 ${
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shrink-0 ${
               todayAttendance
-                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
-                : 'bg-amber-500/15 border border-amber-500/30 text-amber-400 animate-pulse'
+                ? 'bg-slate-900 border border-slate-800 text-emerald-400'
+                : 'bg-slate-900 border border-slate-800 text-amber-400'
             }`}>
-              {todayAttendance ? <CheckCircle className="w-5 h-5 stroke-[2.5]" /> : <UserCheck className="w-5 h-5 stroke-[2.5]" />}
+              {todayAttendance ? <CheckCircle className="w-5 h-5 stroke-[2]" /> : <UserCheck className="w-5 h-5 stroke-[2]" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-200">Presença do Dia ({formatDateBR(todayStr)})</span>
+                <span className="text-xs font-semibold text-slate-200">Presença do Dia ({formatDateBR(todayStr)})</span>
                 {todayAttendance ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
-                    ✓ CONFIRMADA
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-900 text-slate-300 border border-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Confirmada
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
-                    NÃO REGISTRADA
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-900 text-slate-400 border border-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    Não Registrada
                   </span>
                 )}
               </div>
@@ -161,7 +164,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           {!todayAttendance && onOpenCheckin && (
             <button
               onClick={onOpenCheckin}
-              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-95"
             >
               <UserCheck className="w-4 h-4 stroke-[2.5]" />
               <span>Bater Presença Agora</span>
@@ -174,13 +177,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div 
           onClick={() => onNavigate('ranking')}
-          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
+          className="bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 rounded-2xl p-4.5 sm:p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Posição da Semana</span>
-            <Trophy className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold text-slate-400">Posição da Semana</span>
+            <Trophy className="w-4 h-4 text-slate-400" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-300">
+          <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
             #{myWeekItem?.rank || '-'}
           </p>
           <p className="text-[11px] text-slate-400 truncate">
@@ -190,13 +193,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
 
         <div 
           onClick={() => onNavigate('ranking')}
-          className="bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
+          className="bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 rounded-2xl p-4.5 sm:p-5 text-white space-y-2 cursor-pointer transition-all hover:scale-[1.01] shadow-md"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Posição do Mês</span>
-            <Flame className="w-4 h-4 text-amber-500" />
+            <span className="text-xs font-semibold text-slate-400">Posição do Mês</span>
+            <Flame className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-400">
+          <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
             #{myMonthItem?.rank || '-'}
           </p>
           <p className="text-[11px] text-slate-400 truncate">
@@ -204,17 +207,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           </p>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white space-y-2 shadow-md">
-          <span className="text-xs font-bold text-slate-400 block">Total de Treinos</span>
-          <p className="text-2xl sm:text-3xl font-black text-slate-100">
+        <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4.5 sm:p-5 text-white space-y-2 shadow-md">
+          <span className="text-xs font-semibold text-slate-400 block">Total de Treinos</span>
+          <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
             {getStudentTotalClasses(currentStudent, attendances)}
           </p>
-          <p className="text-[11px] text-emerald-400 font-semibold truncate">Presenças no tatame</p>
+          <p className="text-[11px] text-slate-400 font-medium truncate">Presenças no tatame</p>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 text-white space-y-2 shadow-md">
-          <span className="text-xs font-bold text-slate-400 block">Tempo de Treino</span>
-          <p className="text-lg sm:text-xl font-black text-amber-300 truncate">
+        <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4.5 sm:p-5 text-white space-y-2 shadow-md">
+          <span className="text-xs font-semibold text-slate-400 block">Tempo de Treino</span>
+          <p className="text-lg sm:text-xl font-bold text-slate-200 truncate">
             {getTrainingTimeText(currentStudent.startDate, currentStudent.initialMonthsTrained)}
           </p>
           <p className="text-[11px] text-slate-400 truncate">Jornada acumulada</p>
@@ -239,18 +242,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
         const lastGradDateFormatted = lastGrad?.promotedAt ? formatDateBR(lastGrad.promotedAt) : (currentStudent.lastGraduationDate ? formatDateBR(currentStudent.lastGraduationDate) : formatDateBR(currentStudent.startDate));
 
         return (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800/90 hover:border-amber-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-xl space-y-4">
+          <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400 shrink-0 shadow-xs">
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+                  <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
                     {isTeacherOrAdmin ? 'Evolução & Treinos Pós-Grau' : 'Sua Graduação & Frequência'}
                     {isTeacherOrAdmin && isEligible && (
-                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
-                        ✓ Apto para Exame
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-900 text-emerald-400 border border-slate-800 uppercase flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        Apto para Exame
                       </span>
                     )}
                   </h3>
@@ -264,10 +268,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
                 <BeltBadge belt={currentStudent.belt} stripes={currentStudent.stripes} size="sm" />
                 <button
                   onClick={() => onNavigate('graduations')}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/80 transition-all flex items-center gap-1 cursor-pointer"
                 >
                   <span>Ver Passaporte</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                 </button>
               </div>
             </div>
@@ -333,18 +337,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
         if (!latestPhoto) return null;
 
         return (
-          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-xl space-y-4 relative overflow-hidden">
+          <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4 relative overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                  <Camera className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shrink-0">
+                  <Camera className="w-5 h-5 text-slate-400" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-base text-slate-100">
-                      Foto do Treino Oficial 📸
+                    <h3 className="font-bold text-base sm:text-lg text-slate-100 tracking-tight">
+                      Foto Oficial do Treino
                     </h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
                       Alta Definição
                     </span>
                   </div>
@@ -356,7 +360,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
 
               <button
                 onClick={() => onNavigate('gallery')}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
               >
                 <span>Ver Mural Completo</span>
                 <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
@@ -366,21 +370,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
               <div
                 onClick={() => onNavigate('gallery')}
-                className="sm:col-span-4 aspect-16/10 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group relative"
+                className="sm:col-span-4 aspect-16/10 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group relative"
               >
                 <img
                   src={latestPhoto.photoUrl}
                   alt={latestPhoto.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold">
                   Ampliar Imagem
                 </div>
               </div>
 
               <div className="sm:col-span-8 space-y-3">
                 <div>
-                  <h4 className="font-black text-slate-100 text-sm">{latestPhoto.title}</h4>
+                  <h4 className="font-bold text-slate-100 text-sm">{latestPhoto.title}</h4>
                   {latestPhoto.caption && (
                     <p className="text-xs text-slate-300 mt-1 line-clamp-2">
                       "{latestPhoto.caption}"
@@ -395,10 +399,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
                   <a
                     href={latestPhoto.photoUrl}
                     download={`treino_${latestPhoto.date}.jpg`}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs inline-flex items-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                    className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs inline-flex items-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
                   >
                     <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>Baixar Foto em Alta Resolução (Original)</span>
+                    <span>Baixar Foto em Alta Resolução</span>
                   </a>
                 </div>
               </div>
@@ -406,6 +410,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           </div>
         );
       })()}
+
+      {/* Desfechos de Rolas no Tatame (Destaque de 3 Dias no Painel Geral) */}
+      <RecentRollOutcomesSection onNavigate={onNavigate} />
 
       {/* Desafios de Rola no Tatame */}
       {(() => {
@@ -415,15 +422,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
         const openChallenges = rollChallenges.filter(c => c.status === 'PENDING' && c.isPublicOpenChallenge && c.challengerId !== studentId);
 
         return (
-          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-white space-y-4 shadow-lg relative overflow-hidden">
+          <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-4 shadow-md relative overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-lg shadow-sm shrink-0">
-                  <Swords className="w-5 h-5 stroke-[2.5]" />
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shrink-0">
+                  <Swords className="w-5 h-5 text-amber-400 stroke-[2]" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-                    Desafios de Rola no Tatame 🥋
+                  <h3 className="font-bold text-base sm:text-lg text-slate-100 flex items-center gap-2 tracking-tight">
+                    Desafios de Rola no Tatame
                   </h3>
                   <p className="text-xs text-slate-400">
                     Desafie colegas, participe de rolas de estudo ou aceite confrontos do mural.
@@ -434,7 +441,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => onNavigate('challenges')}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Ver Todos os Desafios →</span>
@@ -444,21 +451,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
 
             {/* Quick Banner Alert if Pending Challenge for Current Student */}
             {myPending.length > 0 && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-950 to-slate-950 border border-amber-500/40 flex items-center justify-between gap-3 flex-wrap animate-pulse">
+              <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">⚔️</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
                   <div>
-                    <p className="font-extrabold text-xs text-amber-300">
+                    <p className="font-bold text-xs text-amber-300">
                       Você foi desafiado por {myPending[0].challengerName}!
                     </p>
-                    <p className="text-[11px] text-slate-300">
+                    <p className="text-[11px] text-slate-400">
                       Modalidade: {myPending[0].modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'} ({myPending[0].targetDurationMinutes} min)
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => onNavigate('challenges')}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all cursor-pointer shadow-xs"
+                  className="px-3.5 py-1.5 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs hover:bg-amber-300 transition-all cursor-pointer shadow-xs"
                 >
                   Responder Desafio
                 </button>
@@ -470,15 +477,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               {openChallenges.slice(0, 3).map(ch => (
                 <div
                   key={ch.id}
-                  className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 transition-all space-y-2.5 flex flex-col justify-between"
+                  className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all space-y-2.5 flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                      ch.modality === 'NO_GI' ? 'bg-purple-500/15 text-purple-300' : 'bg-indigo-500/15 text-indigo-300'
-                    }`}>
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700/80">
                       {ch.modality === 'NO_GI' ? 'No-Gi' : 'Com Kimono'}
                     </span>
-                    <span className="text-[10px] font-bold text-amber-400">
+                    <span className="text-[10px] font-semibold text-slate-400">
                       {ch.targetDurationMinutes} min
                     </span>
                   </div>
@@ -499,15 +504,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
 
                   <button
                     onClick={() => onNavigate('challenges')}
-                    className="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 transition-colors cursor-pointer"
+                    className="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-colors cursor-pointer"
                   >
-                    Topar Rola no Mural 🥋
+                    Topar Desafio no Mural
                   </button>
                 </div>
               ))}
 
               {openChallenges.length === 0 && myActive.length === 0 && (
-                <div className="col-span-full py-4 text-center text-xs text-slate-400 bg-slate-950/40 rounded-2xl border border-slate-800/60 p-4">
+                <div className="col-span-full py-4 text-center text-xs text-slate-400 bg-slate-950/40 rounded-xl border border-slate-800/60 p-4">
                   <p className="font-semibold text-slate-300">Nenhum desafio ativo no momento.</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">Clique em "Ver Todos os Desafios" para convidar um colega para rolar!</p>
                 </div>
@@ -518,11 +523,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
       })()}
 
       {/* Foco Técnico da Semana por Turma */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+      <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-4 shadow-md">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
           <div>
-            <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-              <Target className="w-4 h-4 text-amber-400" />
+            <h3 className="font-bold text-base sm:text-lg text-slate-100 flex items-center gap-2 tracking-tight">
+              <Target className="w-4 h-4 text-slate-400" />
               Foco Técnico da Semana
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -541,14 +546,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
           {classes.map(c => (
             <div
               key={c.id}
-              className="bg-slate-950/80 border border-slate-800/90 hover:border-amber-500/40 rounded-2xl p-4 space-y-3 transition-all shadow-xs"
+              className="bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 rounded-xl p-4 space-y-3 transition-all shadow-xs"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-amber-400 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
+                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
                   {c.time} ({c.durationMinutes} min)
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
                   {c.category}
                 </span>
               </div>
@@ -559,18 +564,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
               </div>
 
               {/* Focus Badge */}
-              <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 space-y-2">
-                <span className="text-[10px] font-black uppercase text-amber-400 block mb-0.5">
-                  🎯 Foco da Semana:
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+                <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-0.5">
+                  Foco da Semana:
                 </span>
-                <p className="text-xs font-semibold text-slate-200">
+                <p className="text-xs font-medium text-slate-200">
                   {c.weeklyFocus ? c.weeklyFocus : 'Treino geral e aperfeiçoamento de posições.'}
                 </p>
 
                 {c.weeklyFocusVideoUrl && (
                   <button
                     onClick={() => setSelectedVideoClass(c)}
-                    className="w-full py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    className="w-full py-1.5 px-3 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                   >
                     <Video className="w-4 h-4" />
                     <span>Assistir Posição</span>
@@ -584,7 +589,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate, 
       </div>
 
       {/* Digital Card Preview Box */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 shadow-lg">
+      <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 shadow-md">
         <DigitalMembershipCard student={currentStudent} />
       </div>
 

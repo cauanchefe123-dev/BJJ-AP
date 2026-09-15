@@ -6,6 +6,7 @@ import { resolveStudentForUser, getStudentAvatar } from '../../constants/avatar'
 import { ChallengeCard } from './ChallengeCard';
 import { NewChallengeModal } from './NewChallengeModal';
 import { RollResultModal } from './RollResultModal';
+import { EditChallengeModal } from './EditChallengeModal';
 import { TournamentList } from './tournaments/TournamentList';
 import { TournamentDetail } from './tournaments/TournamentDetail';
 import { BeltBadge } from '../belts/BeltBadge';
@@ -73,6 +74,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewChallengeModalOpen, setIsNewChallengeModalOpen] = useState(false);
   const [selectedChallengeForResult, setSelectedChallengeForResult] = useState<RollChallenge | null>(null);
+  const [selectedChallengeForEdit, setSelectedChallengeForEdit] = useState<RollChallenge | null>(null);
 
   // Challenges involving current student
   const myChallenges = useMemo(() => {
@@ -228,22 +230,22 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Banner */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-[#0b101b] border border-slate-800 rounded-2xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-amber-500/20 border border-amber-400 shrink-0">
-              <Swords className="w-8 h-8 stroke-[2.5]" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 font-bold text-xl shadow-sm shrink-0">
+              <Swords className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight font-display">
-                  Dinâmica de Desafios de Rola 🥋
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight font-display">
+                  Dinâmica de Desafios de Rola
                 </h2>
-                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider font-mono">
-                  Tatame Fight Match
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80 uppercase tracking-wider">
+                  Tatame Match
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl font-medium">
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl font-normal">
                 Desafie seus colegas para um rola, marque treinos específicos de estudo ou lance um desafio aberto no mural da academia.
               </p>
             </div>
@@ -253,26 +255,26 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
           <div className="flex items-center gap-3 w-full md:w-auto">
             <button
               onClick={() => setIsNewChallengeModalOpen(true)}
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer shrink-0"
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              Lançar Desafio 🥋
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              Lançar Desafio
             </button>
           </div>
         </div>
 
         {/* Quick Notification alert if pending challenges for user */}
         {myPendingReceived.length > 0 && (
-          <div className="mt-5 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 flex-wrap animate-pulse">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">⚔️</span>
-              <p className="text-xs font-bold text-amber-300">
+          <div className="mt-4 p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <p className="text-xs font-semibold text-slate-200">
                 Você tem {myPendingReceived.length} convite{myPendingReceived.length > 1 ? 's' : ''} de desafio de rola aguardando sua resposta!
               </p>
             </div>
             <button
               onClick={() => setActiveViewTab('MY_CHALLENGES')}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all cursor-pointer shadow-xs"
+              className="px-3 py-1 rounded-lg bg-slate-800 border border-slate-700 text-amber-400 font-bold text-xs hover:bg-slate-700 transition-all cursor-pointer shadow-xs"
             >
               Ver Convites →
             </button>
@@ -283,11 +285,11 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
       {/* Main Tabs Navigation & Filters */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {[
             { id: 'BOARD', label: 'Mural do Tatame', icon: Swords, count: stats.activeChallengesCount },
             ...(isProfessorOrAdmin
-              ? [{ id: 'TOURNAMENTS', label: 'Chaves de Campeonato 🏆', icon: Trophy, count: tournaments.length }]
+              ? [{ id: 'TOURNAMENTS', label: 'Campeonatos', icon: Trophy, count: tournaments.length }]
               : []),
             { id: 'MY_CHALLENGES', label: 'Meus Desafios', icon: Users, count: myChallenges.length, alertCount: myPendingReceived.length },
             { id: 'HISTORY', label: 'Histórico de Rolas', icon: CheckCircle, count: stats.totalRolls },
@@ -304,23 +306,23 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
                     setSelectedTournament(null);
                   }
                 }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer shrink-0 border ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
                   isActive
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md shadow-amber-500/10'
-                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-800/80 hover:border-slate-700'
+                    ? 'bg-slate-800 text-slate-100 border-slate-700 shadow-sm'
+                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border-slate-800/80 hover:border-slate-700'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isActive ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                    isActive ? 'bg-slate-700 text-slate-200' : 'bg-slate-800 text-slate-400'
                   }`}>
                     {tab.count}
                   </span>
                 )}
                 {tab.alertCount ? (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                 ) : null}
               </button>
             );
@@ -331,7 +333,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
         {activeViewTab !== 'STATS' && activeViewTab !== 'TOURNAMENTS' && (
           <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
             {/* Modality Filter Pills */}
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-2xl p-1 shrink-0">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 shrink-0">
               {[
                 { id: 'ALL', label: 'Todos' },
                 { id: 'GI', label: 'Gi' },
@@ -340,9 +342,9 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
                 <button
                   key={mod.id}
                   onClick={() => setModalityFilter(mod.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     modalityFilter === mod.id
-                      ? 'bg-slate-800 text-amber-400 shadow-xs'
+                      ? 'bg-slate-800 text-slate-100 shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -359,7 +361,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
                 placeholder="Buscar atleta ou turma..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-8.5 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8.5 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-700"
               />
             </div>
           </div>
@@ -581,6 +583,7 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
                   onAccept={handleAcceptChallenge}
                   onDecline={handleDeclineChallenge}
                   onOpenResultModal={(c) => setSelectedChallengeForResult(c)}
+                  onEditChallenge={(c) => setSelectedChallengeForEdit(c)}
                   onOpenTimerWithChallenge={isProfessorOrAdmin ? onNavigateToTimer : undefined}
                   onCancel={handleCancelChallenge}
                 />
@@ -595,6 +598,14 @@ export const RollChallengeBoard: React.FC<RollChallengeBoardProps> = ({
         isOpen={isNewChallengeModalOpen}
         onClose={() => setIsNewChallengeModalOpen(false)}
         challengerStudent={currentStudent}
+      />
+
+      {/* Edit Challenge Details Modal */}
+      <EditChallengeModal
+        isOpen={!!selectedChallengeForEdit}
+        onClose={() => setSelectedChallengeForEdit(null)}
+        challenge={selectedChallengeForEdit}
+        onOpenResultModal={(c) => setSelectedChallengeForResult(c)}
       />
 
       {/* Roll Result Outcome Modal */}

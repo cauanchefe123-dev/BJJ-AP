@@ -203,6 +203,7 @@ interface DataContextType {
   declineRollChallenge: (challengeId: string, reason?: string) => void;
   cancelRollChallenge: (challengeId: string) => void;
   completeRollChallenge: (challengeId: string, result: RollChallengeResult) => void;
+  updateRollChallenge: (challengeId: string, updates: Partial<RollChallenge>) => void;
   deleteRollChallenge: (challengeId: string) => void;
 
   // Campeonatos Internos & Chaveamento (In-House Tournaments & Brackets)
@@ -1670,6 +1671,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateRollChallenge = (challengeId: string, updates: Partial<RollChallenge>) => {
+    let updated: RollChallenge | null = null;
+    setRollChallenges(prev =>
+      prev.map(c => {
+        if (c.id === challengeId) {
+          updated = {
+            ...c,
+            ...updates,
+          };
+          return updated;
+        }
+        return c;
+      })
+    );
+
+    if (updated) {
+      saveToFirestore('rollChallenges', updated);
+    }
+  };
+
   const deleteRollChallenge = (id: string) => {
     setRollChallenges(prev => prev.filter(c => c.id !== id));
     removeFromFirestore('rollChallenges', id);
@@ -2223,6 +2244,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         declineRollChallenge,
         cancelRollChallenge,
         completeRollChallenge,
+        updateRollChallenge,
         deleteRollChallenge,
         tournaments,
         createTournament,

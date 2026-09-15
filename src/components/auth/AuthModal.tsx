@@ -21,7 +21,13 @@ import {
   Crown,
   Settings,
   Send,
-  Tv
+  Eye,
+  EyeOff,
+  Sparkles,
+  Timer,
+  Users,
+  Award,
+  Check
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -54,6 +60,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showFirstAccessPassword, setShowFirstAccessPassword] = useState(false);
 
   const [firstAccessEmail, setFirstAccessEmail] = useState('');
   const [firstAccessPassword, setFirstAccessPassword] = useState('');
@@ -293,36 +302,63 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 text-white space-y-6 shadow-2xl relative my-8">
+    <div className="fixed inset-0 z-50 bg-[#090b10]/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className={`w-full ${
+        activeTab === 'REGISTER' ? 'max-w-xl' : 'max-w-md'
+      } bg-slate-900 border border-slate-800/90 rounded-2xl p-6 sm:p-8 text-white space-y-6 shadow-2xl relative my-auto`}>
         {/* Close Button if user is logged in */}
         {currentUser && (
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            className="absolute top-5 right-5 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Fechar"
           >
             <X className="w-5 h-5" />
           </button>
         )}
 
         {/* Modal Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 p-0.5 mx-auto shadow-xl shadow-amber-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-amber-400">
-              <ShieldCheck className="w-8 h-8" />
+        <div className="text-center space-y-3">
+          <div className="flex flex-col items-center justify-center gap-2">
+            {/* Professional Logo Badge Container */}
+            <div className="relative group">
+              {/* Subtle ambient light glow behind logo */}
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-yellow-500/20 rounded-2xl blur-md opacity-75 group-hover:opacity-100 transition duration-500 pointer-events-none" />
+
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 p-[1.5px] shadow-2xl shadow-black/60 border border-slate-700/60 ring-1 ring-amber-400/20 flex items-center justify-center">
+                <img
+                  src="/logo.svg"
+                  alt="BJJCRON Logo do Sistema"
+                  className="w-full h-full object-contain rounded-[14px] p-1.5 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.src.endsWith('/icon-512.png')) {
+                      target.src = '/icon-512.png';
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Brand Title */}
+            <div className="mt-1">
+              <h1 className="text-2xl font-black tracking-wider text-white">
+                BJJ<span className="text-amber-400">CRON</span>
+              </h1>
             </div>
           </div>
-          <h3 className="text-2xl font-black text-slate-100 tracking-tight">
-            Portal de Cadastro & Acesso BJJCRON
-          </h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            Cadastre-se para acessar como <span className="text-amber-400 font-bold">Mestre / Administrador</span>, <span className="text-blue-400 font-bold">Professor</span> ou <span className="text-emerald-400 font-bold">Aluno</span>.
+
+          <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+            {activeTab === 'LOGIN' && 'Acesse seu painel com conta Google ou credenciais cadastradas.'}
+            {activeTab === 'REGISTER' && 'Cadastre-se na academia e comece seu acompanhamento no tatame.'}
+            {activeTab === 'FIRST_ACCESS' && 'Já foi cadastrado pelo professor? Ative seu primeiro acesso.'}
+            {activeTab === 'RECOVER' && 'Informe seu e-mail para redefinir sua senha com segurança.'}
           </p>
         </div>
 
         {/* Banner de Gerenciamento da Conta Atual */}
         {currentUser && (
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-amber-400 font-bold shrink-0">
                 <User className="w-5 h-5" />
@@ -350,7 +386,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 setFeedback({ type: res.success ? 'success' : 'error', message: res.message });
                 setActiveTab('REGISTER');
               }}
-              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md"
+              className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
               title="Excluir cadastro para recadastrar como outro perfil (Mestre, Professor ou Aluno)"
             >
               <X className="w-4 h-4 text-rose-400" />
@@ -361,53 +397,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Processamento de Retorno do Google Mobile */}
         {isAuthRedirectProcessing && (
-          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 shadow-lg">
-            <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto shadow-md" />
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center space-y-2">
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
             <div>
-              <p className="text-sm font-bold text-amber-300">Conectando Conta Google...</p>
-              <p className="text-xs text-slate-300 mt-1">
-                Finalizando autenticação móvel e sincronizando seu acesso.
+              <p className="text-xs font-bold text-amber-300">Conectando Conta Google...</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Finalizando autenticação e sincronizando seu acesso.
               </p>
             </div>
           </div>
         )}
 
-        {/* Mode Navigation Tabs */}
-        <div className="grid grid-cols-3 p-1 bg-slate-950 rounded-2xl border border-slate-800/80 text-xs font-bold">
+        {/* Mode Navigation Tabs (Segmented Control) */}
+        <div className="grid grid-cols-3 p-1 bg-slate-950 border border-slate-800/80 rounded-xl text-xs font-semibold">
           <button
-            onClick={() => { setActiveTab('REGISTER'); setFeedback(null); }}
-            className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'REGISTER'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <UserPlus className="w-4 h-4" />
-            Cadastrar
-          </button>
-
-          <button
+            type="button"
             onClick={() => { setActiveTab('LOGIN'); setFeedback(null); }}
-            className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'LOGIN'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-slate-800 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Lock className="w-4 h-4" />
-            Entrar
+            <Lock className="w-3.5 h-3.5" />
+            <span>Entrar</span>
           </button>
 
           <button
-            onClick={() => { setActiveTab('FIRST_ACCESS'); setFeedback(null); }}
-            className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'FIRST_ACCESS'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+            type="button"
+            onClick={() => { setActiveTab('REGISTER'); setFeedback(null); }}
+            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'REGISTER'
+                ? 'bg-slate-800 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <KeyRound className="w-4 h-4" />
-            1º Acesso
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Cadastrar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('FIRST_ACCESS'); setFeedback(null); }}
+            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'FIRST_ACCESS'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>1º Acesso</span>
           </button>
         </div>
 
@@ -441,50 +480,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <div className="space-y-5">
             {/* Role Choice Pills */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300 block">
-                Selecione o perfil que deseja cadastrar:
+              <label className="text-xs font-semibold text-slate-300 block">
+                Tipo de Perfil:
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedRole('ALUNO')}
-                  className={`p-3 rounded-2xl border text-left transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                  className={`py-2 px-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     selectedRole === 'ALUNO'
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-lg'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300 font-semibold'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <User className="w-5 h-5 text-emerald-400" />
-                  <span className="font-extrabold text-xs">Aluno</span>
-                  <span className="text-[10px] opacity-75">Atleta da Equipe</span>
+                  <User className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs">Aluno</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedRole('PROFESSOR')}
-                  className={`p-3 rounded-2xl border text-left transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                  className={`py-2 px-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     selectedRole === 'PROFESSOR'
-                      ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow-lg'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-blue-500/15 border-blue-500/60 text-blue-300 font-semibold'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <GraduationCap className="w-5 h-5 text-blue-400" />
-                  <span className="font-extrabold text-xs">Professor</span>
-                  <span className="text-[10px] opacity-75">Instrutor de Turma</span>
+                  <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs">Professor</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedRole('ADMIN')}
-                  className={`p-3 rounded-2xl border text-left transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                  className={`py-2 px-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     selectedRole === 'ADMIN'
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-amber-500/15 border-amber-500/60 text-amber-300 font-semibold'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <Crown className="w-5 h-5 text-amber-400" />
-                  <span className="font-extrabold text-xs">Mestre / Admin</span>
-                  <span className="text-[10px] opacity-75">Gestor / Dono</span>
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs">Mestre</span>
                 </button>
               </div>
             </div>
@@ -599,14 +635,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
                   <div>
                     <label className="text-slate-300 font-bold block mb-1">Crie sua Senha *</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={studentReg.password}
-                      onChange={e => setStudentReg({ ...studentReg, password: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showRegisterPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••"
+                        value={studentReg.password}
+                        onChange={e => setStudentReg({ ...studentReg, password: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-10 py-2.5 text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1"
+                        tabIndex={-1}
+                        title={showRegisterPassword ? 'Ocultar senha' : 'Exibir senha'}
+                      >
+                        {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -729,14 +776,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
                   <div>
                     <label className="text-slate-300 font-bold block mb-1">Crie sua Senha *</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={teacherReg.password}
-                      onChange={e => setTeacherReg({ ...teacherReg, password: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showRegisterPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••"
+                        value={teacherReg.password}
+                        onChange={e => setTeacherReg({ ...teacherReg, password: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-10 py-2.5 text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1"
+                        tabIndex={-1}
+                        title={showRegisterPassword ? 'Ocultar senha' : 'Exibir senha'}
+                      >
+                        {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -829,14 +887,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
                 <div>
                   <label className="text-slate-300 font-bold block mb-1">Crie sua Senha de Acesso *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={adminReg.password}
-                    onChange={e => setAdminReg({ ...adminReg, password: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showRegisterPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      value={adminReg.password}
+                      onChange={e => setAdminReg({ ...adminReg, password: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-10 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1"
+                      tabIndex={-1}
+                      title={showRegisterPassword ? 'Ocultar senha' : 'Exibir senha'}
+                    >
+                      {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <button
@@ -854,12 +923,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         {/* TAB 2: LOGIN WITH PASSWORD */}
         {activeTab === 'LOGIN' && (
           <div className="space-y-4 text-xs">
-            {/* Google Fast Sign-In */}
+            {/* Google Quick Sign-In */}
             <button
               type="button"
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading}
-              className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-100 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-md active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed group"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 text-slate-200 font-semibold text-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isGoogleLoading ? (
                 <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -883,20 +952,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   />
                 </svg>
               )}
-              <span>{isGoogleLoading ? 'Conectando ao Google...' : 'Entrar com a Conta Google'}</span>
+              <span>{isGoogleLoading ? 'Conectando ao Google...' : 'Continuar com o Google'}</span>
             </button>
 
             <div className="relative flex items-center justify-center my-3">
               <div className="border-t border-slate-800 w-full" />
-              <span className="bg-slate-900 px-3 text-[10px] text-slate-500 font-bold tracking-wider uppercase whitespace-nowrap">
-                ou com e-mail e senha
+              <span className="bg-slate-900 px-3 text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                ou continue com e-mail
               </span>
               <div className="border-t border-slate-800 w-full" />
             </div>
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="text-slate-300 font-bold block mb-1">E-mail Cadastrado</label>
+                <label className="text-slate-300 font-semibold text-xs block mb-1.5">E-mail Cadastrado</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -905,14 +974,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     placeholder="seu.email@exemplo.com"
                     value={loginEmail}
                     onChange={e => setLoginEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 text-xs focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-slate-300 font-bold block">Senha de Acesso</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-semibold text-xs block">Senha de Acesso</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -921,41 +990,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       setRecoveryEmail(loginEmail);
                       setFeedback(null);
                     }}
-                    className="text-amber-400 hover:text-amber-300 font-semibold underline text-[11px] transition-colors"
+                    className="text-amber-400 hover:text-amber-300 font-medium text-[11px] transition-colors"
                   >
-                    Esqueci minha senha
+                    Esqueceu a senha?
                   </button>
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={loginPassword}
                     onChange={e => setLoginPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-slate-100 text-xs focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1 cursor-pointer"
+                    tabIndex={-1}
+                    title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between py-0.5">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 font-medium select-none">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-400 font-medium select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={e => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500"
                   />
-                  <span>Manter-me conectado neste dispositivo</span>
+                  <span>Lembrar neste dispositivo</span>
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs shadow-sm transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
               >
-                Entrar com E-mail
+                <span>Acessar Plataforma</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -994,21 +1072,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showFirstAccessPassword ? 'text' : 'password'}
                   required
                   placeholder="Digite sua senha"
                   value={firstAccessPassword}
                   onChange={e => setFirstAccessPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowFirstAccessPassword(!showFirstAccessPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1"
+                  tabIndex={-1}
+                  title={showFirstAccessPassword ? 'Ocultar senha' : 'Exibir senha'}
+                >
+                  {showFirstAccessPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
             >
-              Ativar Minha Conta & Entrar
+              <span>Ativar Minha Conta & Entrar</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         )}
@@ -1178,14 +1266,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
-                      type="password"
+                      type={showFirstAccessPassword ? 'text' : 'password'}
                       required
                       minLength={3}
                       placeholder="Digite sua nova senha"
                       value={recoveryNewPassword}
                       onChange={e => setRecoveryNewPassword(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-slate-100 focus:ring-2 focus:ring-amber-500 outline-none"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowFirstAccessPassword(!showFirstAccessPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1"
+                      tabIndex={-1}
+                      title={showFirstAccessPassword ? 'Ocultar senha' : 'Exibir senha'}
+                    >
+                      {showFirstAccessPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -1213,17 +1310,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         )}
-
-        {/* Atalho para Smart TV / Placar do Tatame sem login */}
-        <div className="pt-4 border-t border-slate-800 text-center">
-          <a
-            href="/?tv=true&tatame=tatame_1"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all w-full sm:w-auto"
-          >
-            <Tv className="w-4 h-4 text-cyan-400" />
-            <span>📺 Abrir Placar do Tatame na Smart TV (Sem Login)</span>
-          </a>
-        </div>
       </div>
     </div>
   );

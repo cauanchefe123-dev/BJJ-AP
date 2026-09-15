@@ -117,7 +117,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
               className="flex flex-col items-center justify-center -mt-5 relative group cursor-pointer focus:outline-none"
               title="Bater Frequência"
             >
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 border-2 border-slate-950 active:scale-95 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-black/40 border-2 border-slate-950 active:scale-95 transition-all">
                 <Icon className="w-6 h-6 stroke-[2.5]" />
               </div>
               <span className="text-[10px] font-bold text-amber-400 mt-0.5 tracking-tight">
@@ -131,7 +131,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           <button
             key={tab.id}
             onClick={() => handleTabClick(tab)}
-            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[54px] relative ${
+            className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer min-w-[50px] relative ${
               isActive
                 ? 'text-amber-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
@@ -143,26 +143,26 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
               {/* Menu Badge */}
               {tab.isMenuTrigger && totalMenuBadges > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce shadow-md">
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-400 text-slate-950 text-[9px] font-bold flex items-center justify-center ring-2 ring-slate-950 shadow-xs">
                   {totalMenuBadges}
                 </span>
               )}
 
               {/* Observations Badge */}
               {tab.id === 'observations' && unreadObsCount > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce shadow-md">
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-slate-950 shadow-xs">
                   {unreadObsCount}
                 </span>
               )}
 
               {/* Students Badge on Alunos Tab */}
               {tab.id === 'students' && pendingStudentsCount > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center ring-2 ring-slate-950 shadow-md">
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-400 text-slate-950 text-[9px] font-bold flex items-center justify-center ring-2 ring-slate-950 shadow-xs">
                   {pendingStudentsCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-tight truncate max-w-[70px] ${isActive ? 'text-amber-400 font-bold' : 'font-medium'}`}>
+            <span className={`text-[10px] tracking-tight truncate max-w-[65px] ${isActive ? 'text-amber-400 font-bold' : 'font-medium'}`}>
               {tab.label}
             </span>
           </button>

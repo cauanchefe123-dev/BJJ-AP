@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BeltBadge } from '../belts/BeltBadge';
 import { PendingStudentApprovals } from '../students/PendingStudentApprovals';
+import { RecentRollOutcomesSection } from '../challenges/RecentRollOutcomesSection';
 import { QrCode, CalendarDays, Award, Users, CheckCircle, Flame, Clock, Megaphone, Send, X, Sparkles, Target, Edit3, Video, Play, Loader2, ArrowUpRight, UserCheck, Camera } from 'lucide-react';
 import { TechniqueVideoModal } from '../common/TechniqueVideoModal';
 import { EditAttendanceModal } from '../attendance/EditAttendanceModal';
@@ -72,49 +73,49 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
   return (
     <div className="space-y-6">
       {/* Teacher Banner */}
-      <div className="bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-950 border border-slate-800/90 rounded-3xl p-6 sm:p-7 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-lg">
-        <div className="space-y-1.5">
+      <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-5 sm:p-6 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-lg relative overflow-hidden">
+        <div className="space-y-1.5 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               Painel do Mestre
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight font-display">
             Controle de Tatame e Treinos
           </h2>
-          <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-400 max-w-xl leading-relaxed mt-1">
             Realize chamadas rápidas, acompanhe a evolução técnica dos atletas e agende graduações.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto z-10">
           <button
             onClick={() => onNavigate('gallery')}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/10 transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <Camera className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Fotos do Treino</span>
           </button>
           <button
             onClick={() => setIsNoticeModalOpen(true)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
           >
             <Megaphone className="w-4 h-4 text-amber-400 stroke-[2.5]" />
             <span>Disparar Comunicado</span>
           </button>
           <button
             onClick={onOpenCheckin}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer active:scale-95"
           >
             <UserCheck className="w-4 h-4 text-slate-400" />
             <span>Registrar Presença</span>
           </button>
           <button
             onClick={() => onNavigate('timer')}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 transition-all cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700/80 transition-all cursor-pointer active:scale-95"
           >
-            <Flame className="w-4 h-4" />
+            <Flame className="w-4 h-4 text-amber-400" />
             <span>Cronômetro</span>
           </button>
         </div>
@@ -124,11 +125,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       <PendingStudentApprovals />
 
       {/* Classes Schedule */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+      <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-4 shadow-md">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
           <div>
-            <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-amber-400" />
+            <h3 className="font-bold text-base sm:text-lg text-slate-100 flex items-center gap-2 tracking-tight">
+              <CalendarDays className="w-4 h-4 text-slate-400" />
               Turmas Cadastradas
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">Horários, categorias de aula e foco técnico semanal</p>
@@ -209,10 +210,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
       </div>
 
       {/* Recent Presences Today */}
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+      <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-4 shadow-md">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
           <div>
-            <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+            <h3 className="font-bold text-base sm:text-lg text-slate-100 flex items-center gap-2 tracking-tight">
               <CheckCircle className="w-4 h-4 text-emerald-400" />
               Presenças Registradas Hoje ({todayAttendances.length})
             </h3>
@@ -227,7 +228,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
         </div>
 
         {todayAttendances.length === 0 ? (
-          <div className="p-8 text-center bg-slate-950/50 rounded-2xl border border-slate-800/60">
+          <div className="p-8 text-center bg-slate-950/50 rounded-xl border border-slate-800/60">
             <p className="text-xs text-slate-400">Nenhum check-in de atleta realizado hoje até o momento.</p>
           </div>
         ) : (
@@ -235,7 +236,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
             {todayAttendances.map(a => {
               const student = students.find(s => s.id === a.studentId);
               return (
-                <div key={a.id} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs hover:border-slate-700 transition-all">
+                <div key={a.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between shadow-xs hover:border-slate-700 transition-all">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img src={student?.photoUrl} alt={a.studentName} className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0" />
                     <div className="min-w-0">
@@ -244,12 +245,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
                       {getAttendanceLocalTime(a)}
                     </span>
                     <button
                       onClick={() => setEditingAttendance(a)}
-                      className="p-1 rounded-lg bg-slate-900 hover:bg-amber-950/80 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer"
+                      className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-all cursor-pointer"
                       title="Editar / Alterar Presença"
                     >
                       <Edit3 className="w-3 h-3" />
@@ -262,16 +263,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate, 
         )}
       </div>
 
+      {/* Desfechos de Rolas no Tatame (Destaque de 3 Dias) */}
+      <RecentRollOutcomesSection onNavigate={onNavigate} />
+
       {/* Aptos a Graduar */}
       {(() => {
         const studentsReadyForGraduation = students.filter(s =>
           isStudentEligibleForGraduation(s, academyConfig, attendances, graduations)
         );
         return (
-          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 text-white space-y-4 shadow-lg">
+          <div className="bg-[#0c121e] border border-slate-800/90 rounded-2xl p-5 sm:p-6 text-white space-y-4 shadow-md">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
               <div>
-                <h3 className="font-extrabold text-base text-slate-100 flex items-center gap-2">
+                <h3 className="font-bold text-base sm:text-lg text-slate-100 flex items-center gap-2 tracking-tight">
                   <Award className="w-4 h-4 text-amber-400" />
                   Alunos Aptos a Graduar ({studentsReadyForGraduation.length})
                 </h3>
